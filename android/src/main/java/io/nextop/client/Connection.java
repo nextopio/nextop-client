@@ -5,12 +5,16 @@ import android.support.annotation.Nullable;
 import rx.Observable;
 
 public interface Connection {
+    String getHost();
+
     Message send(Path p, Message m, @Nullable SendOptions opts);
     Observable<Message> receive(Path p, @Nullable ReceiveOptions opts);
     void ack(Uri id, @Nullable AckOptions opts);
+    void cancel(Uri id);
 
-    Observable<Uri> listMessages();
+    Observable<MessageStatus> listMessages();
     Observable<MessageStatus> status(Uri id);
+    Observable<Message> get(Uri id);
 
     void close();
 
@@ -26,7 +30,7 @@ public interface Connection {
     }
 
     public final class MessageStatus {
-
+        // TODO id, path, size, transfer stats
     }
 
 

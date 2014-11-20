@@ -1,4 +1,4 @@
-package io.nextop.client;
+package io.nextop.client.demo;
 
 import android.app.Application;
 import android.test.ApplicationTestCase;

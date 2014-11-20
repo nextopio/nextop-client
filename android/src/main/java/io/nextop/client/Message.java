@@ -1,7 +1,8 @@
 package io.nextop.client;
 
-/**
- * Created by brien on 11/15/14.
- */
 public class Message {
+    // TODO id
+    // TODO priority, headers, body, etc
+
+    // TODO builder
 }
