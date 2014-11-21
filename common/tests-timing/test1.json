@@ -1,5 +1,5 @@
 {
-  "title": "tracing the frames between two clients",
+  "title": "message passing between two clients",
   "clients": ["A", "B"],
   "events": [
     [0, "A", "condition.up", {
@@ -7,18 +7,30 @@
       "bytesPerSecond": 50,
       "byteLoss": 0.0
     }],
-    [0, "A", "condition.down", 50, 0.0],
-    [0, "B", "condition.up", 50, 0.0],
-    [0, "B", "condition.down", 50, 0.0],
+    [0, "A", "condition.down", {
+      "delayMs": 20,
+      "bytesPerSecond": 50,
+      "byteLoss": 0.0
+    }],
+    [0, "B", "condition.up", {
+      "delayMs": 20,
+      "bytesPerSecond": 50,
+      "byteLoss": 0.0
+    }],
+    [0, "B", "condition.down", {
+      "delayMs": 20,
+      "bytesPerSecond": 50,
+      "byteLoss": 0.0
+    }],
 
     [0, "A", "send", {
       "id": 0,
-      "path": "/test",
+      "uri": "https://test.nextop.io/test",
       "bytes": 20,
       "priority": 0
     }],
     [0, "B", "receive.subscribe", {
-      "path": "/test",
+      "uri": "https://test.nextop.io/test",
       "replyMap": {
         "0": {
           "id": 1,
@@ -56,7 +68,4 @@
 
     ]
   }
-
-
-
 }
