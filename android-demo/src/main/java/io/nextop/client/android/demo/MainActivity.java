@@ -1,4 +1,4 @@
-package io.nextop.client.demo;
+package io.nextop.client.android.demo;
 
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;

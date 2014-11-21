@@ -1,4 +1,4 @@
-package io.nextop.client.demo.collab;
+package io.nextop.client.android.demo.collab;
 
 import io.nextop.client.Connection;
 import io.nextop.client.ConnectionContext;

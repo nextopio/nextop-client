@@ -1,0 +1,62 @@
+{
+  "title": "tracing the frames between two clients",
+  "clients": ["A", "B"],
+  "events": [
+    [0, "A", "condition.up", {
+      "delayMs": 20,
+      "bytesPerSecond": 50,
+      "byteLoss": 0.0
+    }],
+    [0, "A", "condition.down", 50, 0.0],
+    [0, "B", "condition.up", 50, 0.0],
+    [0, "B", "condition.down", 50, 0.0],
+
+    [0, "A", "send", {
+      "id": 0,
+      "path": "/test",
+      "bytes": 20,
+      "priority": 0
+    }],
+    [0, "B", "receive.subscribe", {
+      "path": "/test",
+      "replyMap": {
+        "0": {
+          "id": 1,
+          "bytes": 20,
+          "priority": 0
+        }
+      }
+    }]
+  ],
+
+  "expectedNamedPaths": [
+    [0, {
+      "path": "/test",
+      "open": true
+    }]
+  ],
+
+  "expectedBinds": [
+
+  ],
+
+  "expectedMetrics": [
+    {
+      "start": 0,
+      "end": 1000,
+      "...": "..."
+    }
+  ],
+
+  "expectedMessageStatuses": {
+    "A": [
+
+    ],
+    "B": [
+
+    ]
+  }
+
+
+
+}

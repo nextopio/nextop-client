@@ -17,7 +17,7 @@ android {
     buildToolsVersion "21.1.1"
 
     defaultConfig {
-        applicationId "io.nextop.client.demo"
+        applicationId "io.nextop.client.android.demo"
         minSdkVersion 8
         targetSdkVersion 21
         versionCode 1

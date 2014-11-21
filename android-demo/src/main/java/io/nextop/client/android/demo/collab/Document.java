@@ -1,4 +1,4 @@
-package io.nextop.client.demo.collab;
+package io.nextop.client.android.demo.collab;
 
 import java.util.UUID;
 
@@ -18,11 +18,15 @@ public class Document {
 
     // TODO make these op objects; have a merge(ops) that merges ops into a deterministic non-conflicting sequence
     //
-    public void add(Node node, UUID after) {
+//    public void add(Node node, UUID after) {
+//
+//    }
+//
+//    public void remove(Node node) {
+//
+//    }
 
-    }
-
-    public void remove(Node node) {
+    public void apply(Op op) {
 
     }
 
