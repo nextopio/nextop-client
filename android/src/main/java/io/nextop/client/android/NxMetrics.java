@@ -1,6 +1,6 @@
 package io.nextop.client.android;
 
-public class Metrics {
+public class NxMetrics {
 
     Aggregate[] nets;
     // these slice the metrics by messages that contain each tag
