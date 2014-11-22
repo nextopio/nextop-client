@@ -7,6 +7,7 @@ import io.nextop.client.Path;
 import rx.Observable;
 import rx.Observer;
 
+// FIXME Server class, takes in an NxClient
 public class Server {
 
     public static void main(String[] args) {
@@ -56,7 +57,5 @@ public class Server {
 
     }
 
-    static final class DocumentStore {
-        Observable<Document> get(String id);
-    }
+
 }

@@ -6,6 +6,8 @@ import io.nextop.client.Message;
 import io.nextop.client.Path;
 import rx.Observable;
 
+// FIXME rename this to a ClientFragment
+// FIXME fragment takes an argument that is the document name.
 public class Client {
     public static void main(String[] args) {
         final DocumentStore store = new MemoryDocumentStore();
