@@ -98,7 +98,7 @@ public class Document implements Serializable {
                 insert(op.node, op.before);
                 break;
             case REMOVE:
-                remove(op.node, op.before);
+                remove(op.node);
                 break;
             default:
                 // ignore
@@ -113,15 +113,16 @@ public class Document implements Serializable {
         } else {
             // insert
 
+            DNode dbefore = findBefore(before);
+
             DNode dnode = new DNode(node);
             nodeMap.put(node.id, dnode);
-            DNode dbefore = findBefore(before);
             dbefore.insertAfter(dnode);
 
             publishOps.onNext(new Op(Op.Type.INSERT, node, dbefore.node.id));
         }
     }
-    private void remove(Node node, UUID before) {
+    private void remove(Node node) {
         if (nodeMap.containsKey(node.id)) {
             // remove
 
