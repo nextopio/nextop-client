@@ -9,6 +9,12 @@ import rx.Subscriber;
 import java.io.IOException;
 
 public interface NxClient {
+    /** Amortized number of bytes that will fit into a single outgoing packet
+     * (control overhead takes the rest). The client may not always fit this many bytes
+     * into a packet, but on average it will. */
+    int OUT_PACKET_MESSAGE_BYTES = 1300;
+
+
     // AUTH
 
     void auth(@Nullable String apiKey);
@@ -23,14 +29,19 @@ public interface NxClient {
 
     // MESSAGING
 
-    Sender<NxMessage> sender(Uri p);
+    Sender<NxMessage> sender(NxUri p);
     // receive is always load balanced
     // the same path is sent to the same client, for consistency on same objects
-    Receiver<NxMessage> receiver(Uri p);
+    Receiver<NxMessage> receiver(NxUri p);
     // always auto ack when observer completes
-//    void ack(Uri id);
+//    void ack(NxUri id);
     // seems like a rare case
-    void cancel(Uri id);
+    void cancel(NxUri id);
+
+
+    /** delay outgoing control messages (e.g. ack, cancel) to group them
+     * or attach them to an outgoing message. */
+    void setControlDelay(boolean controlDelay);
 
 
     // CACHES
@@ -46,16 +57,16 @@ public interface NxClient {
     // INTROSPECTION
 
     Observable<MessageStatus> listMessages();
-    Observable<MessageStatus> messageStatus(Uri id);
-//    Observable<Message> get(Uri id);
+    Observable<MessageStatus> messageStatus(NxUri id);
+//    Observable<Message> get(NxUri id);
 
-    Observable<NxMetrics> metrics(Uri p);
+    Observable<NxMetrics> metrics(NxUri p);
 
     // a bind is when a message ID is connected to a path
     // the bind is open/subscribed as long at both sides are connected.
     // each side can time out or have a subscription->0 transition.
     // in those cases, the bind is closed
-    Observable<Bind> listBinds(Uri p);
+    Observable<Bind> listBinds(NxUri p);
     Observable<ReceivePath> listReceivePaths();
 
 
@@ -81,11 +92,10 @@ public interface NxClient {
     void setTransportFactory(@Nullable TransportFactory tf);
 
 
-
-
-
-
-
+    /** ordering guarantee: messages of the same priority from the same sender (possible on different threads),
+     * or from different senders on the same thread, will be sent in order.
+     *
+     * (thread safe) */
     final class Sender<M extends NxMessage> {
         public Receiver send(M m) {
             // FIXME
@@ -103,6 +113,16 @@ public interface NxClient {
         }
 
 
+        /** enable delay for this message (similar to TCP delay/Nagle's).
+         * In terms of order, delayed messages are a lower priority
+         * than non-delayed messages of the same priority.
+         */
+        public Sender<M> setDelay(boolean delay) {
+            // FIXME
+            return null;
+        }
+
+
         // also does some rotation, etc, for front facing camera images
         public static final class EncoderConfig {
             int maxWidth;
@@ -113,10 +133,10 @@ public interface NxClient {
 
 
     final class Receiver<M extends NxMessage> extends Observable<M> {
-        final Uri id;
+        final NxUri id;
 
 
-        Receiver(Uri id) {
+        Receiver(NxUri id) {
             super(new OnSubscribe<M>() {
                 @Override
                 public void call(Subscriber<? super M> subscriber) {
@@ -155,32 +175,32 @@ public interface NxClient {
             PENDING
         }
 
-        public final Uri id;
+        public final NxUri id;
         public final CompletionStatus completionStatus;
 
         // TODO id, path, size, transfer stats
 
-        MessageStatus(Uri id, CompletionStatus completionStatus) {
+        MessageStatus(NxUri id, CompletionStatus completionStatus) {
             this.id = id;
             this.completionStatus = completionStatus;
         }
     }
 
     final class Bind {
-        public final Uri id;
+        public final NxUri id;
         public final boolean open;
 
-        Bind(Uri id, boolean open) {
+        Bind(NxUri id, boolean open) {
             this.id = id;
             this.open = open;
         }
     }
 
     final class ReceivePath {
-        public final Uri p;
+        public final NxUri p;
         public final boolean open;
 
-        ReceivePath(Uri p, boolean open) {
+        ReceivePath(NxUri p, boolean open) {
             this.p = p;
             this.open = open;
         }

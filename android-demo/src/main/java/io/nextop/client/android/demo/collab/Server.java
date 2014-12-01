@@ -4,35 +4,38 @@ import io.nextop.client.Connection;
 import io.nextop.client.ConnectionContext;
 import io.nextop.client.Message;
 import io.nextop.client.Path;
+import io.nextop.client.android.NxClient;
+import io.nextop.client.android.NxMessage;
+import io.nextop.client.android.NxUri;
 import rx.Observable;
 import rx.Observer;
 
-// FIXME Server class, takes in an NxClient
-public class Server {
-
-    public static void main(String[] args) {
-        final DocumentStore store = new MemoryDocumentStore();
-
-        ConnectionContext cc;
-
-        final Connection c = cc.get("demo.nextop.io");
+final class Server {
+    private final NxClient client;
+    private final DocumentStore store;
 
 
+    Server(NxClient client, DocumentStore store) {
+        this.client = client;
+        this.store = store;
+    }
 
-        Observable<Message> getEdits = c.receive(new Path(Path.Action.GET, "/edits/${id}"));
-        Observable<Message> postEdits = c.receive(new Path(Path.Action.POST, "/edits/${id}"));
+
+    public void onResume() {
+        NxUri edits = NxUri.decode("https://demo.nextop.io/collab/edits/${id}");
+        Observable<NxMessage> getEdits = client.receiver(edits.method(NxUri.Method.GET));
+        Observable<NxMessage> postEdits = client.receiver(edits.method(NxUri.Method.POST));
 
 
         Observable.zip(
-                getEdits.flatMap({m ->
-                        String id = m.get("id");
-        if (null != id) {
-            return store.get(id);
-        } else {
-            return Observable.<Document>never();
-        }}).flatMap({d ->
-        return d.getOps();
-        }),
+                getEdits.flatMap({(NxMessage m) -> {
+                    String id = m.get("id");
+                    if(null != id) {
+                        return store.get(id);
+                    } else{
+                        return Observable.<Document>never();
+                    }
+                }}).flatMap({(Document d) -> Observable.concat(Observable.from(d.getInitialOps()), d.getPublishOps()) }),
         getEdits,
                 {op, m -> new ROp(op, m.id)}).subscribe({
                 {rop -> c.send(rop.toId, rop)}
@@ -57,5 +60,7 @@ public class Server {
 
     }
 
+    public void onPause() {
 
+    }
 }

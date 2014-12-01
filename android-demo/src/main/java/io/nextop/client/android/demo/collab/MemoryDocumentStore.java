@@ -5,7 +5,7 @@ import rx.Observable;
 import java.util.HashMap;
 import java.util.Map;
 
-public final class MemoryDocumentStore implements DocumentStore {
+final class MemoryDocumentStore implements DocumentStore {
     private Map<String, Document> documentMap = new HashMap<String, Document>(32);
 
 

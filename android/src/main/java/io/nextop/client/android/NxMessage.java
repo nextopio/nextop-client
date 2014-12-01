@@ -11,4 +11,14 @@ public class NxMessage {
 
 
     // TODO builder
+
+    public String get(String name) {
+        // FIXME
+        return null;
+    }
+
+
+    public int getSizeBytes() {
+        return 0;
+    }
 }
