@@ -74,6 +74,10 @@ final class Server {
                 public void onNext(NxSession<Document> sd) {
                     Document.Op op = Document.Op.fromBytes(sd.m.getBytes(NxArgs.BODY_KEY));
                     sd.value.apply(op);
+                    // (note: can persist the op before ack)
+                    // client.hold(sd.m.id)
+                    // ...
+                    // client.complete(sd.m.id)
                 }
 
                 @Override
@@ -100,7 +104,14 @@ final class Server {
         }
     }
 
+    // FIXME how to handle the case where the client with the route drops
+    // FIXME nextop will elect a new route, and the route will have to use its local version of the document
 
+    // FIXME this exercise shows what might be a good election strategy:
+    // FIXME use connected time and load (or probably some combo of time to delivery and time to ack).
+    // FIXME (phrase it as an optimization, where trying to min the time to ack)
+
+    // FIXME server document store should be able to reach into the client document store in the case of a new docmument
     final class EphemeralDocumentStore {
         final Map<String, Observable<Document>> dObsMap;
 
@@ -119,6 +130,7 @@ final class Server {
                 client.receiver(NxUri.decode("POST https://demo.nextop.io/collab/${id}/ops")).drain().subscribe(
 
                         // FIXME when the observables goes from 1->0 subscribers, post the ops back and eject from the map
+                        // FIXME not on error (work through normal and error paths; if post when back online after the route was changed, it will corrupt data)
 
                 dObsMap.put(id, dObs);
                 dObs = s;

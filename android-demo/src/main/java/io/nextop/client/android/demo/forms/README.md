@@ -1,0 +1,1 @@
+One role fills out a form, takes a picture, and hits submit. The other role receives forms and approves them. Peer-to-peer.

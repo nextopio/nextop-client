@@ -9,6 +9,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+
+// FIXME need to think through verified ops again. server shoudl reply with an ack to each op.
+// FIXME if op bind is closed before ack, re-send the op (but isn't this what nextop should do automatically?)
+// FIXME think about this
+
 public class Document implements Serializable {
     public static final Node HEAD = new Node(new UUID(0L, 0L), "");
 
@@ -160,6 +165,7 @@ public class Document implements Serializable {
         for (int i = 1; i < n; ++i) {
             ops[i] = new Op(Op.Type.INSERT, nodes[i + 1], nodes[i].id);
         }
+        // FIXME add remove ops here too
         return ops;
     }
 
