@@ -1,6 +1,8 @@
 package io.nextop.client.android;
 
-public class NxMessage {
+import android.database.Observable;
+
+public class NxMessage implements NxArgs {
     // TODO id
     // TODO priority, headers, body, etc
 
@@ -8,17 +10,18 @@ public class NxMessage {
     // TODO decodeBitmap arg (width, height)
     // TODO bodyBytes, bodyBitmap
 
+    // TODO tags
 
 
     // TODO builder
 
-    public String get(String name) {
-        // FIXME
-        return null;
-    }
 
 
     public int getSizeBytes() {
         return 0;
+    }
+
+    public NxSession<Void> session() {
+        // FIXME
     }
 }

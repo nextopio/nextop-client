@@ -4,11 +4,9 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:0.13.0'
-        classpath 'me.tatarka:gradle-retrolambda:2.4.1'
     }
 }
 apply plugin: 'com.android.application'
-apply plugin: 'retrolambda'
 
 
 repositories {
@@ -20,8 +18,8 @@ android {
     buildToolsVersion "21.1.1"
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_1_6
+        targetCompatibility JavaVersion.VERSION_1_6
     }
     defaultConfig {
         applicationId "io.nextop.client.android.demo"

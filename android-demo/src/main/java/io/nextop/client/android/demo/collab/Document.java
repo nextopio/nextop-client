@@ -152,7 +152,7 @@ public class Document implements Serializable {
 
 
 
-    public Op[] getInitialOps() {
+    private Op[] getInitialOps() {
         Node[] nodes = getNodes();
         // [0] is the head
         int n = nodes.length - 1;
@@ -163,8 +163,12 @@ public class Document implements Serializable {
         return ops;
     }
 
-    public Observable<Op> getPublishOps() {
+    private Observable<Op> getPublishOps() {
         return publishOps;
+    }
+
+    public Observable<Op> getOps() {
+        return Observable.concat(Observable.from(getInitialOps()), getPublishOps());
     }
 
     // includes head

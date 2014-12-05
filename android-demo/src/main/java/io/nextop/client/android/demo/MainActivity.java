@@ -4,9 +4,20 @@ import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import io.nextop.client.android.app.NxActivity;
+import io.nextop.client.android.app.NxConfig;
 
 
-public class MainActivity extends ActionBarActivity {
+public class MainActivity extends NxActivity {
+
+    // FIXME start a server here
+
+    public MainActivity() {
+        super(new NxConfig() {{
+            useLocalServer = true;
+        }});
+    }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

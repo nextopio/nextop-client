@@ -4,10 +4,15 @@ package io.nextop.client.android;
 import android.net.Uri;
 import android.support.annotation.Nullable;
 import rx.Observable;
+import rx.Scheduler;
 import rx.Subscriber;
 
 import java.io.IOException;
 
+
+// TODO config path: https://$apikey.nextop.io/config
+// TODO GET on the path returns the entire config as JSON (all possible keys are represented with their current value)
+// TODO POST on the path a JSON object. These keys overwrite the existing values in the config
 public interface NxClient {
     /** Amortized number of bytes that will fit into a single outgoing packet
      * (control overhead takes the rest). The client may not always fit this many bytes
@@ -17,11 +22,14 @@ public interface NxClient {
 
     // AUTH
 
+    /* the API key is the domain for all Nextop messages.
+     * Messages for the key have URI  https://$apikey.nextop.io/$id . */
     void auth(@Nullable String apiKey);
 
     /* permissions in Nextop are done per key. A key is analogous to a Unix group.
      * Each client can have zero or more keys, granting it the
-     * union of the permissions associated with the keys. */
+     * union of the permissions associated with the keys.
+     * Usually an app will have at least three keys: "client", "server", and "admin". */
     void grantKey(String key);
     void revokeKey(String key);
 
@@ -30,16 +38,21 @@ public interface NxClient {
     // MESSAGING
 
     Sender<NxMessage> sender(NxUri p);
+
+    Receiver<NxMessage> receiver(NxUri p);
     // receive is always load balanced
     // the same path is sent to the same client, for consistency on same objects
-    Receiver<NxMessage> receiver(NxUri p);
-    // always auto ack when observer completes
-//    void ack(NxUri id);
-    // seems like a rare case
+    // (see common path routing notes)
+    Receiver<NxMessage> receiver(NxUri p, Scheduler s);
+
+    // halts sending of the message (at whatever stage is possible; may not be possible)
+    // signal the communication on this bind is complete. subscribers to the bind will be given an error
     void cancel(NxUri id);
+    // signal the communication on this bind is complete. subscribers to the bind will be completed.
+    void complete(NxUri id);
 
 
-    /** delay outgoing control messages (e.g. ack, cancel) to group them
+    /** delay outgoing control messages (e.g. ack, cancel, subscribe, unsubscribe, complete) to group them
      * or attach them to an outgoing message. */
     void setControlDelay(boolean controlDelay);
 
@@ -53,6 +66,17 @@ public interface NxClient {
 
     CacheController getNetworkCache();
     CacheController getImageCache();
+
+
+
+    // METRIC TAGS
+
+    // attach to all unsent messages and future messages
+
+    void addTag(String tag);
+    void removeTag(String tag);
+
+
 
     // INTROSPECTION
 
@@ -107,6 +131,9 @@ public interface NxClient {
             return null;
         }
 
+
+
+
         public Sender<NxImageMessage> encodeImages(EncoderConfig c) {
             // FIXME
             return null;
@@ -129,6 +156,32 @@ public interface NxClient {
             int maxHeight;
             float quality;
         }
+
+
+        /////// ANDROID ///////
+
+
+        public Receiver send(NxByteString body) {
+
+        }
+        public Receiver send(byte[] body) {
+
+        }
+        public Receiver send(String body) {
+
+        }
+        public Receiver send(int body) {
+
+        }
+        public Receiver send(long body) {
+
+        }
+        public Receiver send(float body) {
+
+        }
+        public Receiver send(double body) {
+
+        }
     }
 
 
@@ -146,6 +199,11 @@ public interface NxClient {
             this.id = id;
         }
 
+        // receive all messages for this receiver, then complete
+        public Receiver<M> drain() {
+
+        }
+
         public Receiver<NxImageMessage> decodeImages(DecoderConfig c) {
             // FIXME
             return null;
@@ -161,8 +219,8 @@ public interface NxClient {
 
 
     interface CacheController {
-        public void setSize(int bytes);
-        public void trim(float f);
+        void setSize(int bytes);
+        void trim(float f);
     }
 
 
