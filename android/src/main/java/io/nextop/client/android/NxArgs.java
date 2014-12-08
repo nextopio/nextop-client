@@ -3,8 +3,6 @@ package io.nextop.client.android;
 import android.support.annotation.Nullable;
 
 public interface NxArgs {
-    /** HTTP body value is translated to this arg key. */
-    String BODY_KEY = "$body$";
 
 
     Iterable<String> keys();

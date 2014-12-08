@@ -10,7 +10,7 @@ import rx.Subscriber;
 import java.io.IOException;
 
 
-// TODO config path: https://$apikey.nextop.io/config
+// TODO config path: https://$accesskey.nextop.io/config
 // TODO GET on the path returns the entire config as JSON (all possible keys are represented with their current value)
 // TODO POST on the path a JSON object. These keys overwrite the existing values in the config
 public interface NxClient {
@@ -22,9 +22,12 @@ public interface NxClient {
 
     // AUTH
 
-    /* the API key is the domain for all Nextop messages.
-     * Messages for the key have URI  https://$apikey.nextop.io/$id . */
-    void auth(@Nullable String apiKey);
+    /* the access key and grant keys are never forwarded beyond the Nextop proxy.
+     * this would be a security leak. */
+
+    /* the access key is the domain for all Nextop messages.
+     * Messages for the key have URI  https://$accesskey.nextop.io/$id . */
+    void auth(@Nullable String accessKey);
 
     /* permissions in Nextop are done per key. A key is analogous to a Unix group.
      * Each client can have zero or more keys, granting it the
@@ -34,21 +37,37 @@ public interface NxClient {
     void revokeKey(String key);
 
 
+    // SCHEDULING
+
+    Scheduler getScheduler();
+    NxClient on(Scheduler s);
+
+
 
     // MESSAGING
 
-    Sender<NxMessage> sender(NxUri p);
 
-    Receiver<NxMessage> receiver(NxUri p);
     // receive is always load balanced
     // the same path is sent to the same client, for consistency on same objects
     // (see common path routing notes)
-    Receiver<NxMessage> receiver(NxUri p, Scheduler s);
+    Receiver<NxMessage> receiver(NxUri p);
+
+    // @see NxSession#sender
+    Sender<NxMessage> sender(NxUri p);
+
+    // hold until ack; if not nack, auto-acks at the end of dispatching the message
+    // @see NxSession#nack
+    void nack(NxUri id);
+    // only needed if prior #nack called
+    // @see NxSession#ack
+    void ack(NxUri id);
 
     // halts sending of the message (at whatever stage is possible; may not be possible)
     // signal the communication on this bind is complete. subscribers to the bind will be given an error
+    // @see NxSession#cancel
     void cancel(NxUri id);
     // signal the communication on this bind is complete. subscribers to the bind will be completed.
+    // @see NxSession#complete
     void complete(NxUri id);
 
 
@@ -185,7 +204,7 @@ public interface NxClient {
     }
 
 
-    final class Receiver<M extends NxMessage> extends Observable<M> {
+    final class Receiver<M extends NxMessage> extends Observable<NxSession<M>> {
         final NxUri id;
 
 

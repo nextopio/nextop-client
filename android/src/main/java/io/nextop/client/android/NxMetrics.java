@@ -19,11 +19,12 @@ public class NxMetrics {
         // does not contain these tags; count is how many got excluded, e.g. overlap size
         T notTags;
         Q timeToDelivery;
-        C failesMessages;
+        C totalMessages;
+        C failedMessages;
         C pendingMessages;
         Q bytesUsed;
         Q nonControlBytesUsed;
-        Q powerUsers;
+        Q powerUsed;
     }
 
     public static final class Q {

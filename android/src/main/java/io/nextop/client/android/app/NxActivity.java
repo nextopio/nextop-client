@@ -5,7 +5,6 @@ import android.app.Application;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import io.nextop.client.android.NxClient;
-import io.nextop.client.android.NxContext;
 
 public class NxActivity extends Activity implements NxContext {
 

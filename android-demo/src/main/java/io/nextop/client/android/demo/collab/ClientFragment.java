@@ -2,7 +2,6 @@ package io.nextop.client.android.demo.collab;
 
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
-import io.nextop.client.android.NxContext;
 
 public class ClientFragment extends Fragment {
     public static ClientFragment newInstance(String documentId) {

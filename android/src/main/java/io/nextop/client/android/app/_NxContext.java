@@ -1,7 +1,6 @@
 package io.nextop.client.android.app;
 
 import android.os.Bundle;
-import io.nextop.client.android.NxContext;
 
 public class _NxContext implements NxContext {
 

@@ -2,10 +2,19 @@ package io.nextop.client.android;
 
 import rx.Observable;
 
-public class NxSession<A> implements NxArgs {
+// a message id bound to a client
+// use this to maintain state for processing a message
+public class NxSession<M> implements NxArgs {
 
-    public final A value;
-    public final NxMessage m;
+    final NxUri id;
+    final NxClient client;
+    public final M v;
+
+    // FIXME this should be bound to a client
+    // FIXME but how does this work if the client is an activity/fragment and goes away under the session?
+    // FIXME should be bound to a context?
+    // FIXME this should be bound to a client. the client should save messages when disconnected.
+
 
 
 
@@ -41,6 +50,21 @@ public class NxSession<A> implements NxArgs {
     public NxSession<A> set(String key, long value) {
 
     }
+
+
+    // CLIENT
+
+
+    Sender<NxMessage> sender();
+
+    void nack();
+    void ack();
+
+    void cancel();
+    void complete();
+
+
+
 
     /////// ANDROID ///////
 

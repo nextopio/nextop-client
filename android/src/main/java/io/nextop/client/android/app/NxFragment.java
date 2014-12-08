@@ -1,12 +1,10 @@
 package io.nextop.client.android.app;
 
 import android.app.Activity;
-import android.app.Application;
 import android.app.Fragment;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import io.nextop.client.android.NxClient;
-import io.nextop.client.android.NxContext;
 
 public class NxFragment extends Fragment implements NxContext {
 
