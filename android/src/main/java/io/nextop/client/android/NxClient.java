@@ -51,6 +51,10 @@ public interface NxClient {
     // the same path is sent to the same client, for consistency on same objects
     // (see common path routing notes)
     Receiver<NxMessage> receiver(NxUri p);
+    // mirror is a copy of each message on path
+    // mirror can get just the headers (headOnly()) or the full message (default)
+    // FIXME
+//    Mirror<NxMessage> mirror(NxUri p);
 
     // @see NxSession#sender
     Sender<NxMessage> sender(NxUri p);
@@ -92,8 +96,8 @@ public interface NxClient {
 
     // attach to all unsent messages and future messages
 
-    void addTag(String tag);
-    void removeTag(String tag);
+    void addTag(String name, String value);
+    void removeTag(String name);
 
 
 
@@ -109,6 +113,7 @@ public interface NxClient {
     // the bind is open/subscribed as long at both sides are connected.
     // each side can time out or have a subscription->0 transition.
     // in those cases, the bind is closed
+    // FIXME Bind should probably be session. figure that out
     Observable<Bind> listBinds(NxUri p);
     Observable<ReceivePath> listReceivePaths();
 
@@ -218,10 +223,11 @@ public interface NxClient {
             this.id = id;
         }
 
+        // FIXME I'm not sure this is very useful. punt for initial API
         // receive all messages for this receiver, then complete
-        public Receiver<M> drain() {
-
-        }
+//        public Receiver<M> drain() {
+//
+//        }
 
         public Receiver<NxImageMessage> decodeImages(DecoderConfig c) {
             // FIXME
