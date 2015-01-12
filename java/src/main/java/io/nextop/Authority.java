@@ -1,6 +1,7 @@
 package io.nextop;
 
 
+// FIXME add named authority
 public final class Authority {
     public static Authority valueOf(String s) {
         int n = s.length();

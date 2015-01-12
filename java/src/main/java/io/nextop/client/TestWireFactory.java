@@ -3,6 +3,13 @@ package io.nextop.client;
 public class TestWireFactory implements Wire.Factory {
 
 
+    public void advanceWriteToMessageStart() {
+
+    }
+
+    public void advanceReadToMessageStart() {
+
+    }
 
     public void advanceWrite(int messageCount) {
 
@@ -14,6 +21,10 @@ public class TestWireFactory implements Wire.Factory {
 
     }
     public void failRead() {
+
+    }
+
+    public void advanceOpen() {
 
     }
 

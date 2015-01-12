@@ -1,5 +1,7 @@
 package io.nextop;
 
+import io.nextop.Authority;
+
 import javax.annotation.Nullable;
 
 // a url factored to work better with nextop concepts
@@ -29,7 +31,8 @@ public class Nurl {
     public static class Target {
         Method method;
         // paths can use "$var" segments
-        String path;
+        // toString used here
+        Object path;
     }
 
     public static class Via {
