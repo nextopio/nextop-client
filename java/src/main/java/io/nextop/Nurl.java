@@ -23,7 +23,7 @@ public class Nurl {
     public static enum Method {
         GET,
         POST,
-        // FIXME all HTTP methods
+        // FIXME expand HTTP methods
         SUBSCRIBE,
         UNSUBSCRIBE
     }

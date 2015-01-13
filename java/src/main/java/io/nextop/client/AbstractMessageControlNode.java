@@ -1,6 +1,6 @@
 package io.nextop.client;
 
-import com.sun.istack.internal.Nullable;
+import javax.annotation.Nullable;
 
 public abstract class AbstractMessageControlNode implements MessageControlNode {
 

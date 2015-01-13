@@ -13,8 +13,8 @@ public class PassthroughNode extends AbstractMessageControlNode {
     protected void initDownstream() {
         downstream.init(new MessageControlChannel() {
             @Override
-            public void onActive(boolean active, int quality) {
-                upstream.onActive(active, quality);
+            public void onActive(boolean active, MessageControlMetrics metrics) {
+                upstream.onActive(active, metrics);
             }
 
             @Override
@@ -51,8 +51,8 @@ public class PassthroughNode extends AbstractMessageControlNode {
 
 
     @Override
-    public void onActive(boolean active, int quality) {
-        downstream.onActive(active, quality);
+    public void onActive(boolean active, MessageControlMetrics metrics) {
+        downstream.onActive(active, metrics);
     }
 
     @Override

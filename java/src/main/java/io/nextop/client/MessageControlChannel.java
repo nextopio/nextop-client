@@ -14,7 +14,7 @@ public interface MessageControlChannel {
 
 
     // quality is set to 0 into downstream; only the upstream cares about quality
-    void onActive(boolean active, int quality);
+    void onActive(boolean active, MessageControlMetrics metrics);
     void onTransfer(MessageControlState mcs);
     void onMessageControl(MessageControl mc);
 

@@ -14,6 +14,28 @@ public class MessageContext implements MessageControlChannel {
     }
 
 
+    @Override
+    public void onActive(boolean active, MessageControlMetrics metrics) {
 
+    }
 
+    @Override
+    public void onTransfer(MessageControlState mcs) {
+
+    }
+
+    @Override
+    public void onMessageControl(MessageControl mc) {
+
+    }
+
+    @Override
+    public void post(Runnable r) {
+
+    }
+
+    @Override
+    public void postDelayed(Runnable r, int delayMs) {
+
+    }
 }

@@ -32,7 +32,8 @@ public class TestWireFactory implements Wire.Factory {
 
     @Override
     public Wire create() {
-
+        // FIXME
+        return null;
     }
 
 

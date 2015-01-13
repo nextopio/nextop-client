@@ -28,14 +28,16 @@ public class MultiNode extends AbstractMessageControlNode {
 
 
 
-
-    void onActive(boolean active, MessageControlMetrics metrics) {
-
-    }
-    void onTransfer(MessageControlState mcs) {
+    @Override
+    public void onActive(boolean active, MessageControlMetrics metrics) {
 
     }
-    void onMessageControl(MessageControl mc) {
+    @Override
+    public void onTransfer(MessageControlState mcs) {
+
+    }
+    @Override
+    public void onMessageControl(MessageControl mc) {
 
     }
 
@@ -96,9 +98,7 @@ public class MultiNode extends AbstractMessageControlNode {
 
         @Override
         public float rank(MessageControlMetrics prior, MessageControlMetrics current) {
-            return project(prior.battery, current.battery, alpha)
-                    + project(prior.cost, current.cost, alpha)
-                    + project(prior.quality, current.quality, alpha)
+            return project(prior.quality, current.quality, alpha)
                     + project(prior.preference, current.preference, alpha);
         }
 

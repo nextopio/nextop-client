@@ -6,13 +6,29 @@ import io.nextop.Message;
 // FIXME rename message controller?
 // FIXME start with send and simulating failovers
 // FIXME call this a SubjectNode
-public class SubjectNode extends MessageControlNode {
+public class SubjectNode extends AbstractMessageControlNode {
 
     public SubjectNode(MessageControlNode downstream) {
 
     }
 
 
-    void send(Message message);
+    public void send(Message message) {
+        // FIXME
+    }
 
+    @Override
+    public void onActive(boolean active, MessageControlMetrics metrics) {
+
+    }
+
+    @Override
+    public void onTransfer(MessageControlState mcs) {
+
+    }
+
+    @Override
+    public void onMessageControl(MessageControl mc) {
+
+    }
 }

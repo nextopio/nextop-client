@@ -19,8 +19,8 @@ public class Message {
 
 
     public Message toHead() {
-        // FIXME remove all parameters not in Target
-        // FIXME keeps all headers and meta
+        // FIXME remove expand parameters not in Target
+        // FIXME keeps expand headers and meta
         return null;
     }
 
@@ -62,23 +62,23 @@ public class Message {
         }
 
         public Builder setTarget(@Nullable String target) {
-            this.target = target;
+//            this.target = target;
             return this;
         }
 
         public Builder setVia(@Nullable String via) {
-            this.via = via;
+//            this.via = via;
             return this;
         }
 
         public Builder setNurl(@Nullable String nurl) {
-            if (null != nurl) {
-                target = nurl.target;
-                via = nurl.via;
-            } else {
-                target = null;
-                via = null;
-            }
+//            if (null != nurl) {
+//                target = nurl.target;
+//                via = nurl.via;
+//            } else {
+//                target = null;
+//                via = null;
+//            }
             return this;
         }
 
@@ -115,9 +115,10 @@ public class Message {
 
 
         public Message build() {
-            return new Message(id, priority, new Nurl(target, via),
-                    ImmutableMap.copyOf(headers),
-                    ImmutableMap.copyOf(parameters));
+//            return new Message(id, priority, new Nurl(target, via),
+//                    ImmutableMap.copyOf(headers),
+//                    ImmutableMap.copyOf(parameters));
+            return null;
         }
 
 

@@ -2,8 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/android/android.iml" filepath="$PROJECT_DIR$/android/android.iml" />
-      <module fileurl="file://$PROJECT_DIR$/android-demo/android-demo.iml" filepath="$PROJECT_DIR$/android-demo/android-demo.iml" />
       <module fileurl="file://$PROJECT_DIR$/java/java.iml" filepath="$PROJECT_DIR$/java/java.iml" />
       <module fileurl="file://$PROJECT_DIR$/nextop-client.iml" filepath="$PROJECT_DIR$/nextop-client.iml" />
     </modules>

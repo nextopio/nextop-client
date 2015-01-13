@@ -1,3 +1,2 @@
-include ':android', ':android-demo'
 include 'java'
 
