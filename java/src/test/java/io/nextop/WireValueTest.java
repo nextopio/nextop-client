@@ -1,5 +1,6 @@
 package io.nextop;
 
+import com.google.common.base.Charsets;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import junit.framework.TestCase;
@@ -9,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
@@ -63,7 +65,7 @@ public class WireValueTest extends TestCase {
 
 
 
-        ByteBuffer bb = ByteBuffer.allocate(1024);
+        ByteBuffer bb = ByteBuffer.allocate(64 * 1024);
         value.toBytes(bb);
         bb.flip();
 
@@ -82,6 +84,60 @@ public class WireValueTest extends TestCase {
 
         System.out.printf("%s\n", json);
         System.out.printf("json %d bytes\n", json.length());
+    }
+
+
+    @Test
+    public void test3() throws Exception {
+
+
+
+        Random r = new Random();
+
+        byte[] dump = new byte[r.nextInt(1024)];
+        r.nextBytes(dump);
+
+        List<WireValue> list = new ArrayList<WireValue>(16);
+        for (int i = 0; i < 16; ++i) {
+
+            Map<WireValue, WireValue> m = new HashMap<WireValue, WireValue>(8);
+            m.put(WireValue.of("test"), WireValue.of(r.nextInt()));
+            m.put(WireValue.of("rest"), WireValue.of(r.nextInt()));
+            m.put(WireValue.of("dump"), WireValue.of(dump));
+            list.add(WireValue.of(m));
+        }
+
+        WireValue value = WireValue.of(list);
+
+        ByteBuffer bb = ByteBuffer.allocate(64 * 1024);
+        value.toBytes(bb);
+        bb.flip();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        GZIPOutputStream gzos = new GZIPOutputStream(baos);
+
+        WritableByteChannel channel = Channels.newChannel(gzos);
+        channel.write(bb);
+        gzos.finish();
+        gzos.close();
+
+        byte[] cbytes = baos.toByteArray();
+        System.out.printf("c %d bytes\n", cbytes.length);
+
+
+
+        String json = value.toString();
+        System.out.printf("%s\n", json);
+        System.out.printf("json %d bytes\n", json.length());
+
+        ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
+        GZIPOutputStream gzos2 = new GZIPOutputStream(baos2);
+        gzos2.write(json.getBytes(Charsets.UTF_8));
+        gzos2.finish();
+        gzos2.close();
+        byte[] jcbytes = baos2.toByteArray();
+        System.out.printf("jsonc %d bytes\n", jcbytes.length);
+
     }
 
 

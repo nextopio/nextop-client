@@ -49,13 +49,105 @@ public abstract class WireValue {
 //    }
 //
 
+    static WireValue valueOf(byte[] bytes) {
+        int offset = 0;
+        int h = 0xFF & bytes[offset];
+        if ((h & H_COMPRESSED) == H_COMPRESSED) {
+            int nb = h & ~H_COMPRESSED;
+            int size = ((0xFF & bytes[offset + 1]) << 24)
+                    | ((0xFF & bytes[offset + 2]) << 16)
+                    | ((0xFF & bytes[offset + 3]) << 8)
+                    | (0xFF & bytes[offset + 4]);
+            // next 4 is size in bytes
+            int[] offsets = new int[size];
+            // FIXME scan forward and collect offsets
+
+            CompressionState cs = new CompressionState(bytes, offset, offsets, nb);
+            return valueOf(bytes, /* TODO first byte after header */ 0, cs);
+        }
+        return valueOf(bytes, offset, null);
+    }
+
+
+    static WireValue valueOf(byte[] bytes, int offset, CompressionState cs) {
+        int h = 0xFF & bytes[offset];
+        if ((h & H_COMPRESSED) == H_COMPRESSED) {
+            int luti = h & ~H_COMPRESSED;
+            for (int i = 1; i < cs.nb; ++i) {
+                luti = (luti << 8) | (0xFF & bytes[offset + i]);
+            }
+            return valueOf(cs.header, cs.offsets[luti], cs);
+        }
+
+        // FIXME CompressedWireValue subclass for each type
+        switch (h) {
+            case H_BLOB:
+            case H_INT32:
+            case H_INT64:
+            case H_FLOAT32:
+            case H_FLOAT64:
+            case H_TRUE_BOOLEAN:
+            case H_FALSE_BOOLEAN:
+            case H_MAP:
+            case H_LIST:
+            case H_INT32_LIST:
+            case H_INT64_LIST:
+            case H_FLOAT32_LIST:
+            case H_FLOAT64_LIST:
+        }
+    }
+
+
+    // based on byte[] and views into the byte[] (parsing does not expand into a bunch of objects in memory)
+    private static abstract class CompressedWireValue extends WireValue {
+        byte[] bytes;
+        int offset;
+        CompressionState cs;
+
+
+    }
+
+    // LUT sizes: 2^7, 2^15
+    // index maps to byte[]
+    private static class CompressionState {
+        byte[] header;
+        int offset;
+        int[] offsets;
+        int nb;
+    }
+
+
+
+
+
+
     public static WireValue valueOf(JsonElement e) {
         if (e.isJsonPrimitive()) {
             JsonPrimitive p = e.getAsJsonPrimitive();
             if (p.isBoolean()) {
                 return of(p.getAsBoolean());
             } else if (p.isNumber()) {
-                return of(p.getAsNumber());
+                // FIXME
+                String s = p.toString();
+                if (s.contains(".")) {
+                    float f = p.getAsFloat();
+                    try {
+                        if (String.valueOf(f).equals(s)) {
+                            return of(f);
+                        }
+                        // fall through
+                    } catch (NumberFormatException t) {
+                        // fall through
+                    }
+                    return of(p.getAsDouble());
+                } else {
+                    try {
+                        return of(p.getAsInt());
+                    } catch (NumberFormatException t) {
+                        // fall through
+                    }
+                    return of(p.getAsLong());
+                }
             } else if (p.isString()) {
                 return of(p.getAsString());
             } else {
@@ -96,8 +188,13 @@ public abstract class WireValue {
         if (value instanceof Double) {
             return of(((Double) value).doubleValue());
         }
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException("" + value.getClass().getSimpleName());
     }
+
+    static WireValue of(byte[] value) {
+        return new BlobWireValue(value);
+    }
+    // FIXME of(ByteBuffer)
 
     static WireValue of(String value) {
         return new Utf8WireValue(value);
@@ -240,28 +337,28 @@ public abstract class WireValue {
     }
 
     static String base64(byte[] bytes) {
-        // FIXME
-        return "";
+        byte[] b64 = org.apache.commons.codec.binary.Base64.encodeBase64(bytes);
+        return new String(b64, Charsets.UTF_8);
     }
 
 
 
 
-    static final byte H_COMPRESSED = (byte) 0x80;
-    static final byte H_UTF8 = 1;
-    static final byte H_BLOB = 2;
-    static final byte H_INT32 = 3;
-    static final byte H_INT64 = 4;
-    static final byte H_FLOAT32 = 5;
-    static final byte H_FLOAT64 = 6;
-    static final byte H_TRUE_BOOLEAN = 7;
-    static final byte H_FALSE_BOOLEAN = 8;
-    static final byte H_MAP = 9;
-    static final byte H_LIST = 10;
-    static final byte H_INT32_LIST = 11;
-    static final byte H_INT64_LIST = 12;
-    static final byte H_FLOAT32_LIST = 13;
-    static final byte H_FLOAT64_LIST = 14;
+    static final int H_COMPRESSED = 0x80;
+    static final int H_UTF8 = 1;
+    static final int H_BLOB = 2;
+    static final int H_INT32 = 3;
+    static final int H_INT64 = 4;
+    static final int H_FLOAT32 = 5;
+    static final int H_FLOAT64 = 6;
+    static final int H_TRUE_BOOLEAN = 7;
+    static final int H_FALSE_BOOLEAN = 8;
+    static final int H_MAP = 9;
+    static final int H_LIST = 10;
+    static final int H_INT32_LIST = 11;
+    static final int H_INT64_LIST = 12;
+    static final int H_FLOAT32_LIST = 13;
+    static final int H_FLOAT64_LIST = 14;
 
 
     static byte[] header(int nb, int v) {
@@ -277,7 +374,7 @@ public abstract class WireValue {
         }
     }
 
-    static byte listh(List<WireValue> list) {
+    static int listh(List<WireValue> list) {
         int n = list.size();
         if (0 == n) {
             return H_LIST;
@@ -314,9 +411,10 @@ public abstract class WireValue {
         lb.init(this);
         if (lb.opt()) {
             // write the lut header
-            byte[] header = header(lb.lutNb, lb.lut.size());
+            byte[] header = header(lb.lutNb, lb.lutNb);
             header[0] |= H_COMPRESSED;
             bb.put(header);
+            bb.putInt(lb.lut.size());
             bb.putInt(0);
             int i = bb.position();
 
@@ -348,7 +446,7 @@ public abstract class WireValue {
     private void _toBytes(WireValue value, Lb lb, ByteBuffer bb) {
         switch (value.getType()) {
             case MAP: {
-                bb.put(H_MAP);
+                bb.put((byte) H_MAP);
                 bb.putInt(0);
 
                 int i = bb.position();
@@ -366,9 +464,9 @@ public abstract class WireValue {
             }
             case LIST: {
                 List<WireValue> list = value.asList();
-                byte listh = listh(list);
+                int listh = listh(list);
                 if (H_LIST == listh) {
-                    bb.put(H_LIST);
+                    bb.put((byte) H_LIST);
 
                     bb.putInt(0);
 
@@ -382,7 +480,7 @@ public abstract class WireValue {
                     bb.putInt(i - 4, bytes);
                 } else {
                     // primitive homogeneous list
-                    bb.put(listh);
+                    bb.put((byte) listh);
 
                     bb.putInt(0);
 
@@ -420,7 +518,7 @@ public abstract class WireValue {
             case BLOB: {
                 byte[] b = value.asBlob();
 
-                bb.put(H_BLOB);
+                bb.put((byte) H_BLOB);
                 bb.putInt(b.length);
                 bb.put(b);
 
@@ -429,30 +527,30 @@ public abstract class WireValue {
             case UTF8: {
                 byte[] b = value.asString().getBytes(Charsets.UTF_8);
 
-                bb.put(H_UTF8);
+                bb.put((byte) H_UTF8);
                 bb.putInt(b.length);
                 bb.put(b);
 
                 break;
             }
             case INT32:
-                bb.put(H_INT32);
+                bb.put((byte) H_INT32);
                 bb.putInt(value.asInt());
                 break;
             case INT64:
-                bb.put(H_INT64);
+                bb.put((byte) H_INT64);
                 bb.putLong(value.asLong());
                 break;
             case FLOAT32:
-                bb.put(H_FLOAT32);
+                bb.put((byte) H_FLOAT32);
                 bb.putFloat(value.asFloat());
                 break;
             case FLOAT64:
-                bb.put(H_FLOAT64);
+                bb.put((byte) H_FLOAT64);
                 bb.putDouble(value.asDouble());
                 break;
             case BOOLEAN:
-                bb.put(value.asBoolean() ? H_TRUE_BOOLEAN : H_FALSE_BOOLEAN);
+                bb.put(value.asBoolean() ? (byte) H_TRUE_BOOLEAN : (byte) H_FALSE_BOOLEAN);
                 break;
         }
     }
@@ -467,14 +565,14 @@ public abstract class WireValue {
             // FIXME record this in expandOne/expand
             int maxd = -1;
             int maxi = -1;
-            boolean r = false;
+//            boolean r = false;
 
             int luti = -1;
         }
 
 
         Map<WireValue, S> stats = new HashMap<WireValue, S>(4);
-        List<S> rs = new ArrayList<S>(4);
+//        List<S> rs = new ArrayList<S>(4);
 
         List<S> lut = new ArrayList<S>(4);
         int lutNb = 0;
@@ -494,7 +592,7 @@ public abstract class WireValue {
         int expand(WireValue value, int d, int i) {
             switch (value.getType()) {
                 case MAP:
-                    expandOne(value, d, i, true);
+                    expandOne(value, d, i);
                     i += 1;
                     // the rest
                     Map<WireValue, WireValue> m = value.asMap();
@@ -504,7 +602,7 @@ public abstract class WireValue {
                     i = expand(of(values), d + 1, i);
                     break;
                 case LIST:
-                    expandOne(value, d, i, true);
+                    expandOne(value, d, i);
                     i += 1;
                     // the rest
                     for (WireValue v : value.asList()) {
@@ -512,13 +610,13 @@ public abstract class WireValue {
                     }
                     break;
                 default:
-                    expandOne(value, d, i, false);
+                    expandOne(value, d, i);
                     i += 1;
                     break;
             }
             return i;
         }
-        void expandOne(WireValue value, int d, int i, boolean rmask) {
+        void expandOne(WireValue value, int d, int i) {
             S s = stats.get(value);
             if (null == s) {
                 s = new S();
@@ -528,10 +626,10 @@ public abstract class WireValue {
             s.count += 1;
             s.maxd = Math.max(s.maxd, d);
             s.maxi = Math.max(s.maxi, i);
-            if (rmask && !s.r) {
-                s.r = true;
-                rs.add(s);
-            }
+//            if (rmask && !s.r) {
+//                s.r = true;
+//                rs.add(s);
+//            }
         }
 
         boolean opt() {
@@ -543,6 +641,7 @@ public abstract class WireValue {
 
             // order r values by maxd
             // if include each, subtract down
+            List<S> rs = new ArrayList<S>(stats.values());
             Collections.sort(rs, new Comparator<S>() {
                 @Override
                 public int compare(S a, S b) {
@@ -791,6 +890,7 @@ public abstract class WireValue {
     abstract boolean asBoolean();
     abstract List<WireValue> asList();
     abstract Map<WireValue, WireValue> asMap();
+    // FIXME return ByteBuffer
     abstract byte[] asBlob();
 
 
@@ -800,6 +900,59 @@ public abstract class WireValue {
 
 
 
+    private static class BlobWireValue extends WireValue {
+        final byte[] value;
+
+        BlobWireValue(byte[] value) {
+            super(Type.BLOB);
+            this.value = value;
+        }
+
+        public String asString() {
+            return base64(value);
+        }
+
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        public byte[] asBlob() {
+            return value;
+        }
+
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(value);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof BlobWireValue)) {
+                return false;
+            }
+            BlobWireValue b = (BlobWireValue) obj;
+            return Arrays.equals(value, b.value);
+        }
+    }
 
     private static class Utf8WireValue extends WireValue {
         final String value;
@@ -1091,17 +1244,4 @@ public abstract class WireValue {
         }
     }
 
-    // FIXME  ...
-
-
-    // based on byte[] and views into the byte[] (parsing does not expand into a bunch of objects in memory)
-    private static class CompressedWireValue {
-
-    }
-
-    // LUT sizes: 2^7, 2^15
-    // index maps to byte[]
-    private static class CompressionState {
-
-    }
 }
