@@ -1,17 +1,19 @@
 package io.nextop;
 
 import com.google.common.base.Charsets;
-import com.google.common.base.Utf8;
+import com.google.common.collect.AbstractIterator;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import org.apache.commons.codec.binary.Base64OutputStream;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
 import java.util.*;
-import java.util.zip.GZIPOutputStream;
 
 // more efficient codec than text, that allows a lossless (*or nearly, for floats) conversion to text when needed
 // like protobufs/bson but focused on easy conversion to text
@@ -22,6 +24,8 @@ import java.util.zip.GZIPOutputStream;
 // TODO can always call toString to get JSON out (if type is array or object)
 
 // FIXME look at sizes if the lut is stateful, and the lut didn't need to be resent each time
+
+// FIXME memory and compressed wire values should have same hashcode and equals
 public abstract class WireValue {
     // just use int constants here
     static enum Type {
@@ -49,21 +53,42 @@ public abstract class WireValue {
 //    }
 //
 
+
+    static int intv(byte[] bytes, int offset) {
+        return ((0xFF & bytes[offset]) << 24)
+                | ((0xFF & bytes[offset + 1]) << 16)
+                | ((0xFF & bytes[offset + 2]) << 8)
+                | (0xFF & bytes[offset + 3]);
+    }
+    static long longv(byte[] bytes, int offset) {
+        return ((0xFFL & bytes[offset]) << 56)
+                | ((0xFFL & bytes[offset + 1]) << 48)
+                | ((0xFFL & bytes[offset + 2]) << 40)
+                | ((0xFFL & bytes[offset + 3]) << 32)
+                | ((0xFFL & bytes[offset + 4]) << 24)
+                | ((0xFFL & bytes[offset + 5]) << 16)
+                | ((0xFFL & bytes[offset + 6]) << 8)
+                | (0xFFL & bytes[offset + 7]);
+    }
+
     static WireValue valueOf(byte[] bytes) {
         int offset = 0;
         int h = 0xFF & bytes[offset];
         if ((h & H_COMPRESSED) == H_COMPRESSED) {
             int nb = h & ~H_COMPRESSED;
-            int size = ((0xFF & bytes[offset + 1]) << 24)
-                    | ((0xFF & bytes[offset + 2]) << 16)
-                    | ((0xFF & bytes[offset + 3]) << 8)
-                    | (0xFF & bytes[offset + 4]);
+            int size = intv(bytes, offset + 1);
             // next 4 is size in bytes
-            int[] offsets = new int[size];
-            // FIXME scan forward and collect offsets
+            int[] offsets = new int[size + 1];
+            offsets[0] = offset + 9;
+            if (0 < size) {
+                for (int i = 1; i <= size; ++i) {
+                    offsets[i] = offsets[i - 1] + _byteSize(bytes, offsets[i - 1]);
+                }
+            }
+
 
             CompressionState cs = new CompressionState(bytes, offset, offsets, nb);
-            return valueOf(bytes, /* TODO first byte after header */ 0, cs);
+            return valueOf(bytes, offsets[size], cs);
         }
         return valueOf(bytes, offset, null);
     }
@@ -79,21 +104,45 @@ public abstract class WireValue {
             return valueOf(cs.header, cs.offsets[luti], cs);
         }
 
-        // FIXME CompressedWireValue subclass for each type
         switch (h) {
+            case H_UTF8:
+                return new CUtf8WireValue(bytes, offset, cs);
             case H_BLOB:
+                return new CBlobWireValue(bytes, offset, cs);
             case H_INT32:
+                return new CInt32WireValue(bytes, offset, cs);
             case H_INT64:
+                return new CInt64WireValue(bytes, offset, cs);
             case H_FLOAT32:
+                return new CFloat32WireValue(bytes, offset, cs);
             case H_FLOAT64:
+                return new CFloat64WireValue(bytes, offset, cs);
             case H_TRUE_BOOLEAN:
+                return new BooleanWireValue(true);
             case H_FALSE_BOOLEAN:
+                return new BooleanWireValue(false);
             case H_MAP:
+                return new CMapWireValue(bytes, offset, cs);
             case H_LIST:
+                return new CListWireValue(bytes, offset, cs);
             case H_INT32_LIST:
+//                return new CInt32ListWireValue(bytes, offset, cs);
+                // FIXME see listh
+                throw new IllegalArgumentException();
             case H_INT64_LIST:
+//                return new CInt64ListWireValue(bytes, offset, cs);
+                // FIXME see listh
+                throw new IllegalArgumentException();
             case H_FLOAT32_LIST:
+//                return new CFloat32ListWireValue(bytes, offset, cs);
+                // FIXME see listh
+                throw new IllegalArgumentException();
             case H_FLOAT64_LIST:
+//                return new CFloat64ListWireValue(bytes, offset, cs);
+                // FIXME see listh
+                throw new IllegalArgumentException();
+            default:
+                throw new IllegalArgumentException("" + h);
         }
     }
 
@@ -105,7 +154,435 @@ public abstract class WireValue {
         CompressionState cs;
 
 
+        CompressedWireValue(Type type, byte[] bytes, int offset, CompressionState cs) {
+            super(type);
+            this.bytes = bytes;
+            this.offset = offset;
+            this.cs = cs;
+        }
+
+
     }
+
+
+    private static class CUtf8WireValue extends CompressedWireValue{
+        CUtf8WireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.UTF8, bytes, offset, cs);
+        }
+
+        @Override
+        public String asString() {
+            int length = intv(bytes, offset + 1);
+            return new String(bytes, offset + 5, length, Charsets.UTF_8);
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class CBlobWireValue extends CompressedWireValue{
+        CBlobWireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.BLOB, bytes, offset, cs);
+        }
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            int length = intv(bytes, offset + 1);
+            return ByteBuffer.wrap(bytes, offset + 5, length);
+        }
+    }
+
+
+    private static class CMapWireValue extends CompressedWireValue{
+        CMapWireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.MAP, bytes, offset, cs);
+        }
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+
+            return new AbstractMap<WireValue, WireValue>() {
+                int ds = offset + 5;
+                List<WireValue> keys = valueOf(bytes, ds, cs).asList();
+                List<WireValue> values = valueOf(bytes, ds + byteSize(bytes, ds, cs), cs).asList();
+                int n = keys.size();
+
+                @Override
+                public Set<Entry<WireValue, WireValue>> entrySet() {
+                    return new AbstractSet<Entry<WireValue, WireValue>>() {
+                        @Override
+                        public int size() {
+                            return n;
+                        }
+                        @Override
+                        public Iterator<Entry<WireValue, WireValue>> iterator() {
+                            return new Iterator<Entry<WireValue, WireValue>>() {
+                                int i = 0;
+
+                                @Override
+                                public boolean hasNext() {
+                                    return i < n;
+                                }
+
+                                @Override
+                                public Entry<WireValue, WireValue> next() {
+                                    int j = i++;
+                                    return new SimpleImmutableEntry<WireValue, WireValue>(keys.get(j), values.get(j));
+                                }
+                            };
+                        }
+                    };
+                }
+            };
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class CListWireValue extends CompressedWireValue {
+        CListWireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.LIST, bytes, offset, cs);
+        }
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            return new AbstractList<WireValue>() {
+                int n = intv(bytes, offset + 1);
+                int[] offsets = null;
+                int offseti = 0;
+
+                @Override
+                public int size() {
+                    return n;
+                }
+
+                @Override
+                public WireValue get(int index) {
+                    if (index < 0 || n <= index) {
+                        throw new IndexOutOfBoundsException();
+                    }
+                    fillOffsets(index);
+                    return valueOf(bytes, offsets[index], cs);
+                }
+
+
+                void fillOffsets(int j) {
+                    if (offseti <= j) {
+                        if (null == offsets) {
+                            offsets = new int[n];
+                            offsets[0] = offset + 9;
+                            offseti = 1;
+                        }
+
+                        int i = offseti;
+                        for (; i <= j; ++i) {
+                            offsets[i] = offsets[i - 1] + byteSize(bytes, offsets[i - 1], cs);
+                        }
+                        offseti = i;
+                    }
+                }
+            };
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+
+    private static class CInt32WireValue extends CompressedWireValue {
+        CInt32WireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.INT32, bytes, offset, cs);
+        }
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            return intv(bytes, offset + 1);
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class CInt64WireValue extends CompressedWireValue {
+        CInt64WireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.INT64, bytes, offset, cs);
+        }
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            return longv(bytes, offset + 1);
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class CFloat32WireValue extends CompressedWireValue {
+        CFloat32WireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.FLOAT32, bytes, offset, cs);
+        }
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            return Float.intBitsToFloat(intv(bytes, offset + 1));
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class CFloat64WireValue extends CompressedWireValue {
+        CFloat64WireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.FLOAT64, bytes, offset, cs);
+        }
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            return Double.longBitsToDouble(longv(bytes, offset + 1));
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+
+
 
     // LUT sizes: 2^7, 2^15
     // index maps to byte[]
@@ -114,6 +591,13 @@ public abstract class WireValue {
         int offset;
         int[] offsets;
         int nb;
+
+        CompressionState(byte[] header, int offset, int[] offsets, int nb) {
+            this.header = header;
+            this.offset = offset;
+            this.offsets = offsets;
+            this.nb = nb;
+        }
     }
 
 
@@ -236,6 +720,9 @@ public abstract class WireValue {
 
 
     final Type type;
+    boolean hashCodeSet = false;
+    int hashCode;
+
 
     WireValue(Type type) {
         this.type = type;
@@ -246,11 +733,95 @@ public abstract class WireValue {
 
 
 
-    public Type getType() {
+    public final Type getType() {
         return type;
     }
 
 
+    @Override
+    public final int hashCode() {
+        if (!hashCodeSet) {
+            hashCode = _hashCode(this);
+            hashCodeSet = true;
+        }
+        return hashCode;
+    }
+    static int _hashCode(WireValue value) {
+        switch (value.type) {
+            case UTF8:
+                return value.asString().hashCode();
+            case BLOB:
+                return value.asBlob().hashCode();
+            case INT32:
+                return Integer.hashCode(value.asInt());
+            case INT64:
+                return Long.hashCode(value.asLong());
+            case FLOAT32:
+                return Float.hashCode(value.asFloat());
+            case FLOAT64:
+                return Double.hashCode(value.asDouble());
+            case BOOLEAN:
+                return Boolean.hashCode(value.asBoolean());
+            case MAP: {
+                Map<WireValue, WireValue> map = value.asMap();
+                List<WireValue> keys = stableKeys(map);
+                List<WireValue> values = stableValues(map, keys);
+                int c = 0;
+                for (WireValue v : keys) {
+                    c = 31 * c + _hashCode(v);
+                }
+                for (WireValue v : values) {
+                    c = 31 * c + _hashCode(v);
+                }
+                return c;
+             }
+            case LIST: {
+                int c = 0;
+                for (WireValue v : value.asList()) {
+                    c = 31 * c + _hashCode(v);
+                }
+                return c;
+            }
+            default:
+                throw new IllegalArgumentException();
+        }
+    }
+
+    @Override
+    public final boolean equals(Object obj) {
+        if (!(obj instanceof WireValue)) {
+            return false;
+        }
+        WireValue b = (WireValue) obj;
+        return _equals(this, b);
+    }
+    static boolean _equals(WireValue a, WireValue b) {
+        if (!a.type.equals(b.type) || a.hashCode() != b.hashCode()) {
+            return false;
+        }
+        switch (a.type) {
+            case UTF8:
+                return a.asString().equals(b.asString());
+            case BLOB:
+                return a.asBlob().equals(b.asBlob());
+            case INT32:
+                return a.asInt() == b.asInt();
+            case INT64:
+                return a.asLong() == b.asLong();
+            case FLOAT32:
+                return a.asFloat() == b.asFloat();
+            case FLOAT64:
+                return a.asDouble() == b.asDouble();
+            case BOOLEAN:
+                return a.asBoolean() == b.asBoolean();
+            case MAP:
+                return a.asMap().equals(b.asMap());
+            case LIST:
+                return a.asList().equals(b.asList());
+            default:
+                throw new IllegalArgumentException();
+        }
+    }
 
 
     public String toString() {
@@ -265,6 +836,12 @@ public abstract class WireValue {
         return sb.toString();
     }
 
+    public String toJsonString() {
+        StringBuilder sb = new StringBuilder();
+
+        toString(this, sb, true, 0);
+        return sb.toString();
+    }
 
     void toString(WireValue value, StringBuilder sb, boolean q, int qe) {
         switch (value.getType()) {
@@ -336,8 +913,20 @@ public abstract class WireValue {
         return sb.toString();
     }
 
-    static String base64(byte[] bytes) {
-        byte[] b64 = org.apache.commons.codec.binary.Base64.encodeBase64(bytes);
+    static String base64(ByteBuffer bytes) {
+        byte[] b64;
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(bytes.remaining() * 4 / 3);
+            Base64OutputStream b64os = new Base64OutputStream(baos, true, 0, null);
+
+            WritableByteChannel channel = Channels.newChannel(b64os);
+            channel.write(bytes);
+            channel.close();
+
+            b64 = baos.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
         return new String(b64, Charsets.UTF_8);
     }
 
@@ -375,35 +964,84 @@ public abstract class WireValue {
     }
 
     static int listh(List<WireValue> list) {
-        int n = list.size();
-        if (0 == n) {
-            return H_LIST;
-        }
-        Type t = list.get(0).getType();
-        for (int i = 0; i < n; ++i) {
-            if (!t.equals(list.get(1).getType())) {
-                return H_LIST;
-            }
-        }
-        switch (t) {
-            case INT32:
-                return H_INT32;
-            case INT64:
-                return H_INT64_LIST;
-            case FLOAT32:
-                return H_FLOAT32_LIST;
-            case FLOAT64:
-                return H_FLOAT64_LIST;
-            default:
-                return H_LIST;
-        }
+        return H_LIST;
+        // FIXME implement later
+//        int n = list.size();
+//        if (0 == n) {
+//            return H_LIST;
+//        }
+//        Type t = list.get(0).getType();
+//        for (int i = 0; i < n; ++i) {
+//            if (!t.equals(list.get(1).getType())) {
+//                return H_LIST;
+//            }
+//        }
+//        switch (t) {
+//            case INT32:
+//                return H_INT32;
+//            case INT64:
+//                return H_INT64_LIST;
+//            case FLOAT32:
+//                return H_FLOAT32_LIST;
+//            case FLOAT64:
+//                return H_FLOAT64_LIST;
+//            default:
+//                return H_LIST;
+//        }
     }
 
 
 
 
     // toByte should always compress
+    static int byteSize(byte[] bytes, int offset, CompressionState cs) {
+        int h = 0xFF & bytes[offset];
+        if ((h & H_COMPRESSED) == H_COMPRESSED) {
+            return cs.nb;
+        }
+        return _byteSize(bytes, offset);
+    }
 
+    static int _byteSize(byte[] bytes, int offset) {
+        int h = 0xFF & bytes[offset];
+//        System.out.printf("_byteSize %s\n", h);
+        switch (h) {
+            case H_UTF8:
+                return 5 + intv(bytes, offset + 1);
+            case H_BLOB:
+                return 5 + intv(bytes, offset + 1);
+            case H_INT32:
+                return 5;
+            case H_INT64:
+                return 9;
+            case H_FLOAT32:
+                return 5;
+            case H_FLOAT64:
+                return 9;
+            case H_TRUE_BOOLEAN:
+                return 1;
+            case H_FALSE_BOOLEAN:
+                return 1;
+            case H_MAP:
+                return 5 + intv(bytes, offset + 1);
+            case H_LIST:
+                return 9 + intv(bytes, offset + 5);
+            case H_INT32_LIST:
+                // FIXME see listh
+                throw new IllegalArgumentException();
+            case H_INT64_LIST:
+                // FIXME see listh
+                throw new IllegalArgumentException();
+            case H_FLOAT32_LIST:
+                // FIXME see listh
+                throw new IllegalArgumentException();
+            case H_FLOAT64_LIST:
+                // FIXME see listh
+                throw new IllegalArgumentException();
+            default:
+                throw new IllegalArgumentException("" + h);
+        }
+    }
 
     public void toBytes(ByteBuffer bb) {
 
@@ -411,9 +1049,7 @@ public abstract class WireValue {
         lb.init(this);
         if (lb.opt()) {
             // write the lut header
-            byte[] header = header(lb.lutNb, lb.lutNb);
-            header[0] |= H_COMPRESSED;
-            bb.put(header);
+            bb.put((byte) (H_COMPRESSED | lb.lutNb));
             bb.putInt(lb.lut.size());
             bb.putInt(0);
             int i = bb.position();
@@ -467,7 +1103,7 @@ public abstract class WireValue {
                 int listh = listh(list);
                 if (H_LIST == listh) {
                     bb.put((byte) H_LIST);
-
+                    bb.putInt(list.size());
                     bb.putInt(0);
 
                     int i = bb.position();
@@ -481,7 +1117,7 @@ public abstract class WireValue {
                 } else {
                     // primitive homogeneous list
                     bb.put((byte) listh);
-
+                    bb.putInt(list.size());
                     bb.putInt(0);
 
                     int i = bb.position();
@@ -516,10 +1152,10 @@ public abstract class WireValue {
                 break;
             }
             case BLOB: {
-                byte[] b = value.asBlob();
+                ByteBuffer b = value.asBlob();
 
                 bb.put((byte) H_BLOB);
-                bb.putInt(b.length);
+                bb.putInt(b.remaining());
                 bb.put(b);
 
                 break;
@@ -550,12 +1186,15 @@ public abstract class WireValue {
                 bb.putDouble(value.asDouble());
                 break;
             case BOOLEAN:
-                bb.put(value.asBoolean() ? (byte) H_TRUE_BOOLEAN : (byte) H_FALSE_BOOLEAN);
+                bb.put((byte) (value.asBoolean() ? H_TRUE_BOOLEAN : H_FALSE_BOOLEAN));
                 break;
+            default:
+                throw new IllegalArgumentException();
         }
     }
 
 
+    // lut builder
     static class Lb {
         static class S {
             WireValue value;
@@ -844,16 +1483,16 @@ public abstract class WireValue {
                     return 0;
                 }
                 case BLOB: {
-                    byte[] abytes = a.asBlob();
-                    byte[] bbytes = b.asBlob();
-                    int n = abytes.length;
-                    int m = bbytes.length;
+                    ByteBuffer abytes = a.asBlob();
+                    ByteBuffer bbytes = b.asBlob();
+                    int n = abytes.remaining();
+                    int m = bbytes.remaining();
                     d = n - m;
                     if (0 != d) {
                         return d;
                     }
                     for (int i = 0; i < n; ++i) {
-                        d = (0xFF & abytes[i]) - (0xFF & bbytes[i]);
+                        d = (0xFF & abytes.get(i)) - (0xFF & bbytes.get(i));
                         if (0 != d) {
                             return d;
                         }
@@ -890,8 +1529,7 @@ public abstract class WireValue {
     abstract boolean asBoolean();
     abstract List<WireValue> asList();
     abstract Map<WireValue, WireValue> asMap();
-    // FIXME return ByteBuffer
-    abstract byte[] asBlob();
+    abstract ByteBuffer asBlob();
 
 
 
@@ -909,7 +1547,7 @@ public abstract class WireValue {
         }
 
         public String asString() {
-            return base64(value);
+            return base64(ByteBuffer.wrap(value));
         }
 
         public int asInt() {
@@ -934,24 +1572,11 @@ public abstract class WireValue {
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
-        public byte[] asBlob() {
-            return value;
+        public ByteBuffer asBlob() {
+            return ByteBuffer.wrap(value);
         }
 
 
-        @Override
-        public int hashCode() {
-            return Arrays.hashCode(value);
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (!(obj instanceof BlobWireValue)) {
-                return false;
-            }
-            BlobWireValue b = (BlobWireValue) obj;
-            return Arrays.equals(value, b.value);
-        }
     }
 
     private static class Utf8WireValue extends WireValue {
@@ -988,23 +1613,8 @@ public abstract class WireValue {
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
-        public byte[] asBlob() {
-            return value.getBytes(Charsets.UTF_8);
-        }
-
-
-        @Override
-        public int hashCode() {
-            return value.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (!(obj instanceof Utf8WireValue)) {
-                return false;
-            }
-            Utf8WireValue b = (Utf8WireValue) obj;
-            return value.equals(b.value);
+        public ByteBuffer asBlob() {
+            return ByteBuffer.wrap(value.getBytes(Charsets.UTF_8));
         }
     }
 
@@ -1059,24 +1669,9 @@ public abstract class WireValue {
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
-        public byte[] asBlob() {
+        public ByteBuffer asBlob() {
             // TODO
             throw new UnsupportedOperationException();
-        }
-
-
-        @Override
-        public int hashCode() {
-            return value.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (!(obj instanceof NumberWireValue)) {
-                return false;
-            }
-            NumberWireValue b = (NumberWireValue) obj;
-            return value.equals(b.value);
         }
     }
 
@@ -1115,23 +1710,9 @@ public abstract class WireValue {
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
-        public byte[] asBlob() {
+        public ByteBuffer asBlob() {
             // TODO
             throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int hashCode() {
-            return Boolean.hashCode(value);
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (!(obj instanceof BooleanWireValue)) {
-                return false;
-            }
-            BooleanWireValue b = (BooleanWireValue) obj;
-            return value == b.value;
         }
     }
 
@@ -1169,25 +1750,10 @@ public abstract class WireValue {
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
-        public byte[] asBlob() {
+        public ByteBuffer asBlob() {
             // TODO
             throw new UnsupportedOperationException();
         }
-
-        @Override
-        public int hashCode() {
-            return value.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (!(obj instanceof ListWireValue)) {
-                return false;
-            }
-            ListWireValue b = (ListWireValue) obj;
-            return value.equals(b.value);
-        }
-
     }
 
     private static class MapWireValue extends WireValue {
@@ -1224,23 +1790,9 @@ public abstract class WireValue {
         public Map<WireValue, WireValue> asMap() {
             return value;
         }
-        public byte[] asBlob() {
+        public ByteBuffer asBlob() {
             // TODO
             throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int hashCode() {
-            return value.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (!(obj instanceof MapWireValue)) {
-                return false;
-            }
-            MapWireValue b = (MapWireValue) obj;
-            return value.equals(b.value);
         }
     }
 

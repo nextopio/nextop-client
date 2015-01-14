@@ -1,8 +1,8 @@
 package io.nextop;
 
 import com.google.common.base.Charsets;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
+import io.nextop.util.HexBytes;
 import junit.framework.TestCase;
 import org.junit.Test;
 
@@ -140,6 +140,102 @@ public class WireValueTest extends TestCase {
 
     }
 
+
+    @Test
+    public void testRandomCodec() {
+
+        // 1. generate random json
+        // 2. convert to wire value
+
+        // 3. bytes (measure time)
+        // 4. parse (3) (measure time)
+        // 5. (4) to json string (measure time)
+        // 6. parse json (5) (measure time)
+        // 7. convert json to wire value
+        // 8. assert (4) == (7)
+
+
+        Random r = new Random();
+        JsonElement je = randomJson(r, 6);
+        WireValue v = WireValue.valueOf(je);
+        ByteBuffer bb = ByteBuffer.allocate(32 * 1024 * 1024);
+        for (int i = 0; i < 8; ++i) {
+            bb.clear();
+            long t = System.nanoTime();
+            v.toBytes(bb);
+            System.out.printf("to bytes %.3fms\n", ((System.nanoTime() - t) / 1000) / 1000.f);
+
+            bb.flip();
+            byte[] bytes = new byte[bb.remaining()];
+            bb.get(bytes);
+            t = System.nanoTime();
+            WireValue v2 = WireValue.valueOf(bytes);
+            System.out.printf("parse bytes %.3fms\n", ((System.nanoTime() - t) / 1000) / 1000.f);
+            assertEquals(v, v2);
+
+            t = System.nanoTime();
+            String js2 = v2.toJsonString();
+            System.out.printf("to json %.3fms\n", ((System.nanoTime() - t) / 1000) / 1000.f);
+
+            t = System.nanoTime();
+            JsonElement je2 = new JsonParser().parse(js2);
+            System.out.printf("parse json %.3fms\n", ((System.nanoTime() - t) / 1000) / 1000.f);
+
+            t = System.nanoTime();
+            WireValue v3 = WireValue.valueOf(je2);
+            System.out.printf("value of json %.3fms\n", ((System.nanoTime() - t) / 1000) / 1000.f);
+            assertEquals(v, v3);
+
+            v = v3;
+        }
+    }
+    private JsonElement randomJson(Random r, int d) {
+        // list, map, long, double, string, bool
+        switch (r.nextInt(0 < d ? 14 : 4)) {
+            case 0: {
+                int m = r.nextInt(16);
+                byte[] bytes = new byte[m];
+                r.nextBytes(bytes);
+                return new JsonPrimitive(HexBytes.toString(bytes));
+            }
+            case 1:
+                return new JsonPrimitive(r.nextLong());
+            case 2:
+                return new JsonPrimitive(r.nextDouble());
+            case 3:
+                return new JsonPrimitive(r.nextBoolean());
+            case 4:
+            case 5:
+            case 6:
+            case 7:
+            case 8: {
+                int n = r.nextInt(16);
+                JsonArray array = new JsonArray();
+                for (int i = 0; i < n; ++i) {
+                    array.add(randomJson(r, d - 1));
+                }
+                return array;
+            }
+            case 9:
+            case 10:
+            case 11:
+            case 12:
+            case 13: {
+                int n = r.nextInt(16);
+                JsonObject object = new JsonObject();
+                for (int i = 0; i < n; ++i) {
+                    int m = r.nextInt(32);
+                    byte[] keyBytes = new byte[m];
+                    r.nextBytes(keyBytes);
+                    String key = HexBytes.toString(keyBytes);
+                    object.add(key, randomJson(r, d - 1));
+                }
+                return object;
+            }
+            default:
+                throw new IllegalStateException();
+        }
+    }
 
 
 
