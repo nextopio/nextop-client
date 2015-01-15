@@ -31,8 +31,7 @@ public class Nurl {
     public static class Target {
         Method method;
         // paths can use "$var" segments
-        // toString used here
-        Object path;
+        String path;
     }
 
     public static class Via {

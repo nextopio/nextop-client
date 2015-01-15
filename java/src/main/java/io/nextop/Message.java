@@ -1,14 +1,12 @@
 package io.nextop;
 
-import com.google.common.collect.ImmutableMap;
-
 import javax.annotation.Nullable;
 import java.util.Map;
 
 
 // goals: fast to parse, minimal object creation on parse or each operation
 public class Message {
-    public static final WireValue P_BODY = WireValue.of("$body");
+    public static final WireValue P_CONTENT = WireValue.of("$content");
 
 
     Id id;
@@ -95,7 +93,7 @@ public class Message {
         }
 
         public Builder setBody(@Nullable Object value) {
-            return put(P_BODY, value);
+            return put(P_CONTENT, value);
         }
 
         public Builder put(Object name, @Nullable Object value) {

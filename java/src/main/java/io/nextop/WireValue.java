@@ -26,6 +26,9 @@ import java.util.*;
 // FIXME look at sizes if the lut is stateful, and the lut didn't need to be resent each time
 
 // FIXME memory and compressed wire values should have same hashcode and equals
+
+
+// FIXME everywhere replace byte[] with ByteBuffer
 public abstract class WireValue {
     // just use int constants here
     static enum Type {

@@ -2,8 +2,10 @@ package io.nextop;
 
 
 // FIXME add named authority
-public final class Authority {
-    public static Authority valueOf(String s) {
+public final class Authority<H> {
+    public static Authority<?> valueOf(String s) {
+        // FIXME try ip; then try domain name; then fail
+
         int n = s.length();
         int i = n - 1;
         // find last : to be compatible with ipv6
@@ -22,7 +24,7 @@ public final class Authority {
 
 
 
-    public static Authority create(Ip host, int port) {
+    public static Authority<Ip> create(Ip host, int port) {
         if (port < 0 || Short.MAX_VALUE < port) {
             throw new IllegalArgumentException();
         }
@@ -30,11 +32,11 @@ public final class Authority {
     }
 
 
-    public final Ip host;
+    public final H host;
     public final int port;
 
 
-    private Authority(Ip host, int port) {
+    private Authority(H host, int port) {
         this.host = host;
         this.port = port;
     }
@@ -61,6 +63,15 @@ public final class Authority {
         int c = host.hashCode();
         c = m * c + Integer.hashCode(port);
         return c;
+    }
+
+
+    public static final class IpAuthority extends Authority {
+
+    }
+
+    public static final class DomainNameAuthority extends Authority {
+
     }
 
 }
