@@ -63,7 +63,7 @@ public class ClientDemo {
 
         s.send(Message.newBuilder()
                 .setNurl("GET https://google.com/")
-                .setBody("hello world!")
+                .setContent("hello world!")
                 .build());
 
         // this should completely send the message
@@ -79,7 +79,7 @@ public class ClientDemo {
 
         s.send(Message.newBuilder()
                 .setNurl("GET https://google.com/")
-                .setBody("hello world!")
+                .setContent("hello world!")
                 .build());
 
         for (TestWireFactory twf : new TestWireFactory[]{nWifiWireFactory, nCellWireFactory, hWifiWireFactory, hCellWireFactory}) {

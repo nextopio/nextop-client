@@ -46,13 +46,13 @@ echo location of your Java installation.
 goto fail
 
 :init
-@rem Get command-line arguments, handling Windowz variants
+@rem Get command-line parameters, handling Windowz variants
 
 if not "%OS%" == "Windows_NT" goto win9xME_args
 if "%@eval[2+2]" == "4" goto 4NT_args
 
 :win9xME_args
-@rem Slurp the command line arguments.
+@rem Slurp the command line parameters.
 set CMD_LINE_ARGS=
 set _SKIP=2
 
@@ -63,7 +63,7 @@ set CMD_LINE_ARGS=%*
 goto execute
 
 :4NT_args
-@rem Get arguments from the 4NT Shell from JP Software
+@rem Get parameters from the 4NT Shell from JP Software
 set CMD_LINE_ARGS=%$
 
 :execute

@@ -15,6 +15,16 @@ import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.util.*;
 
+
+// TODO
+// wire value v2:
+// - fixed size index (23-bit)
+// - incremental headers
+// -- lru maintainenace to keep within a fixed size
+// -- store the compressed value in the lru map
+// -- never compress int* of float*
+// - use ByteBuffer in API instead of byte[]
+
 // more efficient codec than text, that allows a lossless (*or nearly, for floats) conversion to text when needed
 // like protobufs/bson but focused on easy conversion to text
 // conversion of text is important when constructing HTTP requests, which are test-based
@@ -661,21 +671,45 @@ public abstract class WireValue {
 
 
     public static WireValue of(Object value) {
-        // FIXME if wire value, return
-        // FIXME else call into the right of(...)
-        if (value instanceof Integer) {
-            return of(((Integer) value).intValue());
+        if (value instanceof WireValue) {
+            return (WireValue) value;
         }
-        if (value instanceof Long) {
-            return of(((Long) value).longValue());
+        if (value instanceof CharSequence) {
+            return of(value.toString());
         }
-        if (value instanceof Float) {
-            return of(((Float) value).floatValue());
+        if (value instanceof Number) {
+            if (value instanceof Integer) {
+                return of(((Integer) value).intValue());
+            }
+            if (value instanceof Long) {
+                return of(((Long) value).longValue());
+            }
+            if (value instanceof Float) {
+                return of(((Float) value).floatValue());
+            }
+            if (value instanceof Double) {
+                return of(((Double) value).doubleValue());
+            }
+            // default int32
+            return of(((Number) value).intValue());
         }
-        if (value instanceof Double) {
-            return of(((Double) value).doubleValue());
+        if (value instanceof Boolean) {
+            return of(((Boolean) value).booleanValue());
         }
-        throw new IllegalArgumentException("" + value.getClass().getSimpleName());
+        if (value instanceof byte[]) {
+            return of((byte[]) value);
+        }
+        // FIXME bytebuffer
+        if (value instanceof Map) {
+            return of((Map<WireValue, WireValue>) value);
+        }
+        if (value instanceof Collection) {
+            if (value instanceof List) {
+                return of((List<WireValue>) value);
+            }
+            return of(new ArrayList<WireValue>(((Collection) value)));
+        }
+        throw new IllegalArgumentException();
     }
 
     static WireValue of(byte[] value) {
