@@ -1,6 +1,8 @@
 package io.nextop.client;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Future;
 
 // blocking interface. each method blocks
@@ -19,7 +21,8 @@ interface Wire {
 
 
     interface Factory {
-        Wire create();
+        // this can block until the wire is available
+        Wire create() throws NoSuchElementException;
     }
 }
 

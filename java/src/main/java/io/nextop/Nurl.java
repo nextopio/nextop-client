@@ -71,12 +71,29 @@ public final class Nurl {
         return String.format("%s %s%s", target.method, via, target.path);
     }
 
+
+    @Override
+    public int hashCode() {
+        int c = target.hashCode();
+        c = 31 * c + via.hashCode();
+        return c;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof Nurl)) {
+            return false;
+        }
+        Nurl b = (Nurl) obj;
+        return target.equals(b.target) && via.equals(b.via);
+    }
+
+
+
     public static enum Method {
         GET,
         POST,
         // FIXME expand HTTP methods
-        SUBSCRIBE,
-        UNSUBSCRIBE
     }
 
     public static enum Scheme {
@@ -100,10 +117,15 @@ public final class Nurl {
         }
 
 
+        public static Target create(Method method, Path path) {
+            return new Target(method, path);
+        }
+
+
         public final Method method;
         public final Path path;
 
-        public Target(Method method, Path path) {
+        private Target(Method method, Path path) {
             this.method = method;
             this.path = path;
         }
@@ -145,11 +167,16 @@ public final class Nurl {
         }
 
 
+        public static Via create(Scheme scheme, Authority authority) {
+            return new Via(scheme, authority);
+        }
+
+
         public final Scheme scheme;
         public final Authority authority;
 
 
-        public Via(Scheme scheme, Authority authority) {
+        private Via(Scheme scheme, Authority authority) {
             this.scheme = scheme;
             this.authority = authority;
         }

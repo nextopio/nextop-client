@@ -9,4 +9,13 @@ public class DurableNode /* FIXME */ extends PassthroughNode {
     public DurableNode(MessageControlNode downstream) {
         super(downstream);
     }
+
+
+
+    // subscribe -> CACHE (cache will emit a receive if not ackd)
+    //        CACHE <- subscribe (cache will emit a send if not ackd)
+
+
+    // FIXME facade to storage
+
 }

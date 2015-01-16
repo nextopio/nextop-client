@@ -2,9 +2,7 @@ package io.nextop.client;
 
 import java.util.List;
 
-/**
- * Created by brien on 1/10/15.
- */ // all message control nodes run on a single thread (handler) controlled by the top level node,
+// all message control nodes run on a single thread (handler) controlled by the top level node,
 // via post and postDelayed
 interface MessageControlNode extends MessageControlChannel {
 

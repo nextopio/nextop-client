@@ -2,21 +2,30 @@ package io.nextop.client;
 
 import io.nextop.Message;
 
-/**
- * Created by brien on 1/10/15.
- */
 class MessageControl {
     static enum Type {
-        SEND_ACK, // follow up to send_nack (?)
-        SEND_ERROR, // follow up to send_nack (?)
-        SEND_NACK, // represents the case where the transport has committed the message to the remote but not received a response
-        SEND,
-        RECEIVE,
-        RECEIVE_ACK
-        // TODO receive nack?
+
+        SUBSCRIBE, // <->
+        UNSUBSCRIBE, // <->
+
+        SEND, // ->
+        SEND_ACK, // <- message has been successfully sent. can delete locally
+        SEND_NACK, // -> cancel
+        SEND_ERROR, // <- message rejected from the other side
+
+        RECEIVE, // <- here's a message, hasn't been ack'd yet
+        RECEIVE_ACK, // ->
+        RECEIVE_NACK, // -> error handling response; may send back for another receiver
+        RECEIVE_ERROR // <- message is gone (ejected/deleted after timeout, etc)
     }
 
+    public final Type type;
+    public final Message message;
 
-    Message message;
+
+    public MessageControl(Type type, Message message) {
+        this.type = type;
+        this.message = message;
+    }
 
 }

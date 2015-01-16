@@ -5,17 +5,34 @@ import com.google.common.collect.ImmutableMap;
 import javax.annotation.Nullable;
 import java.util.*;
 
+import static io.nextop.Nurl.*;
 
 // goals: fast to parse, minimal object creation on parse or each operation
 public class Message {
     public static final WireValue P_CONTENT = WireValue.of("$content");
 
 
-    private final Id id;
-    private final int priority;
-    private final Nurl nurl;
-    private final Map<WireValue, WireValue> headers;
-    private final Map<WireValue, WireValue> parameters;
+
+    public static Nurl receiverNurl(Id id) {
+        return Nurl.local(Target.create(Method.POST, Path.valueOf(id.toString())));
+    }
+
+    public static Message receiverSpec(Id id, int priority) {
+        return newBuilder()
+                .setNurl(receiverNurl(id))
+                .setPriority(priority)
+                .build();
+    }
+
+
+
+
+
+    public final Id id;
+    public final int priority;
+    public final Nurl nurl;
+    public final Map<WireValue, WireValue> headers;
+    public final Map<WireValue, WireValue> parameters;
 
 
 
