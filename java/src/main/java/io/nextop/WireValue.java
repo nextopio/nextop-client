@@ -41,7 +41,7 @@ import java.util.*;
 // FIXME everywhere replace byte[] with ByteBuffer
 public abstract class WireValue {
     // just use int constants here
-    static enum Type {
+    public static enum Type {
         UTF8,
         BLOB,
         INT32,
@@ -624,26 +624,20 @@ public abstract class WireValue {
             if (p.isBoolean()) {
                 return of(p.getAsBoolean());
             } else if (p.isNumber()) {
-                // FIXME
-                String s = p.toString();
-                if (s.contains(".")) {
-                    float f = p.getAsFloat();
-                    try {
-                        if (String.valueOf(f).equals(s)) {
-                            return of(f);
-                        }
-                        // fall through
-                    } catch (NumberFormatException t) {
-                        // fall through
+                try {
+                    long n = p.getAsLong();
+                    if ((int) n == n) {
+                        return of((int) n);
+                    } else {
+                        return of(n);
                     }
-                    return of(p.getAsDouble());
-                } else {
-                    try {
-                        return of(p.getAsInt());
-                    } catch (NumberFormatException t) {
-                        // fall through
+                } catch (NumberFormatException x) {
+                    double d = p.getAsDouble();
+                    if ((float) d == d) {
+                        return of((float) d);
+                    } else {
+                        return of(d);
                     }
-                    return of(p.getAsLong());
                 }
             } else if (p.isString()) {
                 return of(p.getAsString());
@@ -1558,15 +1552,15 @@ public abstract class WireValue {
 
     // logical view, regardless of wire format
 
-    abstract String asString();
-    abstract int asInt();
-    abstract long asLong();
-    abstract float asFloat();
-    abstract double asDouble();
-    abstract boolean asBoolean();
-    abstract List<WireValue> asList();
-    abstract Map<WireValue, WireValue> asMap();
-    abstract ByteBuffer asBlob();
+    public abstract String asString();
+    public abstract int asInt();
+    public abstract long asLong();
+    public abstract float asFloat();
+    public abstract double asDouble();
+    public abstract boolean asBoolean();
+    public abstract List<WireValue> asList();
+    public abstract Map<WireValue, WireValue> asMap();
+    public abstract ByteBuffer asBlob();
 
 
 

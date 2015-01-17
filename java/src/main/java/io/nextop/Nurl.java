@@ -3,16 +3,15 @@ package io.nextop;
 import io.nextop.Authority;
 
 import javax.annotation.Nullable;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 
 // a url factored to work better with nextop concepts
 // in nextop, Authority.local() is an alias for "$access-key.nextop.io",
 // which the edge uses for control messages
 public final class Nurl {
     public static final Via LOCAL = new Via(Scheme.NEXTOP, Authority.local());
-
-
-
-    // FIXME valueOf(Url); toUrl()
 
 
     public static Nurl valueOf(String s) {
@@ -64,6 +63,9 @@ public final class Nurl {
         this.target = target;
         this.via = via;
     }
+
+
+
 
 
     @Override

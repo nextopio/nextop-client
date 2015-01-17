@@ -1,8 +1,13 @@
 package io.nextop;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.http.client.utils.URIBuilder;
+import rx.functions.Func1;
 
 import javax.annotation.Nullable;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.*;
 
 import static io.nextop.Nurl.*;
@@ -26,6 +31,20 @@ public class Message {
 
 
 
+    // FIXME
+//    public static Message valueOf(URI uri) {
+//        // FIXME
+//    }
+//
+//    public static Message valueOf(URL url) {
+//        try {
+//            return valueOf(url.toURI());
+//        } catch (URISyntaxException e) {
+//            throw new IllegalArgumentException(e);
+//        }
+//    }
+
+
 
 
     public final Id id;
@@ -47,32 +66,43 @@ public class Message {
     }
 
 
-    // FIXME toUrl that inserts values into variables
+    public Nurl receiverNurl() {
+        return receiverNurl(id);
+    }
 
 
-    public Message toHead() {
-        // FIXME
-        Builder b = newBuilder()
-                .setPriority(priority)
-                .setNurl(nurl);
+    public URI toUri() throws URISyntaxException {
+        // variables in path get substituted to path;
+        // if not all variables can be substituted, throw a URISyntaxException
+        // parameters except P_CONTENT get added as query params (via toString)
 
-        List<String> variables = nurl.target.path.getVariables();
-        Set<WireValue> variableKeys = new HashSet<WireValue>(variables.size());
-        for (String variable : variables) {
-            variableKeys.add(WireValue.of(variable));
+        Path fixedPath = nurl.target.path.fix(new Func1<String, Object>() {
+            @Override
+            public Object call(String s) {
+                return parameters.get(WireValue.of(s));
+            }
+        });
+
+        URIBuilder builder = new URIBuilder();
+        builder.setScheme(nurl.via.scheme.toString());
+        builder.setHost(nurl.via.authority.getHost());
+        if (0 < nurl.via.authority.port) {
+            builder.setPort(nurl.via.authority.port);
         }
+        builder.setPath(fixedPath.toString());
 
-        for (Map.Entry<WireValue, WireValue> e : headers.entrySet()) {
-            b = b.setHeader(e.getKey(), e.getValue());
-        }
         for (Map.Entry<WireValue, WireValue> e : parameters.entrySet()) {
-            if (variableKeys.contains(e.getKey())) {
-                b = b.set(e.getKey(), e.getValue());
+            WireValue key = e.getKey();
+            WireValue value = e.getValue();
+            if (!P_CONTENT.equals(key)) {
+                builder.addParameter(key.toString(), value.toString());
             }
         }
 
-        return b.build();
+        return builder.build();
     }
+
+
 
     public Builder toBuilder() {
         Builder b = newBuilder()

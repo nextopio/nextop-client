@@ -73,6 +73,7 @@ public final class Authority {
     public final Type type;
     @Nullable
     private final Object host;
+    /** <code>0</code> means default */
     public final int port;
 
 
@@ -99,6 +100,10 @@ public final class Authority {
             default:
                 throw new IllegalStateException();
         }
+    }
+
+    public String getHost() {
+        return host.toString();
     }
 
 

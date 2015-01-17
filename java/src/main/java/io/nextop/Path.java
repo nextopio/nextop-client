@@ -3,11 +3,11 @@ package io.nextop;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import rx.functions.Func1;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import javax.annotation.Nullable;
+import java.net.URISyntaxException;
+import java.util.*;
 import java.util.regex.Pattern;
 
 // paths can use "$var" segments
@@ -57,14 +57,35 @@ public class Path {
         return true;
     }
 
-    public List<String> getVariables() {
-        List<String> variables = new LinkedList<String>();
-        for (Segment segment : segments) {
-            if (Segment.Type.VARIABLE.equals(segment.type)) {
-                variables.add(segment.value);
+
+    public Path fix(Func1<String, Object> subs) throws URISyntaxException {
+        int n = segments.size();
+        List<Segment> fixedSegments = new ArrayList<Segment>(n);
+        for (int i = 0; i < n; ++i) {
+            Segment segment = segments.get(i);
+            switch (segment.type) {
+                case FIXED:
+                    fixedSegments.add(segment);
+                    break;
+                case VARIABLE:
+                    Segment subSegment;
+                    @Nullable Object subValue = subs.call(segment.value);
+                    if (null == subValue) {
+                        throw new URISyntaxException(segment.toString(), "No substitution found.", i);
+                    }
+                    try {
+                        subSegment = Segment.valueOf(subValue.toString());
+                    } catch (IllegalArgumentException e) {
+                        throw new URISyntaxException(segment.toString(), String.format("Substitution not a valid segment: %s", subValue), i);
+                    }
+                    if (!Segment.Type.FIXED.equals(subSegment.type)) {
+                        throw new URISyntaxException(segment.toString(), String.format("Substitution not a fixed segment: %s", subSegment), i);
+                    }
+                    fixedSegments.add(subSegment);
+                    break;
             }
         }
-        return variables;
+        return new Path(fixedSegments);
     }
 
 

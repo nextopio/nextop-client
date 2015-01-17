@@ -15,6 +15,7 @@ package io.nextop.client;
 
 
 import io.nextop.Message;
+import io.nextop.client.*;
 
 public class ClientDemo {
 

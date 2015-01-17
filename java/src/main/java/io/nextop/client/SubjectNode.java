@@ -54,14 +54,25 @@ public class SubjectNode extends AbstractMessageControlNode {
                     public void call() {
                         boolean s = receivers.remove(spec.nurl, subscriber);
                         assert s;
-                        downstream.onMessageControl(new MessageControl(MessageControl.Type.UNSUBSCRIBE, spec));
-                        // FIXME CHANGE_SUBSCRIPTION with new spec if another instead of unsubscribe (?)
+
+                        downstream.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                downstream.onMessageControl(new MessageControl(MessageControl.Type.UNSUBSCRIBE, spec));
+                                // FIXME CHANGE_SUBSCRIPTION with new spec if another instead of unsubscribe (?)
+                            }
+                        });
                     }
                 });
                 subscriber.add(subscription);
                 assert !subscription.isUnsubscribed();
                 // FIXME only send if not already subscribed (?)
-                downstream.onMessageControl(new MessageControl(MessageControl.Type.SUBSCRIBE, spec));
+                downstream.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        downstream.onMessageControl(new MessageControl(MessageControl.Type.SUBSCRIBE, spec));
+                    }
+                });
             }
         });
     }
@@ -93,8 +104,13 @@ public class SubjectNode extends AbstractMessageControlNode {
     }
 
 
-    public void cancelSend(Message spec) {
-        downstream.onMessageControl(new MessageControl(MessageControl.Type.SEND_NACK, spec));
+    public void cancelSend(final Message spec) {
+        downstream.post(new Runnable() {
+            @Override
+            public void run() {
+                downstream.onMessageControl(new MessageControl(MessageControl.Type.SEND_NACK, spec));
+            }
+        });
     }
 
 
