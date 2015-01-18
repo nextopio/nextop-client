@@ -29,6 +29,9 @@ public class Message {
                 .build();
     }
 
+    // FIXME echoNurl
+    // FIXME statusNurl
+
 
 
     // FIXME

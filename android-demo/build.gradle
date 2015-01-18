@@ -3,7 +3,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath group: 'com.android.tools.build', name: 'gradle', version: '1.0.1'
+        classpath group: 'com.android.tools.build', name: 'gradle', version: '0.14.2'
     }
 }
 
@@ -33,5 +33,6 @@ android {
 }
 
 dependencies {
+    compile project(':android')
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }

@@ -9,6 +9,7 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/android" />
+            <option value="$PROJECT_DIR$/android-demo" />
             <option value="$PROJECT_DIR$/java" />
           </set>
         </option>
