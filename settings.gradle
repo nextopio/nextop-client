@@ -1,3 +1,5 @@
 include 'java'
 
 include 'android'
+
+include 'android-demo'
