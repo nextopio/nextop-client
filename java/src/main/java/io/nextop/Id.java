@@ -42,6 +42,7 @@ public final class Id {
 
 
     private final byte[] bytes;
+    // FIXME use a murmur3 hash here
     private final int hashCode;
 
 

@@ -33,6 +33,8 @@ public class ImageView extends android.widget.ImageView {
 
     }
 
+    // FIXME setImageViewModel, onAttachToWindow bind, onUnattachFromWindow unbind
+
 
     public void clearImage() {
 

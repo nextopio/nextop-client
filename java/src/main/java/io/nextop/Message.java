@@ -292,6 +292,7 @@ public class Message {
 
     /////// HTTPCLIENT CONVERSIONS ///////
 
+    private static final String H_PRAGMA_ID_PREFIX = "nextop-id";
     private static final String H_PRAGMA_PREFIX = "nextop-header";
 
 
@@ -342,6 +343,10 @@ public class Message {
 
 
     private static void attachHeaders(Message message, HttpRequest request) {
+        // add the id
+        request.addHeader(HttpHeaders.PRAGMA, String.format("%s %s",
+                H_PRAGMA_ID_PREFIX, message.id));
+
         for (Map.Entry<WireValue, WireValue> e : message.headers.entrySet()) {
             WireValue key = e.getKey();
             WireValue value = e.getValue();
