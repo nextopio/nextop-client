@@ -65,6 +65,20 @@ public final class Nurl {
     }
 
 
+    @Nullable
+    public Id getLocalId() {
+        if (via.isLocal() && target.path.isFixed() && 1 <= target.path.segments.size()) {
+            Path.Segment first = target.path.segments.get(0);
+            assert Path.Segment.Type.FIXED.equals(first.type);
+            try {
+                return Id.valueOf(first.value);
+            } catch (IllegalArgumentException e) {
+                // FIXME log, strange ... could be a client-generated bad value
+                return null;
+            }
+        }
+        return null;
+    }
 
 
 
@@ -94,6 +108,7 @@ public final class Nurl {
 
     public static enum Method {
         GET,
+        HEAD,
         POST,
         // FIXME expand HTTP methods
     }
@@ -182,6 +197,12 @@ public final class Nurl {
             this.scheme = scheme;
             this.authority = authority;
         }
+
+
+        public boolean isLocal() {
+            return LOCAL.equals(this);
+        }
+
 
         @Override
         public String toString() {

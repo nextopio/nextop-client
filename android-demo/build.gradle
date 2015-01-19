@@ -10,6 +10,9 @@ buildscript {
 apply plugin: 'com.android.application'
 
 repositories {
+//    maven {
+//        url 'https://github.com/nextopio/nextop-client/tree/android-v2/repository/nextop-client'
+//    }
     mavenCentral()
 }
 
@@ -18,7 +21,7 @@ android {
     buildToolsVersion '21.1.2'
 
     defaultConfig {
-        applicationId "io.nextop.client.demo"
+        applicationId "io.nextop.demo"
         minSdkVersion 21
         targetSdkVersion 21
         versionCode 1
@@ -34,5 +37,7 @@ android {
 
 dependencies {
     compile project(':android')
+//    debugCompile project(':android')
+//    releaseCompile group: 'nextop-client', name: 'android', version: '0.1-SNAPSHOT'
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }

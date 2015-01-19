@@ -4,7 +4,7 @@ import java.util.List;
 
 // all message control nodes run on a single thread (handler) controlled by the top level node,
 // via post and postDelayed
-interface MessageControlNode extends MessageControlChannel {
+public interface MessageControlNode extends MessageControlChannel {
 
 
     void init(MessageControlChannel upstream);

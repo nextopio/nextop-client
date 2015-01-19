@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.nextop.client.demo" >
+    package="io.nextop.demo" >
 
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/AppTheme" >
+        android:theme="@style/AppTheme"
+        android:name="io.nextop.NextopApplication">
         <activity
-            android:name="io.nextop.client.demo.MainActivity"
+            android:name="io.nextop.demo.MainActivity"
             android:label="@string/app_name" >
 
             <intent-filter>

@@ -21,7 +21,7 @@ class MessageControl {
 
     public final Type type;
     public final Message message;
-
+    // TODO direction: out, in
 
     public MessageControl(Type type, Message message) {
         this.type = type;

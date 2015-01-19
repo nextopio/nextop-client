@@ -1,15 +1,16 @@
 package io.nextop;
 
 import com.google.common.base.Charsets;
-import com.google.common.collect.AbstractIterator;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
+import com.google.gson.stream.JsonWriter;
 import org.apache.commons.codec.binary.Base64OutputStream;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
@@ -39,8 +40,11 @@ import java.util.*;
 
 
 // FIXME everywhere replace byte[] with ByteBuffer
+
 public abstract class WireValue {
     // just use int constants here
+
+    // FIXME MESSAGE, IMAGE(source=capture_front,capture_back,binary; representation as jpegBytes or Bitmap) and NULL should be WireValue top-level types
     public static enum Type {
         UTF8,
         BLOB,
@@ -84,6 +88,7 @@ public abstract class WireValue {
                 | (0xFFL & bytes[offset + 7]);
     }
 
+    // FIXME use ByteBuffer here
     static WireValue valueOf(byte[] bytes) {
         int offset = 0;
         int h = 0xFF & bytes[offset];
@@ -664,6 +669,80 @@ public abstract class WireValue {
     }
 
 
+    public static WireValue valueOfJson(String json) {
+        try {
+            return valueOfJson(new StringReader(json));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** @param jsonIn json source. Closed by this method. */
+    public static WireValue valueOfJson(Reader jsonIn) throws IOException {
+        JsonReader r = new JsonReader(jsonIn);
+        try {
+            return parseJson(r);
+        } finally {
+            r.close();
+        }
+    }
+
+    private static WireValue parseJson(JsonReader r) throws IOException {
+        switch (r.peek()) {
+            case BEGIN_OBJECT: {
+                Map<WireValue, WireValue> map = new HashMap<WireValue, WireValue>(4);
+                r.beginObject();
+                while (!JsonToken.END_OBJECT.equals(r.peek())) {
+                    WireValue key = WireValue.of(r.nextName());
+                    WireValue value = parseJson(r);
+                    map.put(key, value);
+                }
+                r.endObject();
+                return WireValue.of(map);
+            }
+            case BEGIN_ARRAY: {
+                List<WireValue> list = new ArrayList<WireValue>(4);
+                r.beginArray();
+                while (!JsonToken.END_ARRAY.equals(r.peek())) {
+                    WireValue value = parseJson(r);
+                    list.add(value);
+                }
+                r.endArray();
+                return WireValue.of(list);
+            }
+            case STRING:
+                return WireValue.of(r.nextString());
+            case NUMBER: {
+                try {
+                    long n = r.nextLong();
+                    if ((int) n == n) {
+                        return WireValue.of((int) n);
+                    } else {
+                        return WireValue.of(n);
+                    }
+                } catch (NumberFormatException e) {
+                    double d = r.nextDouble();
+                    if ((float) d == d) {
+                        return WireValue.of((float) d);
+                    } else {
+                        return WireValue.of(d);
+                    }
+                }
+            }
+            case BOOLEAN:
+                return WireValue.of(r.nextBoolean());
+            case NULL:
+                // FIXME have a NULL WireValue Type
+                throw new IllegalArgumentException();
+            default:
+            case END_DOCUMENT:
+                throw new IllegalArgumentException();
+        }
+    }
+
+
+
+
     public static WireValue of(Object value) {
         if (value instanceof WireValue) {
             return (WireValue) value;
@@ -856,92 +935,99 @@ public abstract class WireValue {
 
 
     public String toString() {
-        // blob to base64
-        // object, array to json (string values underneath get quoted)
-        // others to standard string forms
-        // FIXME
-
-        StringBuilder sb = new StringBuilder();
-
-        toString(this, sb, false, 0);
-        return sb.toString();
+        return toJson();
     }
 
-    public String toJsonString() {
-        StringBuilder sb = new StringBuilder();
 
-        toString(this, sb, true, 0);
-        return sb.toString();
-    }
-
-    void toString(WireValue value, StringBuilder sb, boolean q, int qe) {
-        switch (value.getType()) {
+    public String toText() {
+        switch (type) {
             case UTF8:
-                if (q) {
-                    sb.append(q(qe)).append(value.asString()).append(q(qe));
-                } else {
-                    sb.append(value.asString());
-                }
-                break;
+                return asString();
             case BLOB:
-                if (q) {
-                    sb.append(q(qe)).append(base64(value.asBlob())).append(q(qe));
-                } else {
-                    sb.append(base64(value.asBlob()));
-                }
-                break;
+                return base64(asBlob());
             case INT32:
-                sb.append(value.asInt());
-                break;
+                return String.valueOf(asInt());
             case INT64:
-                sb.append(value.asLong());
-                break;
+                return String.valueOf(asLong());
             case FLOAT32:
-                sb.append(value.asFloat());
-                break;
+                return String.valueOf(asFloat());
             case FLOAT64:
-                sb.append(value.asDouble());
-                break;
+                return String.valueOf(asDouble());
             case BOOLEAN:
-                sb.append(value.asBoolean());
-                break;
-            case MAP: {
-                sb.append("{");
-                int c = 0;
-                for (Map.Entry<WireValue, WireValue> e : value.asMap().entrySet()) {
-                    if (1 < ++c) {
-                        sb.append(",");
-                    }
-                    sb.append(q(qe));
-                    toString(e.getKey(), sb, false, qe + 1);
-                    sb.append(q(qe)).append(":");
-                    toString(e.getValue(), sb, true, qe);
-                }
-                sb.append("}");
-                break;
-            }
+                return String.valueOf(asBoolean());
+            case MAP:
+                return toJson();
             case LIST:
-                sb.append("[");
-                int c = 0;
-                for (WireValue v : value.asList()) {
-                    if (1 < ++c) {
-                        sb.append(",");
-                    }
-                    toString(v, sb, true, qe);
-                }
-                sb.append("]");
-                break;
+                return toJson();
             default:
                 throw new IllegalArgumentException();
         }
     }
-    static String q(int e) {
-        StringBuilder sb = new StringBuilder(e + 1);
-        for (int i = 0; i < e; ++i) {
-            sb.append("\\");
+
+
+
+    public String toJson() {
+        // TODO better size upper bound - will the better memory efficiency be worth a pre-scan?
+        StringWriter sw = new StringWriter();
+        try {
+            toJson(sw);
+            return sw.toString();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
         }
-        sb.append("\"");
-        return sb.toString();
+    }
+
+    public void toJson(Writer jsonOut) throws IOException {
+        JsonWriter w = new JsonWriter(jsonOut);
+        try {
+            toJson(this, w);
+        } finally {
+            w.close();
+        }
+    }
+
+
+    static void toJson(WireValue value, JsonWriter w) throws IOException {
+        switch (value.getType()) {
+            case UTF8:
+                w.value(value.asString());
+                break;
+            case BLOB:
+                w.value(base64(value.asBlob()));
+                break;
+            case INT32:
+                w.value(value.asInt());
+                break;
+            case INT64:
+                w.value(value.asLong());
+                break;
+            case FLOAT32:
+                w.value(value.asFloat());
+                break;
+            case FLOAT64:
+                w.value(value.asDouble());
+                break;
+            case BOOLEAN:
+                w.value(value.asBoolean());
+                break;
+            case MAP:
+                w.beginObject();
+                for (Map.Entry<WireValue, WireValue> e : value.asMap().entrySet()) {
+                    w.name(e.getKey().toText());
+                    toJson(e.getValue(), w);
+                }
+                w.endObject();
+                break;
+            case LIST:
+                w.beginArray();
+                for (WireValue v : value.asList()) {
+                    toJson(v, w);
+                }
+                w.endArray();
+                break;
+            default:
+                throw new IllegalArgumentException();
+        }
     }
 
     static String base64(ByteBuffer bytes) {
