@@ -20,6 +20,12 @@
             </intent-filter>
 
         </activity>
+
+        <activity
+                android:name="io.nextop.demo.FlipActivity" >
+
+
+        </activity>
     </application>
 
 </manifest>

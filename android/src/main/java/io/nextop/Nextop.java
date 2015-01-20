@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+// calls all receives on the MAIN thread
 @Beta
 public class Nextop {
     /** The android:name to use in application meta-data to set the access key

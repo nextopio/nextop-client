@@ -3,12 +3,11 @@ package io.nextop.view;
 import android.content.Context;
 import android.net.Uri;
 import android.util.AttributeSet;
-import android.view.View;
 import com.google.common.annotations.Beta;
 import io.nextop.Id;
-import io.nextop.Message;
 import io.nextop.Nextop;
-import io.nextop.Nurl;
+import io.nextop.vm.ImageViewModel;
+import rx.Observer;
 
 
 @Beta
@@ -68,5 +67,35 @@ public class ImageView extends android.widget.ImageView {
 
 
 
+    public static final class Updater implements Observer<ImageViewModel> {
+        private final ImageView imageView;
+
+
+        public Updater(ImageView imageView) {
+            this.imageView = imageView;
+        }
+
+
+        @Override
+        public void onNext(ImageViewModel imageViewModel) {
+            if (null != imageViewModel.uri) {
+                imageView.setImage(imageViewModel.uri);
+            } else if (null != imageViewModel.localId) {
+                imageView.setLocalImage(imageViewModel.localId);
+            } else {
+                imageView.clearImage();
+            }
+        }
+
+        @Override
+        public void onCompleted() {
+            // Do nothing
+        }
+
+        @Override
+        public void onError(Throwable e) {
+            // Do nothing
+        }
+    }
 
 }

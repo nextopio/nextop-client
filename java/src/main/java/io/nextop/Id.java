@@ -1,5 +1,6 @@
 package io.nextop;
 
+import com.google.common.hash.Hashing;
 import io.nextop.util.HexBytes;
 
 import java.lang.IllegalArgumentException;import java.lang.Object;import java.lang.Override;import java.lang.String;import java.nio.ByteBuffer;
@@ -42,13 +43,12 @@ public final class Id {
 
 
     private final byte[] bytes;
-    // FIXME use a murmur3 hash here
-    private final int hashCode;
+    private final long hashCode;
 
 
     private Id(byte[] bytes) {
         this.bytes = bytes;
-        hashCode = Arrays.hashCode(bytes);
+        hashCode = Hashing.murmur3_128().hashBytes(bytes).asLong();
     }
 
 
@@ -59,8 +59,13 @@ public final class Id {
 
     @Override
     public int hashCode() {
+        return (int) hashCode;
+    }
+
+    public long longHashCode() {
         return hashCode;
     }
+
 
     @Override
     public boolean equals(Object obj) {

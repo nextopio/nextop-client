@@ -39,5 +39,7 @@ dependencies {
     compile project(':android')
 //    debugCompile project(':android')
 //    releaseCompile group: 'nextop-client', name: 'android', version: '0.1-SNAPSHOT'
+    compile group: 'com.android.support', name: 'support-v4', version: '21.0.3'
+    compile group: 'com.android.support', name: 'support-v13', version: '21.0.3'
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }

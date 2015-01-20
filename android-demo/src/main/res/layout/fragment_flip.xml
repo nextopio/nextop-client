@@ -13,5 +13,13 @@
             android:layout_height="80dp"
             android:layout_gravity="bottom|right" />
 
+    <io.nextop.view.ImageView android:id="@+id/large"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:layout_marginTop="96dp"
+          android:layout_marginBottom="96dp"
+            android:visibility="invisible"
+            android:background="@android:color/black" />
+
 
 </FrameLayout>
