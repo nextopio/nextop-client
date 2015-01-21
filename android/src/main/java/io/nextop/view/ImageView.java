@@ -41,10 +41,10 @@ public class ImageView extends android.widget.ImageView {
 
     @Override
     public void setImageURI(Uri uri) {
-        setImage(uri);
+        setImageUri(uri);
     }
 
-    public void setImage(Uri uri) {
+    public void setImageUri(Uri uri) {
 
     }
 
@@ -78,10 +78,12 @@ public class ImageView extends android.widget.ImageView {
 
         @Override
         public void onNext(ImageViewModel imageViewModel) {
-            if (null != imageViewModel.uri) {
-                imageView.setImage(imageViewModel.uri);
+            if (null != imageViewModel.bitmap) {
+                imageView.setImageBitmap(imageViewModel.bitmap);
             } else if (null != imageViewModel.localId) {
                 imageView.setLocalImage(imageViewModel.localId);
+            } else if (null != imageViewModel.uri) {
+                imageView.setImageUri(imageViewModel.uri);
             } else {
                 imageView.clearImage();
             }

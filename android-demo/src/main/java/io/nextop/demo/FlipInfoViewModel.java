@@ -19,7 +19,7 @@ public class FlipInfoViewModel extends RxManaged {
 
     {
         Random r = new Random();
-        int n = 5 + r.nextInt(10);
+        int n = 5 + r.nextInt(50);
         StringBuilder sb = new StringBuilder(n);
         for (int i = 0; i < n; ++i) {
             switch (r.nextInt(4)) {

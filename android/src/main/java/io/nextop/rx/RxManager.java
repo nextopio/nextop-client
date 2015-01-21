@@ -100,6 +100,7 @@ public abstract class RxManager<M extends RxManaged> {
                 }
                 this.state = state;
                 updater.call(state);
+                verifyState(state);
             }
 
             @Override
@@ -158,8 +159,16 @@ public abstract class RxManager<M extends RxManaged> {
         if (!id.equals(state.id)) {
             throw new IllegalStateException("#create must return a managed object with the same id as input.");
         }
+        verifyState(state);
         states.put(id, state);
         return state;
+    }
+
+
+    private void verifyState(ManagedState<M> state) {
+        if (null == state.m) {
+            throw new IllegalStateException();
+        }
     }
 
 

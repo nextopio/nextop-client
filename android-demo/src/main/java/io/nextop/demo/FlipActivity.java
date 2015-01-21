@@ -33,6 +33,10 @@ public class FlipActivity extends Activity {
 
 
     Id flipId;
+
+    Demo demo;
+    FlipAdapter flipAdapter;
+
     ViewPager viewPager;
 
 
@@ -43,11 +47,11 @@ public class FlipActivity extends Activity {
         Intent intent = getIntent();
         flipId = Id.valueOf(intent.getData().getPath());
         String action = intent.getAction();
-        int initialIndex;
+        boolean startRecording;
         if (Intent.ACTION_VIEW.equals(action)) {
-            initialIndex = 0;
+            startRecording = false;
         } else if (ACTION_RECORD.equals(action)) {
-            initialIndex = 1;
+            startRecording = true;
         } else {
             throw new IllegalArgumentException();
         }
@@ -59,9 +63,45 @@ public class FlipActivity extends Activity {
 
         setContentView(R.layout.activity_flip);
 
+
+        demo = (Demo) getApplication();
+        flipAdapter = new FlipAdapter();
+
         viewPager = (ViewPager) findViewById(R.id.pager);
-        viewPager.setAdapter(new FlipAdapter());
-        viewPager.setCurrentItem(initialIndex, false);
+        viewPager.setAdapter(flipAdapter);
+
+
+        viewPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageSelected(int i) {
+                switch (i) {
+                    case 0:
+                        stopRecording();
+                        break;
+                    case 1:
+                        startRecording();
+                        break;
+                    default:
+                        throw new IllegalArgumentException();
+                }
+            }
+
+            @Override
+            public void onPageScrolled(int i, float v, int i1) {
+                // Do nothing
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int i) {
+                // Do nothing
+            }
+        });
+
+
+        if (startRecording) {
+            // jump
+            viewPager.setCurrentItem(1, false);
+        }
     }
 
     @Override
@@ -75,7 +115,26 @@ public class FlipActivity extends Activity {
         }
     }
 
+
+
+    void startRecording() {
+        viewPager.setCurrentItem(1, true);
+        ((FlipFragment) flipAdapter.getItem(0)).onStartRecording();
+        ((RecordFragment) flipAdapter.getItem(1)).onStartRecording();
+    }
+
+    void stopRecording() {
+        viewPager.setCurrentItem(0, true);
+        ((FlipFragment) flipAdapter.getItem(0)).onStopRecording();
+        ((RecordFragment) flipAdapter.getItem(1)).onStopRecording();
+    }
+
+
+
     class FlipAdapter extends FragmentPagerAdapter {
+        FlipFragment flipFragment = FlipFragment.newInstance(flipId);
+        RecordFragment recordFragment = RecordFragment.newInstance(flipId);
+
         FlipAdapter() {
             super(getFragmentManager());
         }
@@ -89,9 +148,9 @@ public class FlipActivity extends Activity {
         public Fragment getItem(int i) {
             switch (i) {
                 case 0:
-                    return FlipFragment.newInstance(flipId);
+                    return flipFragment;
                 case 1:
-                    return RecordFragment.newInstance(flipId);
+                    return recordFragment;
                 default:
                     throw new IndexOutOfBoundsException();
             }

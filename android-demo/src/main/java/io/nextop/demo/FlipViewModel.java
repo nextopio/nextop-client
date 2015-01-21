@@ -13,12 +13,7 @@ public class FlipViewModel extends RxManaged {
 
     // last update id
 
-    List<Id> fakeIds = new ArrayList<Id>(50);
-    {
-        for (int i = 0; i < 50; ++i) {
-            fakeIds.add(Id.create());
-        }
-    }
+    List<Id> ids = new ArrayList<Id>(50);
 
 
 
@@ -28,11 +23,11 @@ public class FlipViewModel extends RxManaged {
 
 
     public int size() {
-        return fakeIds.size();
+        return ids.size();
     }
 
 
     public Id getFrameId(int index) {
-        return fakeIds.get(index);
+        return ids.get(index);
     }
 }

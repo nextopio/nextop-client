@@ -1,9 +1,15 @@
 package io.nextop.demo;
 
+import android.animation.Animator;
+import android.animation.ObjectAnimator;
+import android.animation.TimeInterpolator;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewPropertyAnimator;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.*;
 import io.nextop.Id;
 import io.nextop.rx.RxFragment;
@@ -13,10 +19,12 @@ import io.nextop.vm.ImageViewModel;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
+import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.subjects.PublishSubject;
 
 import javax.annotation.Nullable;
+import java.util.NoSuchElementException;
 
 public class FlipFragment extends RxFragment {
 
@@ -33,7 +41,9 @@ public class FlipFragment extends RxFragment {
     Id flipId;
     Demo demo;
     FlipAdapter flipAdapter;
+    ListView listView;
 
+    boolean scrollToEnd = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -56,7 +66,7 @@ public class FlipFragment extends RxFragment {
 
         View view = getView();
 
-        final ListView listView = (ListView) view.findViewById(R.id.list);
+        listView = (ListView) view.findViewById(R.id.list);
 
         LayoutInflater inflater = LayoutInflater.from(view.getContext());
         final View header = inflater.inflate(R.layout.view_flip_header, listView, false);
@@ -82,7 +92,7 @@ public class FlipFragment extends RxFragment {
         createButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                ((FlipActivity) getActivity()).viewPager.setCurrentItem(1, true);
+                ((FlipActivity) getActivity()).startRecording();
             }
         });
 
@@ -112,22 +122,67 @@ public class FlipFragment extends RxFragment {
             boolean visible = false;
 
             Subscription publishSubscription = null;
-            int publishPosition = -1;
+            int publishIndex = -1;
 
 
 
             void show() {
                 if (!visible) {
                     visible = true;
-                    // FIXME animate alpha in
-                    largeView.setVisibility(View.VISIBLE);
+
+                    if (View.VISIBLE != largeView.getVisibility()) {
+                        largeView.setAlpha(0.f);
+                        largeView.setVisibility(View.VISIBLE);
+                    }
+
+                    float a = largeView.getAlpha();
+
+                    ObjectAnimator animator = ObjectAnimator.ofFloat(largeView, "alpha", a, 1.f);
+                    animator.setAutoCancel(true);
+                    animator.setDuration(Math.round((1.f - a) * 200));
+                    animator.setInterpolator(new DecelerateInterpolator());
+                    animator.start();
+
                 }
             }
             void hide() {
                 if (visible) {
                     visible = false;
-                    // FIXME animate alpha out
-                    largeView.setVisibility(View.INVISIBLE);
+
+                    if (View.VISIBLE == largeView.getVisibility()) {
+
+                        float a = largeView.getAlpha();
+
+                        ObjectAnimator animator = ObjectAnimator.ofFloat(largeView, "alpha", a, 0.f);
+                        animator.setAutoCancel(true);
+                        animator.setDuration(Math.round(a * 200));
+                        animator.setInterpolator(new AccelerateInterpolator());
+
+                        animator.addListener(new Animator.AnimatorListener() {
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                largeView.setVisibility(View.INVISIBLE);
+                            }
+
+                            @Override
+                            public void onAnimationStart(Animator animation) {
+
+                            }
+
+                            @Override
+                            public void onAnimationCancel(Animator animation) {
+
+                            }
+
+                            @Override
+                            public void onAnimationRepeat(Animator animation) {
+
+                            }
+                        });
+                        animator.start();
+
+                    }
+
                 }
             }
 
@@ -186,21 +241,16 @@ public class FlipFragment extends RxFragment {
             }
 
             boolean publishLarge(int position) {
-                ListAdapter adapter = listView.getAdapter();
-                if (position < 0 || adapter.getCount() <= position) {
+                int index = position - listView.getHeaderViewsCount();
+                if (index < 0 || flipAdapter.getCount() <= index) {
                     return false;
                 }
-                Object item = listView.getItemAtPosition(position);
-                if (!(item instanceof Id)) {
+                if (publishIndex == index) {
                     return false;
                 }
-                if (publishPosition == position) {
-                    return false;
-                }
-                Id frameId = (Id) item;
+                publishIndex = index;
 
-                publishPosition = position;
-
+                Id frameId = flipAdapter.getItem(index);
 
                 if (null != publishSubscription) {
                     publishSubscription.unsubscribe();
@@ -215,12 +265,67 @@ public class FlipFragment extends RxFragment {
             }
         });
 
+
+        updateHeaderIndefinitely(header, bind(demo.getFlipInfoVmm().get(flipId)));
+
+
         // set up list adapter
         // set up scroll listener
         // set up logic to show fixed frame when scrolling fast
 
+        scrollToEnd();
     }
 
+
+    private void updateHeaderIndefinitely(View view, Observable<FlipInfoViewModel> flipInfoVmSource) {
+        final TextView intro = (TextView) view.findViewById(R.id.intro);
+        Observable<String> introSource = flipInfoVmSource.map(new Func1<FlipInfoViewModel, String>() {
+            @Override
+            public String call(FlipInfoViewModel flipInfoVm) {
+                return flipInfoVm.intro;
+            }
+        });
+        introSource.subscribe(new Action1<String>() {
+            @Override
+            public void call(String s) {
+                intro.setText(s);
+            }
+        });
+    }
+
+
+
+    void onStartRecording() {
+        // Do nothing
+    }
+    void onStopRecording() {
+        // Do nothing
+
+        scrollToEnd = true;
+        scrollToEnd();
+    }
+
+    void scrollToEnd() {
+        if (scrollToEnd && null != listView) {
+            scrollToEnd = false;
+
+            int n = flipAdapter.getCount();
+            int index = n - 1;
+            for (; 0 <= index; --index) {
+                try {
+                    FrameViewModel frameVm = demo.getFrameVmm().peek(flipAdapter.getItem(index)).toBlocking().first();
+                    if (null != frameVm.imageVm.uri) {
+                        break;
+                    }
+                } catch (NoSuchElementException e) {
+                    // skip
+                }
+            }
+            if (index + 1 < n) {
+                listView.setSelection(listView.getHeaderViewsCount() + index + 1);
+            }
+        }
+    }
 
 
 
