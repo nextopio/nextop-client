@@ -9,14 +9,18 @@ import rx.functions.Action1;
 public class FlipViewModelManager extends RxManager<FlipViewModel> {
 
 
-    void addFrame(Id flipId, final Id frameId) {
+    void addFrame(Id flipId, final FrameViewModel frameVm) {
         update(flipId, new Action1<ManagedState<FlipViewModel>>() {
             @Override
             public void call(ManagedState<FlipViewModel> state) {
-                state.m.ids.add(frameId);
+                state.m.frameVms.put(frameVm.id, frameVm);
+                state.m.frameIds.add(frameVm.id);
             }
         });
     }
+
+
+
 
 
     @Override

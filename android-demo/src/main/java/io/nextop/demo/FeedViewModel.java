@@ -15,12 +15,7 @@ public class FeedViewModel extends RxManaged {
     // on change observer
 
 
-    List<Id> fakeIds = new ArrayList<Id>(50);
-    {
-        for (int i = 0; i < 50; ++i) {
-            fakeIds.add(Id.create());
-        }
-    }
+    List<Id> flipIds = new ArrayList<Id>(50);
 
 
     public FeedViewModel(Id feedId) {
@@ -29,12 +24,12 @@ public class FeedViewModel extends RxManaged {
 
 
     public int size() {
-        return fakeIds.size();
+        return flipIds.size();
     }
 
 
     public Id getFlipId(int index) {
-        return fakeIds.get(index);
+        return flipIds.get(index);
     }
 
 

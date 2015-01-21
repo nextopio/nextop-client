@@ -13,7 +13,6 @@ public class Demo extends NextopApplication {
     private FeedViewModelManager feedVmm = new FeedViewModelManager();
     private FlipInfoViewModelManager flipInfoVmm = new FlipInfoViewModelManager();
     private FlipViewModelManager flipVmm = new FlipViewModelManager();
-    private FrameViewModelManager frameVmm = new FrameViewModelManager();
 
 
 
@@ -31,9 +30,13 @@ public class Demo extends NextopApplication {
                 }
                 if (null == camera) {
                     if (0 <= cameraId) {
-                        camera = Camera.open(cameraId);
-                        if (null != camera) {
-                            cameraConnected = true;
+                        try {
+                            camera = Camera.open(cameraId);
+                            if (null != camera) {
+                                cameraConnected = true;
+                            }
+                        } catch (Exception e) {
+                            // e.g. Fail to connect to camera service
                         }
                     }
                 } else {
@@ -56,17 +59,22 @@ public class Demo extends NextopApplication {
 
     void openCamera() {
         if (null == camera) {
-            camera = Camera.open();
+            try {
+                camera = Camera.open();
+            } catch (Exception e) {
+                // e.g. Fail to connect to camera service
+
+            }
         }
     }
 
     void closeCamera() {
         unlockCamera();
         if (null != camera) {
-            camera.release();
             cameraId = -1;
+            camera.release();
+            camera = null;
         }
-
     }
 
 
@@ -106,9 +114,6 @@ public class Demo extends NextopApplication {
         return flipVmm;
     }
 
-    public FrameViewModelManager getFrameVmm() {
-        return frameVmm;
-    }
 
 
 }

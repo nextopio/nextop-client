@@ -6,7 +6,7 @@ import io.nextop.vm.ImageViewModel;
 
 public class FrameViewModel extends RxManaged {
     // FIXME
-    ImageViewModel imageVm = new ImageViewModel(null, null);
+    ImageViewModel imageVm = new ImageViewModel(null, null, null);
     // ImageViewModel
     // frame id
     // snap time

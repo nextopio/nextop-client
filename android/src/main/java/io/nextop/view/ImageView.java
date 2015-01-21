@@ -1,13 +1,20 @@
 package io.nextop.view;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.util.AttributeSet;
 import com.google.common.annotations.Beta;
 import io.nextop.Id;
 import io.nextop.Nextop;
+import io.nextop.NextopApplication;
 import io.nextop.vm.ImageViewModel;
 import rx.Observer;
+
+import javax.annotation.Nullable;
+import java.util.Random;
 
 
 @Beta
@@ -67,8 +74,53 @@ public class ImageView extends android.widget.ImageView {
 
 
 
+    // FIXME demo hacks below
+    float uploadProgress = 1.f;
+    boolean online = true;
+
+    Paint tempPaint = new Paint();
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+
+        if (uploadProgress < 1.f) {
+            // if online, filled grey with white pie
+            // if offline, outline grey with white pie
+
+            float w = getWidth();
+            float h = getHeight();
+            float s = 0.2f * Math.min(w, h);
+
+            tempPaint.setColor(Color.argb(128, 64, 64, 64));
+            if (online) {
+                tempPaint.setStyle(Paint.Style.FILL);
+
+            } else {
+
+                tempPaint.setStyle(Paint.Style.STROKE);
+            }
+            canvas.drawArc(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s, 360 * uploadProgress, 360 * (1.f - uploadProgress), true, tempPaint);
+
+            if (online) {
+                tempPaint.setColor(Color.argb(128, 255, 255, 255));
+            } else {
+                tempPaint.setColor(Color.argb(64, 255, 255, 255));
+            }
+            tempPaint.setStyle(Paint.Style.FILL);
+            canvas.drawArc(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s, 0.f, 360 * uploadProgress, true, tempPaint);
+
+
+        }
+
+    }
+
     public static final class Updater implements Observer<ImageViewModel> {
         private final ImageView imageView;
+
+
+        // FIXME demo hack
+        @Nullable
+        Runnable progressUpdater = null;
 
 
         public Updater(ImageView imageView) {
@@ -77,16 +129,56 @@ public class ImageView extends android.widget.ImageView {
 
 
         @Override
-        public void onNext(ImageViewModel imageViewModel) {
-            if (null != imageViewModel.bitmap) {
-                imageView.setImageBitmap(imageViewModel.bitmap);
-            } else if (null != imageViewModel.localId) {
-                imageView.setLocalImage(imageViewModel.localId);
-            } else if (null != imageViewModel.uri) {
-                imageView.setImageUri(imageViewModel.uri);
+        public void onNext(final ImageViewModel imageVm) {
+            if (null != imageVm.bitmap) {
+                imageView.setImageBitmap(imageVm.bitmap);
+            } else if (null != imageVm.localId) {
+                imageView.setLocalImage(imageVm.localId);
+            } else if (null != imageVm.uri) {
+                imageView.setImageUri(imageVm.uri);
             } else {
                 imageView.clearImage();
             }
+
+
+
+
+
+
+
+            // FIXME demo hacks below
+
+                progressUpdater = new Runnable() {
+                    Random r = new Random();
+                    @Override
+                    public void run() {
+                        if (this == progressUpdater) {
+
+
+                            if (imageVm.uploadProgress < 1.f) {
+                                if (((NextopApplication) imageView.getContext().getApplicationContext()).isOnline()) {
+                                    imageVm.uploadProgress = Math.min(1.f, imageVm.uploadProgress + r.nextFloat() * 0.003f);
+                                    imageView.online = true;
+                                } else {
+                                    imageView.online = false;
+                                }
+
+                                imageView.uploadProgress = imageVm.uploadProgress;
+                                imageView.invalidate();
+
+                                imageView.postDelayed(this, 1000 / 60);
+
+                            } else {
+                                imageView.uploadProgress = 1.f;
+//                                imageView.invalidate();
+                                progressUpdater = null;
+                            }
+
+                        }
+                    }
+                };
+                progressUpdater.run();
+
         }
 
         @Override

@@ -13,10 +13,13 @@
           android:stretchMode="columnWidth"
           android:gravity="center"
             />
-    <Button android:id="@+id/create_button"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_gravity="bottom|right" />
+    <ImageButton android:id="@+id/create_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_margin="8dp"
+            android:layout_gravity="bottom|right"
+            android:background="@drawable/button_round"
+            android:elevation="4dp" />
 
 
 </FrameLayout>

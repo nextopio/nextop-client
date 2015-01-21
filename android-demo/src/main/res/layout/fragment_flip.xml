@@ -8,18 +8,22 @@
               android:layout_height="match_parent"
               android:gravity="center"
             />
-    <Button android:id="@+id/create_button"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_gravity="bottom|right" />
+    <ImageButton android:id="@+id/create_button"
+                 android:layout_width="48dp"
+                 android:layout_height="48dp"
+                 android:layout_margin="8dp"
+            android:layout_gravity="bottom|right"
+            android:background="@drawable/button_round"
+            android:elevation="4dp"/>
 
     <io.nextop.view.ImageView android:id="@+id/large"
           android:layout_width="match_parent"
           android:layout_height="match_parent"
-          android:layout_marginTop="96dp"
-          android:layout_marginBottom="96dp"
+          android:layout_marginTop="0dp"
+          android:layout_marginBottom="0dp"
             android:visibility="invisible"
-            android:background="@android:color/black" />
+            android:scaleType="centerCrop"
+          android:layout_gravity="center_horizontal|center_vertical"/>
 
 
 </FrameLayout>

@@ -45,6 +45,8 @@ public class FlipFragment extends RxFragment {
 
     boolean scrollToEnd = false;
 
+    int targetHeight;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -74,7 +76,7 @@ public class FlipFragment extends RxFragment {
 
         final ImageView largeView = (ImageView) view.findViewById(R.id.large);
 
-        Button createButton = (Button) view.findViewById(R.id.create_button);
+        ImageButton createButton = (ImageButton) view.findViewById(R.id.create_button);
 
 
         listView.addHeaderView(header);
@@ -103,13 +105,13 @@ public class FlipFragment extends RxFragment {
             @Override
             public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
 
-                int height = bottom - top;
-                if (height != header.getLayoutParams().height) {
-                    header.getLayoutParams().height = height;
+                targetHeight = bottom - top;
+                if (targetHeight != header.getLayoutParams().height) {
+                    header.getLayoutParams().height = targetHeight;
                     header.invalidate();
                 }
-                if (height != footer.getLayoutParams().height) {
-                    footer.getLayoutParams().height = height;
+                if (targetHeight != footer.getLayoutParams().height) {
+                    footer.getLayoutParams().height = targetHeight;
                     footer.invalidate();
                 }
 
@@ -121,68 +123,75 @@ public class FlipFragment extends RxFragment {
             int scrollState = SCROLL_STATE_IDLE;
             boolean visible = false;
 
-            Subscription publishSubscription = null;
             int publishIndex = -1;
 
 
 
             void show() {
+//                if (!visible) {
+//                    visible = true;
+//
+//                    if (View.VISIBLE != largeView.getVisibility()) {
+////                        largeView.setAlpha(0.f);
+//                        largeView.setVisibility(View.VISIBLE);
+//                    }
+//
+//                    float a = largeView.getAlpha();
+//
+//                    ObjectAnimator animator = ObjectAnimator.ofFloat(largeView, "alpha", a, 1.f);
+//                    animator.setAutoCancel(true);
+//                    animator.setDuration(Math.round((1.f - a) * 200));
+//                    animator.setInterpolator(new DecelerateInterpolator());
+//                    animator.start();
+//
+//                }
                 if (!visible) {
                     visible = true;
-
-                    if (View.VISIBLE != largeView.getVisibility()) {
-                        largeView.setAlpha(0.f);
-                        largeView.setVisibility(View.VISIBLE);
-                    }
-
-                    float a = largeView.getAlpha();
-
-                    ObjectAnimator animator = ObjectAnimator.ofFloat(largeView, "alpha", a, 1.f);
-                    animator.setAutoCancel(true);
-                    animator.setDuration(Math.round((1.f - a) * 200));
-                    animator.setInterpolator(new DecelerateInterpolator());
-                    animator.start();
-
+                    largeView.setVisibility(View.VISIBLE);
                 }
             }
             void hide() {
+//                if (visible) {
+//                    visible = false;
+//
+//                    if (View.VISIBLE == largeView.getVisibility()) {
+//
+//                        float a = largeView.getAlpha();
+//
+//                        ObjectAnimator animator = ObjectAnimator.ofFloat(largeView, "alpha", a, 0.f);
+//                        animator.setAutoCancel(true);
+//                        animator.setDuration(Math.round(a * 200));
+//                        animator.setInterpolator(new AccelerateInterpolator());
+//
+//                        animator.addListener(new Animator.AnimatorListener() {
+//                            @Override
+//                            public void onAnimationEnd(Animator animation) {
+//                                largeView.setVisibility(View.INVISIBLE);
+//                            }
+//
+//                            @Override
+//                            public void onAnimationStart(Animator animation) {
+//
+//                            }
+//
+//                            @Override
+//                            public void onAnimationCancel(Animator animation) {
+//
+//                            }
+//
+//                            @Override
+//                            public void onAnimationRepeat(Animator animation) {
+//
+//                            }
+//                        });
+//                        animator.start();
+//
+//                    }
+//
+//                }
                 if (visible) {
                     visible = false;
-
-                    if (View.VISIBLE == largeView.getVisibility()) {
-
-                        float a = largeView.getAlpha();
-
-                        ObjectAnimator animator = ObjectAnimator.ofFloat(largeView, "alpha", a, 0.f);
-                        animator.setAutoCancel(true);
-                        animator.setDuration(Math.round(a * 200));
-                        animator.setInterpolator(new AccelerateInterpolator());
-
-                        animator.addListener(new Animator.AnimatorListener() {
-                            @Override
-                            public void onAnimationEnd(Animator animation) {
-                                largeView.setVisibility(View.INVISIBLE);
-                            }
-
-                            @Override
-                            public void onAnimationStart(Animator animation) {
-
-                            }
-
-                            @Override
-                            public void onAnimationCancel(Animator animation) {
-
-                            }
-
-                            @Override
-                            public void onAnimationRepeat(Animator animation) {
-
-                            }
-                        });
-                        animator.start();
-
-                    }
-
+                    largeView.setVisibility(View.INVISIBLE);
                 }
             }
 
@@ -192,15 +201,15 @@ public class FlipFragment extends RxFragment {
             public void onScrollStateChanged(AbsListView view, int scrollState) {
 
                 this.scrollState = scrollState;
-                switch (scrollState) {
-                    case SCROLL_STATE_IDLE:
-                    case SCROLL_STATE_TOUCH_SCROLL:
-                        hide();
-                        break;
-                    default:
-                        // ignore
-                        break;
-                }
+//                switch (scrollState) {
+//                    case SCROLL_STATE_IDLE:
+//                    case SCROLL_STATE_TOUCH_SCROLL:
+//                        hide();
+//                        break;
+//                    default:
+//                        // ignore
+//                        break;
+//                }
 
 
             }
@@ -210,58 +219,66 @@ public class FlipFragment extends RxFragment {
                 // FIXME bind
                 // FIXME fade bg of last element to black on scroll down
 
-                switch (scrollState) {
-                    case SCROLL_STATE_FLING:
-                        if (publishLarge(firstVisibleItem, visibleItemCount)) {
-                            show();
-                        } else {
-                            hide();
-                        }
-                        break;
-                    default:
-                        // ignore
-                        break;
+                if (publishLarge(firstVisibleItem, visibleItemCount)) {
+                    show();
+                } else {
+                    hide();
                 }
+
+//                switch (scrollState) {
+//                    case SCROLL_STATE_FLING:
+//                        if (publishLarge(firstVisibleItem, visibleItemCount)) {
+//                            show();
+//                        } else {
+//                            hide();
+//                        }
+//                        break;
+//                    default:
+//                        // ignore
+//                        break;
+//                }
             }
 
             boolean publishLarge(int firstVisibleItem, int visibleItemCount) {
                 // publish large the frame closest to the center
-                int centerPosition = firstVisibleItem + visibleItemCount / 2;
-                if (publishLarge(centerPosition)) {
+//                int centerPosition = firstVisibleItem + visibleItemCount / 2;
+//                if (publishLarge(centerPosition)) {
+//                    return true;
+//                }
+//
+//                for (int i = 1; i <= visibleItemCount / 2; ++i) {
+//                    if (publishLarge(centerPosition + i) || publishLarge(centerPosition - i)) {
+//                        return true;
+//                    }
+//                }
+//
+//                return false;
+
+                int index = indexOf(firstVisibleItem);
+                if (0 <= index && 0 <= indexOf(firstVisibleItem + visibleItemCount - 1)) {
+                    publishLarge(index);
                     return true;
+                } else {
+                    return false;
                 }
-
-                for (int i = 1; i <= visibleItemCount / 2; ++i) {
-                    if (publishLarge(centerPosition + i) || publishLarge(centerPosition - i)) {
-                        return true;
-                    }
-                }
-
-                return false;
             }
 
-            boolean publishLarge(int position) {
+            int indexOf(int position) {
                 int index = position - listView.getHeaderViewsCount();
                 if (index < 0 || flipAdapter.getCount() <= index) {
-                    return false;
+                    return -1;
                 }
-                if (publishIndex == index) {
-                    return false;
-                }
-                publishIndex = index;
+                return index;
+            }
 
-                Id frameId = flipAdapter.getItem(index);
+            void publishLarge(int index) {
+                if (publishIndex != index) {
+                    publishIndex = index;
 
-                if (null != publishSubscription) {
-                    publishSubscription.unsubscribe();
+                    Id frameId = flipAdapter.getItem(index);
+
+                    largeSource.onNext(flipAdapter.flipVm.getFrameVm(frameId).imageVm);
                 }
-                publishSubscription = demo.getFrameVmm().get(frameId).map(new Func1<FrameViewModel, ImageViewModel>() {
-                    @Override
-                    public ImageViewModel call(FrameViewModel frameVm) {
-                        return frameVm.imageVm;
-                    }
-                }).subscribe(largeSource);
-                return true;
             }
         });
 
@@ -312,13 +329,9 @@ public class FlipFragment extends RxFragment {
             int n = flipAdapter.getCount();
             int index = n - 1;
             for (; 0 <= index; --index) {
-                try {
-                    FrameViewModel frameVm = demo.getFrameVmm().peek(flipAdapter.getItem(index)).toBlocking().first();
-                    if (null != frameVm.imageVm.uri) {
-                        break;
-                    }
-                } catch (NoSuchElementException e) {
-                    // skip
+                @Nullable FrameViewModel frameVm = flipAdapter.flipVm.getFrameVm(flipAdapter.getItem(index));
+                if (null != frameVm && null != frameVm.imageVm.uri) {
+                    break;
                 }
             }
             if (index + 1 < n) {
@@ -375,15 +388,28 @@ public class FlipFragment extends RxFragment {
                 convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_flip_frame, parent, false);
             }
 
-            Id frameId = getItem(position);
+            convertView.getLayoutParams().height = targetHeight;
+
+
+            final Id frameId = getItem(position);
 
             final RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
             if (null != rxVg) {
                 rxVg.reset();
-                updateIndefinitely(convertView, rxVg.bind(demo.getFrameVmm().get(frameId)));
+                updateIndefinitely(convertView, rxVg.bind(demo.getFlipVmm().get(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
+                    @Override
+                    public FrameViewModel call(FlipViewModel flipVm) {
+                        return flipVm.frameVms.get(frameId);
+                    }
+                })));
             } else {
                 // update immediate snapshot
-                updateIndefinitely(convertView, demo.getFrameVmm().peek(frameId));
+                updateIndefinitely(convertView, demo.getFlipVmm().peek(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
+                    @Override
+                    public FrameViewModel call(FlipViewModel flipVm) {
+                        return flipVm.frameVms.get(frameId);
+                    }
+                }));
             }
 
             return convertView;

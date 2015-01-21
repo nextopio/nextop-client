@@ -61,6 +61,7 @@ public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder 
 
     @Override
     public <T> Observable<T> bind(Observable<T> source) {
+        
         // FIXME
         return source;
     }

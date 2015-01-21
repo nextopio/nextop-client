@@ -1,27 +1,34 @@
 package io.nextop.demo;
 
 
-import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 import io.nextop.Id;
 import io.nextop.rx.RxActivity;
-import io.nextop.rx.RxManager;
 import io.nextop.rx.RxViewGroup;
 import io.nextop.view.ImageView;
 import io.nextop.vm.ImageViewModel;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action0;
 import rx.functions.Action1;
-import rx.functions.Func0;
 import rx.functions.Func1;
-import rx.internal.util.SubscriptionList;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends RxActivity {
 
@@ -45,7 +52,7 @@ public class MainActivity extends RxActivity {
         GridView gridView = (GridView) findViewById(R.id.grid);
         gridView.setAdapter(feedAdapter);
 
-        Button createButton = (Button) findViewById(R.id.create_button);
+        ImageButton createButton = (ImageButton) findViewById(R.id.create_button);
 
 
         bind(demo.getFeedVmm().get(demo.getFeedId())).subscribe(feedAdapter);
@@ -73,11 +80,14 @@ public class MainActivity extends RxActivity {
 //                flipVm.title = "";
 
 
-                // FIXME
-//                demo.getFlipVmm().create(flipId, flipVm);
 
-                Toast toast = Toast.makeText(MainActivity.this, "Speak an intro now ...", Toast.LENGTH_LONG);
-                toast.show();
+
+
+                demo.getFeedVmm().addFlip(demo.getFeedId(), flipId);
+
+
+
+
 
                 startActivity(FlipActivity.recordIntent(MainActivity.this, flipId));
 
@@ -86,6 +96,14 @@ public class MainActivity extends RxActivity {
 
     }
 
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // FIXME this should happen via bind(...) subscribes when bind works!
+        feedAdapter.notifyDataSetChanged();
+    }
 
     private class FeedAdapter extends BaseAdapter implements Observer<FeedViewModel> {
         @Nullable
@@ -129,37 +147,70 @@ public class MainActivity extends RxActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            if (null == convertView) {
+            // FIXME demo hack - because rxVg.reset() doesn't work
+//            if (null == convertView) {
                 convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_feed_tile, parent, false);
-            }
+//            }
 
             Id flipId = getItem(position);
 
             final RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
             if (null != rxVg) {
                 rxVg.reset();
-                updateIndefinitely(convertView, rxVg.bind(demo.getFlipInfoVmm().get(flipId)));
+                updateIndefinitely(convertView, rxVg.bind(demo.getFlipInfoVmm().get(flipId)), rxVg.bind(demo.getFlipVmm().get(flipId)));
             } else {
                 // update immediate snapshot
-                updateIndefinitely(convertView, demo.getFlipInfoVmm().peek(flipId));
+                updateIndefinitely(convertView, demo.getFlipInfoVmm().peek(flipId), demo.getFlipVmm().peek(flipId));
             }
 
             return convertView;
         }
         // assume the subscription will be managed via onComplete from a higher level
         // this code just assumes it runs until done
-        private void updateIndefinitely(View view, Observable<FlipInfoViewModel> flipInfoVmSource) {
+        private void updateIndefinitely(View view, Observable<FlipInfoViewModel> flipInfoVmSource, Observable<FlipViewModel> flipVmSource) {
             ImageView imageView = (ImageView) view.findViewById(R.id.image);
             final TextView shortIntroView = (TextView) view.findViewById(R.id.short_intro);
 
 
-            Observable<ImageViewModel> imageVmSource = flipInfoVmSource.map(new Func1<FlipInfoViewModel, ImageViewModel>() {
-                @Override
-                public ImageViewModel call(FlipInfoViewModel flipInfoVm) {
-                    return flipInfoVm.imageVm;
-                }
-            }).distinctUntilChanged();
-            imageVmSource.subscribe(new ImageView.Updater(imageView));
+            final Subscription[] HACK = new Subscription[1];
+            Observable<ImageViewModel> imageVmSource = flipVmSource
+
+                    // FIXME holy shit, massive demo hack because upload progress is not reactive
+                    .take(1).repeat(AndroidSchedulers.mainThread()).delay(100, TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
+
+                    .flatMap(new Func1<FlipViewModel, Observable<ImageViewModel>>() {
+                        @Override
+                        public Observable<ImageViewModel> call(FlipViewModel flipVm) {
+                            int n = flipVm.size();
+                            if (0 < n) {
+                                // find the first with remaining upload progress
+                                for (int i = 0; i < n; ++i) {
+                                    FrameViewModel frameVm = flipVm.getFrameVm(flipVm.getFrameId(i));
+                                    if (frameVm.imageVm.uploadProgress < 1.f) {
+                                        return Observable.just(frameVm.imageVm);
+                                    }
+                                }
+                                // else return the first
+                                return Observable.just(flipVm.getFrameVm(flipVm.getFrameId(0)).imageVm);
+                            } else {
+                                AndroidSchedulers.mainThread().createWorker().schedule(new Action0() {
+                                                                                           @Override
+                                                                                           public void call() {
+                                                                                               HACK[0].unsubscribe();
+                                                                                           }
+                                                                                       });
+
+
+                                return Observable.empty();
+                            }
+                        }
+                    })
+
+
+            .distinctUntilChanged();
+            HACK[0] = imageVmSource.subscribe(new ImageView.Updater(imageView));
+
+
 
 
             Observable<String> shortIntroSource = flipInfoVmSource.map(new Func1<FlipInfoViewModel, String>() {

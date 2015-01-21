@@ -26,6 +26,11 @@ public class ImageViewModel {
     @Nullable
     public final Bitmap bitmap;
 
+
+    // FIXME demo hack
+    public float uploadProgress = 0.f;
+
+
     public ImageViewModel(@Nullable Uri uri, @Nullable Id localId, @Nullable Bitmap bitmap) {
         this.uri = uri;
         this.localId = localId;

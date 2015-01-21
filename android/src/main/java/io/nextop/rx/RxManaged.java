@@ -8,4 +8,6 @@ public abstract class RxManaged {
     public RxManaged(Id id) {
         this.id = id;
     }
+
+    // FIXME add dispose method
 }

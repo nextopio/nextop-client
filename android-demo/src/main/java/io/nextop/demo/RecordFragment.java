@@ -1,14 +1,18 @@
 package io.nextop.demo;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.view.*;
 import io.nextop.Id;
 import io.nextop.rx.RxFragment;
+import io.nextop.vm.ImageViewModel;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 public class RecordFragment extends RxFragment {
     public static RecordFragment newInstance(Id flipId) {
@@ -28,8 +32,10 @@ public class RecordFragment extends RxFragment {
 
     boolean previewStarted = false;
 
-    SurfaceView surfaceView;
-    SurfaceHolder surfaceHolder;
+    TextureView textureView;
+    SurfaceTexture surfaceTexture;
+
+    boolean record = false;
 
 
     @Override
@@ -55,30 +61,63 @@ public class RecordFragment extends RxFragment {
 
         View view = getView();
 
-        surfaceView = (SurfaceView) view.findViewById(R.id.surface);
+        textureView = (TextureView) view.findViewById(R.id.texture);
 
-        surfaceView.setOnClickListener(new View.OnClickListener() {
+        textureView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 ((FlipActivity) getActivity()).stopRecording();
             }
         });
 
-        surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
+        textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
-            public void surfaceCreated(SurfaceHolder holder) {
-                surfaceHolder = holder;
+            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                surfaceTexture = surface;
                 startPreview();
             }
-            @Override
-            public void surfaceDestroyed(SurfaceHolder holder) {
-                surfaceHolder = null;
-                stopPreview();
-            }
-            @Override
-            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
 
+            @Override
+            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+                surfaceTexture = null;
+                stopPreview();
+                return true;
             }
+
+
+            long lastCaptureNanos = 0L;
+            @Override
+            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+                // FIXME if record, push a frame here
+                if (record) {
+                    long nanos = System.nanoTime();
+
+                    if (TimeUnit.MILLISECONDS.toNanos(200) <= nanos - lastCaptureNanos) {
+                        lastCaptureNanos = nanos;
+
+
+                        Bitmap bitmap = textureView.getBitmap();
+
+                        int sw = 320;
+                        int sh = bitmap.getHeight() * sw / bitmap.getWidth();
+                        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, sw, sh, false);
+
+
+                        Id frameId = Id.create();
+                        FrameViewModel frameVm = new FrameViewModel(frameId);
+                        frameVm.imageVm = ImageViewModel.memory(scaled);
+                        demo.getFlipVmm().addFrame(flipId, frameVm);
+                    }
+
+                }
+            }
+
+
+            @Override
+            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+                // Do nothing
+            }
+
         });
 
     }
@@ -86,9 +125,21 @@ public class RecordFragment extends RxFragment {
 
     void onStartRecording() {
         // TODO set preview buffer, attach preview callback
+
+//        demo.camera.addCallbackBuffer(new byte[1024 * 1204]);
+//        demo.camera.setPreviewCallbackWithBuffer(new Camera.PreviewCallback() {
+//            @Override
+//            public void onPreviewFrame(byte[] data, Camera camera) {
+//
+//            }
+//        });
+
+        record = true;
     }
     void onStopRecording() {
         // TODO unattach preview callback, clear buffer
+
+        record = false;
     }
 
 
@@ -97,9 +148,9 @@ public class RecordFragment extends RxFragment {
         if (!previewStarted) {
             // TODO retry this if camera not opened
             demo.lockCamera();
-            if (demo.cameraConnected && null != surfaceHolder) {
+            if (demo.cameraConnected && null != surfaceTexture) {
                 try {
-                    demo.camera.setPreviewDisplay(surfaceHolder);
+                    demo.camera.setPreviewTexture(surfaceTexture);
                     setCameraDisplayOrientation(getActivity(), demo.cameraId, demo.camera);
                     demo.camera.startPreview();
                     previewStarted = true;
@@ -158,6 +209,6 @@ public class RecordFragment extends RxFragment {
         super.onPause();
 
         stopPreview();
-        demo.unlockCamera();
+        demo.closeCamera();
     }
 }
