@@ -170,7 +170,7 @@ public class ImageView extends android.widget.ImageView {
 
                             } else {
                                 imageView.uploadProgress = 1.f;
-//                                imageView.invalidate();
+                                imageView.invalidate();
                                 progressUpdater = null;
                             }
 
