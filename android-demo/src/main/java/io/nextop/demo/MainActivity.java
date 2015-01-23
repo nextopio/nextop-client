@@ -96,14 +96,14 @@ public class MainActivity extends RxActivity {
 
     }
 
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        // FIXME this should happen via bind(...) subscribes when bind works!
-        feedAdapter.notifyDataSetChanged();
-    }
+//
+//    @Override
+//    protected void onResume() {
+//        super.onResume();
+//
+//        // FIXME this should happen via bind(...) subscribes when bind works!
+//        feedAdapter.notifyDataSetChanged();
+//    }
 
     private class FeedAdapter extends BaseAdapter implements Observer<FeedViewModel> {
         @Nullable
@@ -148,13 +148,17 @@ public class MainActivity extends RxActivity {
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             // FIXME demo hack - because rxVg.reset() doesn't work
-//            if (null == convertView) {
+            if (null == convertView) {
                 convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_feed_tile, parent, false);
-//            }
+                @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
+                if (null != rxVg) {
+                    rxVg.cascadeDispose(MainActivity.this);
+                }
+            }
 
             Id flipId = getItem(position);
 
-            final RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
+            @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
             if (null != rxVg) {
                 rxVg.reset();
                 updateIndefinitely(convertView, rxVg.bind(demo.getFlipInfoVmm().get(flipId)), rxVg.bind(demo.getFlipVmm().get(flipId)));
@@ -171,12 +175,13 @@ public class MainActivity extends RxActivity {
             ImageView imageView = (ImageView) view.findViewById(R.id.image);
             final TextView shortIntroView = (TextView) view.findViewById(R.id.short_intro);
 
+            // FIXME split out the image source into its own observable
 
-            final Subscription[] HACK = new Subscription[1];
+//            final Subscription[] HACK = new Subscription[1];
             Observable<ImageViewModel> imageVmSource = flipVmSource
 
                     // FIXME holy shit, massive demo hack because upload progress is not reactive
-                    .take(1).repeat(AndroidSchedulers.mainThread()).delay(100, TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
+//                    .take(1).repeat(AndroidSchedulers.mainThread()).delay(100, TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
 
                     .flatMap(new Func1<FlipViewModel, Observable<ImageViewModel>>() {
                         @Override
@@ -193,12 +198,12 @@ public class MainActivity extends RxActivity {
                                 // else return the first
                                 return Observable.just(flipVm.getFrameVm(flipVm.getFrameId(0)).imageVm);
                             } else {
-                                AndroidSchedulers.mainThread().createWorker().schedule(new Action0() {
-                                                                                           @Override
-                                                                                           public void call() {
-                                                                                               HACK[0].unsubscribe();
-                                                                                           }
-                                                                                       });
+//                                AndroidSchedulers.mainThread().createWorker().schedule(new Action0() {
+//                                                                                           @Override
+//                                                                                           public void call() {
+//                                                                                               HACK[0].unsubscribe();
+//                                                                                           }
+//                                                                                       });
 
 
                                 return Observable.empty();
@@ -208,7 +213,8 @@ public class MainActivity extends RxActivity {
 
 
             .distinctUntilChanged();
-            HACK[0] = imageVmSource.subscribe(new ImageView.Updater(imageView));
+            /*HACK[0] =*/
+            imageVmSource.subscribe(new ImageView.Updater(imageView));
 
 
 

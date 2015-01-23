@@ -10,32 +10,40 @@ import rx.internal.util.SubscriptionList;
 public class RxActivity extends Activity implements RxLifecycleBinder {
 
 
+    private final RxLifecycleBinder.Lifted liftedRxLifecycleBinder = new RxLifecycleBinder.Lifted();
+
+
+
 
 
 
     @Override
     public void reset() {
-
-    }
-
-    @Override
-    public void bind(Subscription subscription) {
-
-    }
-
-    @Override
-    public void bind(Func0<Subscription> source) {
-
-    }
-
-    @Override
-    public void bind(Action1<SubscriptionList> source) {
-
+        liftedRxLifecycleBinder.reset();
     }
 
     @Override
     public <T> Observable<T> bind(Observable<T> source) {
-        // FIXME
-        return source;
+        return liftedRxLifecycleBinder.bind(source);
     }
+
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        liftedRxLifecycleBinder.onStart();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        liftedRxLifecycleBinder.onStop();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        liftedRxLifecycleBinder.onDestroy();
+    }
+
 }

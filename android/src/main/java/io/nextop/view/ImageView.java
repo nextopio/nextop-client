@@ -183,12 +183,12 @@ public class ImageView extends android.widget.ImageView {
 
         @Override
         public void onCompleted() {
-            // Do nothing
+            progressUpdater = null;
         }
 
         @Override
         public void onError(Throwable e) {
-            // Do nothing
+            progressUpdater = null;
         }
     }
 

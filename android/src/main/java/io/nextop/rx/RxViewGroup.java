@@ -4,16 +4,15 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.widget.FrameLayout;
 import rx.Observable;
-import rx.Subscription;
-import rx.functions.Action1;
-import rx.functions.Func0;
-import rx.internal.util.SubscriptionList;
 
-import java.util.Objects;
+import javax.annotation.Nullable;
 
 // connects to the view lifecycle (attached to window, detached from window)
 public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder {
     public static final Object TAG = new Object();
+
+
+    private final RxLifecycleBinder.Lifted liftedRxLifecycleBinder = new RxLifecycleBinder.Lifted();
 
 
     public RxViewGroup(Context context) {
@@ -41,28 +40,38 @@ public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder 
 
     @Override
     public void reset() {
-
-    }
-
-    @Override
-    public void bind(Subscription subscription) {
-
-    }
-
-    @Override
-    public void bind(Func0<Subscription> source) {
-
-    }
-
-    @Override
-    public void bind(Action1<SubscriptionList> source) {
-
+        liftedRxLifecycleBinder.reset();
     }
 
     @Override
     public <T> Observable<T> bind(Observable<T> source) {
-        
-        // FIXME
-        return source;
+        return liftedRxLifecycleBinder.bind(source);
     }
+
+
+    public void onDispose() {
+        liftedRxLifecycleBinder.onDestroy();
+    }
+
+    public void cascadeDispose(@Nullable RxLifecycleBinder parent) {
+        liftedRxLifecycleBinder.cascadeDestroy(parent);
+    }
+
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        liftedRxLifecycleBinder.onStart();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        liftedRxLifecycleBinder.onStop();
+    }
+
+
+
+
+
 }

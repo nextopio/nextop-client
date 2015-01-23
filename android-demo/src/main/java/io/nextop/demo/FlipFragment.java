@@ -87,7 +87,7 @@ public class FlipFragment extends RxFragment {
 
 
         final PublishSubject<ImageViewModel> largeSource = PublishSubject.create();
-        bind(largeSource.distinctUntilChanged().subscribe(new ImageView.Updater(largeView)));
+        bind(largeSource).distinctUntilChanged().subscribe(new ImageView.Updater(largeView));
 
 
 
@@ -386,6 +386,10 @@ public class FlipFragment extends RxFragment {
         public View getView(int position, View convertView, ViewGroup parent) {
             if (null == convertView) {
                 convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_flip_frame, parent, false);
+                @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
+                if (null != rxVg) {
+                    rxVg.cascadeDispose(FlipFragment.this);
+                }
             }
 
             convertView.getLayoutParams().height = targetHeight;
@@ -393,7 +397,7 @@ public class FlipFragment extends RxFragment {
 
             final Id frameId = getItem(position);
 
-            final RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
+            @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
             if (null != rxVg) {
                 rxVg.reset();
                 updateIndefinitely(convertView, rxVg.bind(demo.getFlipVmm().get(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {

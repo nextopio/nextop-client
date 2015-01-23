@@ -24,12 +24,12 @@ public class FeedViewModel extends RxManaged {
 
 
     public int size() {
-        return flipIds.size();
+        return 100 * flipIds.size();
     }
 
 
     public Id getFlipId(int index) {
-        return flipIds.get(index);
+        return flipIds.get(index % flipIds.size());
     }
 
 
