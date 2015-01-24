@@ -42,19 +42,25 @@ public final class Id {
     }
 
 
+
     private final byte[] bytes;
+    private final int offset;
     private final long hashCode;
 
 
-    private Id(byte[] bytes) {
+    Id(byte[] bytes) {
+        this(bytes, 0);
+    }
+    Id(byte[] bytes, int offset) {
         this.bytes = bytes;
-        hashCode = Hashing.murmur3_128().hashBytes(bytes).asLong();
+        this.offset = offset;
+        hashCode = Hashing.murmur3_128().hashBytes(bytes, offset, 32).asLong();
     }
 
 
     @Override
     public String toString() {
-        return HexBytes.toString(bytes);
+        return HexBytes.toString(bytes, offset, 32);
     }
 
     @Override

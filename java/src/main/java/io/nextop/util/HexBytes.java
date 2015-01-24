@@ -21,7 +21,7 @@ public class HexBytes {
         return bytes;
     }
 
-    public static String toString(byte[] bytes) {
+    public static String toString(byte[] bytes, int offset, int length) {
         int n = bytes.length;
         CharBuffer cb = CharBuffer.allocate(2 * n);
         toString(bytes, 0, n, cb);

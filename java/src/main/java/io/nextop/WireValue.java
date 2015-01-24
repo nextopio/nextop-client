@@ -10,6 +10,7 @@ import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import org.apache.commons.codec.binary.Base64OutputStream;
 
+import javax.annotation.Nullable;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
@@ -166,6 +167,12 @@ public abstract class WireValue {
 //                return new CFloat64ListWireValue(bytes, offset, cs);
                 // FIXME see listh
                 throw new IllegalArgumentException();
+            case H_NULL:
+                return new NullWireValue();
+            case H_MESSAGE:
+                return new CMessageWireValue(bytes, offset, cs);
+            case H_IMAGE:
+                return new CImageWireValue(bytes, offset, cs);
             default:
                 throw new IllegalArgumentException("" + h);
         }
@@ -606,6 +613,23 @@ public abstract class WireValue {
         }
     }
 
+    private static class CMessageWireValue extends CompressedWireValue {
+        CMessageWireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.MESSAGE, bytes, offset, cs);
+        }
+
+        // FIXME codec
+
+    }
+
+    private static class CImageWireValue extends CompressedWireValue {
+        CImageWireValue(byte[] bytes, int offset, CompressionState cs) {
+            super(Type.IMAGE, bytes, offset, cs);
+        }
+
+        // FIXME codec
+    }
+
 
 
 
@@ -750,7 +774,10 @@ public abstract class WireValue {
 
 
 
-    public static WireValue of(Object value) {
+    public static WireValue of(@Nullable Object value) {
+        if (null == value) {
+            return of();
+        }
         if (value instanceof WireValue) {
             return (WireValue) value;
         }
@@ -788,6 +815,12 @@ public abstract class WireValue {
                 return of((List<WireValue>) value);
             }
             return of(new ArrayList<WireValue>(((Collection) value)));
+        }
+        if (value instanceof Message) {
+            return of((Message) value);
+        }
+        if (value instanceof EncodedImage) {
+            return of((EncodedImage) value);
         }
         throw new IllegalArgumentException();
     }
@@ -830,6 +863,18 @@ public abstract class WireValue {
     }
 
 
+    static WireValue of(Message m) {
+        return new MessageWireValue(m);
+    }
+
+    static WireValue of(EncodedImage image) {
+        return new ImageWireValue(image);
+    }
+
+    // null
+    static WireValue of() {
+        return new NullWireValue();
+    }
 
 
 
@@ -1072,6 +1117,9 @@ public abstract class WireValue {
     static final int H_INT64_LIST = 12;
     static final int H_FLOAT32_LIST = 13;
     static final int H_FLOAT64_LIST = 14;
+    static final int H_NULL = 15;
+    static final int H_MESSAGE = 16;
+    static final int H_IMAGE = 17;
 
 
     static byte[] header(int nb, int v) {
@@ -1311,6 +1359,24 @@ public abstract class WireValue {
                 break;
             case BOOLEAN:
                 bb.put((byte) (value.asBoolean() ? H_TRUE_BOOLEAN : H_FALSE_BOOLEAN));
+                break;
+            case NULL:
+                bb.put((byte) H_NULL);
+                break;
+            case MESSAGE: {
+                Message message = value.asMessage();
+
+                message.id.toBytes(bb);
+                bb.putInt(message.priority);
+                // FIXME support serialID when it comes in
+                // FIXME support toBytes on NURL to avoid string conversion
+                toBytes(WireValue.of(message.nurl.toString()), lb, bb);
+                toBytes(WireValue.of(message.headers), lb, bb);
+                toBytes(WireValue.of(message.parameters), lb, bb);
+                break;
+            }
+            case IMAGE:
+                // FIXME
                 break;
             default:
                 throw new IllegalArgumentException();
@@ -1654,6 +1720,8 @@ public abstract class WireValue {
     public abstract List<WireValue> asList();
     public abstract Map<WireValue, WireValue> asMap();
     public abstract ByteBuffer asBlob();
+    public abstract Message asMessage();
+    public abstract EncodedImage asImage();
 
 
 
@@ -1670,34 +1738,49 @@ public abstract class WireValue {
             this.value = value;
         }
 
+        @Override
         public String asString() {
             return base64(ByteBuffer.wrap(value));
         }
-
+        @Override
         public int asInt() {
             throw new UnsupportedOperationException();
         }
-
+        @Override
         public long asLong() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public float asFloat() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public double asDouble() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public boolean asBoolean() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public List<WireValue> asList() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public ByteBuffer asBlob() {
             return ByteBuffer.wrap(value);
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
         }
 
 
@@ -1711,34 +1794,49 @@ public abstract class WireValue {
             this.value = value;
         }
 
+        @Override
         public String asString() {
             return value;
         }
-
+        @Override
         public int asInt() {
             return Integer.parseInt(value);
         }
-
+        @Override
         public long asLong() {
             return Long.parseLong(value);
         }
+        @Override
         public float asFloat() {
             return Float.parseFloat(value);
         }
+        @Override
         public double asDouble() {
             return Double.parseDouble(value);
         }
+        @Override
         public boolean asBoolean() {
             return Boolean.parseBoolean(value);
         }
+        @Override
         public List<WireValue> asList() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public ByteBuffer asBlob() {
             return ByteBuffer.wrap(value.getBytes(Charsets.UTF_8));
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -1766,35 +1864,50 @@ public abstract class WireValue {
             this.value = value;
         }
 
+        @Override
         public String asString() {
             return value.toString();
         }
-
+        @Override
         public int asInt() {
             return value.intValue();
         }
-
+        @Override
         public long asLong() {
             return value.longValue();
         }
+        @Override
         public float asFloat() {
             return value.floatValue();
         }
+        @Override
         public double asDouble() {
             return value.doubleValue();
         }
+        @Override
         public boolean asBoolean() {
             // c style
             return 0 != value.floatValue();
         }
+        @Override
         public List<WireValue> asList() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public ByteBuffer asBlob() {
             // TODO
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
             throw new UnsupportedOperationException();
         }
     }
@@ -1808,34 +1921,49 @@ public abstract class WireValue {
             this.value = value;
         }
 
+        @Override
         public String asString() {
             return String.valueOf(value);
         }
-
+        @Override
         public int asInt() {
             return value ? 1 : 0;
         }
-
+        @Override
         public long asLong() {
             return value ? 1L : 0L;
         }
+        @Override
         public float asFloat() {
             return value ? 1.f : 0.f;
         }
+        @Override
         public double asDouble() {
             return value ? 1.0 : 0.0;
         }
+        @Override
         public boolean asBoolean() {
             return value;
         }
+        @Override
         public List<WireValue> asList() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public ByteBuffer asBlob() {
             // TODO
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
             throw new UnsupportedOperationException();
         }
     }
@@ -1848,34 +1976,49 @@ public abstract class WireValue {
             this.value = value;
         }
 
+        @Override
         public String asString() {
             return value.toString();
         }
-
+        @Override
         public int asInt() {
             throw new UnsupportedOperationException();
         }
-
+        @Override
         public long asLong() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public float asFloat() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public double asDouble() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public boolean asBoolean() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public List<WireValue> asList() {
             return value;
         }
+        @Override
         public Map<WireValue, WireValue> asMap() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public ByteBuffer asBlob() {
             // TODO
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
             throw new UnsupportedOperationException();
         }
     }
@@ -1888,36 +2031,252 @@ public abstract class WireValue {
             this.value = value;
         }
 
+        @Override
         public String asString() {
             return value.toString();
         }
-
+        @Override
         public int asInt() {
             throw new UnsupportedOperationException();
         }
-
+        @Override
         public long asLong() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public float asFloat() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public double asDouble() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public boolean asBoolean() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public List<WireValue> asList() {
             throw new UnsupportedOperationException();
         }
+        @Override
         public Map<WireValue, WireValue> asMap() {
             return value;
         }
+        @Override
         public ByteBuffer asBlob() {
             // TODO
             throw new UnsupportedOperationException();
         }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
     }
+
+    private static class MessageWireValue extends WireValue {
+        final Message message;
+
+        MessageWireValue(Message message) {
+            super(Type.MESSAGE);
+            this.message = message;
+        }
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            return message;
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class ImageWireValue extends WireValue {
+        final EncodedImage image;
+
+        ImageWireValue(EncodedImage image) {
+            super(Type.IMAGE);
+            this.image = image;
+        }
+
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            return image;
+        }
+    }
+
+    private static class NullWireValue extends WireValue {
+        NullWireValue() {
+            super(Type.NULL);
+        }
+
+
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+
+
+    static class IdCodec {
+
+        public static Id valueOf(byte[] bytes, int offset) {
+
+        }
+
+        public static void toBytes(Id id, ByteBuffer bb) {
+
+        }
+
+    }
+
+
+    static class EncodedImageCodec {
+
+
+        static final int H_F_WEBP = 1;
+        static final int H_F_JPEG = 2;
+        static final int H_F_PNG = 3;
+
+        static final int H_O_REAR_FACING = 1;
+        static final int H_O_FRONT_FACING = 2;
+
+
+
+        public static EncodedImage valueOf(byte[] bytes, int offset) {
+
+        }
+
+
+
+        public static void toBytes(EncodedImage image, ByteBuffer bb) {
+
+        }
+
+    }
+
 
 }

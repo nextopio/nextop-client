@@ -295,7 +295,12 @@ public class Message {
     /////// HTTPCLIENT CONVERSIONS ///////
 
     private static final String H_PRAGMA_ID_PREFIX = "nextop-id";
+    // FIXME serialID
     private static final String H_PRAGMA_PREFIX = "nextop-header";
+
+    // IMAGE
+    // FIXME maxTransferWidth, maxTransferHeight
+
 
 
     public static HttpUriRequest toHttpRequest(Message message) throws URISyntaxException {
