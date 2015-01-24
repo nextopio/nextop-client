@@ -44,7 +44,7 @@ import java.util.*;
 public abstract class WireValue {
     // just use int constants here
 
-    // FIXME MESSAGE, IMAGE(source=capture_front,capture_back,binary; representation as jpegBytes or Bitmap) and NULL should be WireValue top-level types
+    // FIXME MESSAGE, IMAGE(orientation=capture_front,capture_back,binary; representation as bytes+encoding) and NULL should be WireValue top-level types
     public static enum Type {
         UTF8,
         BLOB,
@@ -54,7 +54,14 @@ public abstract class WireValue {
         FLOAT64,
         BOOLEAN,
         MAP,
-        LIST
+        LIST,
+
+        // FIXME
+        MESSAGE,
+        // FIXME
+        IMAGE,
+        // FIXME
+        NULL
 
     }
 

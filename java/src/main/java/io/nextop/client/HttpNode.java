@@ -10,6 +10,7 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import io.nextop.Message;
 import io.nextop.WireValue;
+import io.nextop.client.retry.SendStrategy;
 import io.nextop.util.HexBytes;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Base64InputStream;
@@ -36,10 +37,13 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 // FIXME ordering and retry
+// FIXME use a package-shifted version of HttpClient
 public class HttpNode extends AbstractMessageControlNode {
 
     private Executor executor;
     private CloseableHttpClient httpClient;
+
+    private SendStrategy sendStrategy = SendStrategy.INDEFINITE;
 
 
     public HttpNode(Wire.Factory wireFactory) {
@@ -139,6 +143,7 @@ public class HttpNode extends AbstractMessageControlNode {
                 return;
             }
 
+            // FIXME can do retry here while active {  use supplied retry strategy
             final CloseableHttpResponse response;
             try {
                 response = httpClient.execute(request);
@@ -151,7 +156,12 @@ public class HttpNode extends AbstractMessageControlNode {
                 });
                 return;
             }
+            // FIXME }
 
+            // FIXME surface progress
+
+            // FIXME can't do retry here if not idempotent
+            // FIXME *can do* retry here on idempotent (GET, HEAD)
             final Message responseMessage;
             try {
                 responseMessage = Message.fromHttpResponse(response).setNurl(requestMessage.receiverNurl()).build();

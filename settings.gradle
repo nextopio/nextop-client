@@ -2,4 +2,6 @@ include 'java'
 
 include 'android'
 
-include 'android-demo'
+include 'android-test'
+
+include 'android-demo-flip'

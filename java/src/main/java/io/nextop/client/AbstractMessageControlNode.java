@@ -15,6 +15,8 @@ public abstract class AbstractMessageControlNode implements MessageControlNode {
 
 
 
+
+
     private void checkUpstream() {
         if (null == upstream) {
             throw new IllegalStateException();

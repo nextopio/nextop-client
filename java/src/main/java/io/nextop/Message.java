@@ -84,6 +84,8 @@ public class Message {
     public final Map<WireValue, WireValue> headers;
     public final Map<WireValue, WireValue> parameters;
 
+    // FIXME messages with the same serialId are sent serially
+    // FIXME Id serialId;
 
 
     private Message(Id id, int priority, Nurl nurl,

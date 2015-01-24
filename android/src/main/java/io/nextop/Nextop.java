@@ -193,10 +193,15 @@ public class Nextop {
             int maxCacheHeight;
 
             // affects url
-            int maxBytes;
-            // affects url
-            int maxMs;
+            float quality;
+//
+//            // affects url
+//            int maxBytes;
+//            // affects url
+//            int maxMs;
 
+            // affects transmission
+            int priority;
 
             // does not affect cache url; decode only
             int maxWidth;
