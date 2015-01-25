@@ -7,8 +7,6 @@ import com.google.common.io.ByteStreams;
 import com.google.common.io.CharStreams;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpRequest;
@@ -28,58 +26,67 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-import static io.nextop.Nurl.*;
+import static io.nextop.Nurl.Method;
+import static io.nextop.Nurl.Target;
 
 // goals: fast to parse, minimal object creation on parse or each operation
 public class Message {
     public static final WireValue P_CONTENT = WireValue.of("$content");
+    public static final WireValue P_FRAGMENT = WireValue.of("$fragment");
 
 
+    public static final Id DEFAULT_GROUP_ID = Id.create(0L, 0L, 0L, 0L);
+    public static final int DEFAULT_GROUP_PRIORITY = 0;
 
+
+    /** @see Nurl#getLocalId */
     public static Nurl receiverNurl(Id id) {
         return Nurl.local(Target.create(Method.POST, Path.valueOf(id.toString())));
     }
-
-    public static Message receiverSpec(Id id, int priority) {
-        return newBuilder()
-                .setNurl(receiverNurl(id))
-                .setPriority(priority)
-                .build();
-    }
-
+    /** @see Nurl#getLocalId */
     public static Nurl echoNurl(Id id) {
         return Nurl.local(Target.create(Method.GET, Path.valueOf("/" + id)));
     }
+    /** @see Nurl#getLocalId */
     public static Nurl echoHeadNurl(Id id) {
         return Nurl.local(Target.create(Method.HEAD, Path.valueOf("/" + id)));
     }
+    /** @see Nurl#getLocalId */
     public static Nurl statusNurl(Id id) {
         return Nurl.local(Target.create(Method.GET, Path.valueOf("/" + id + "/status")));
     }
 
 
+    public static final WireValue P_PROGRESS = WireValue.of("progress");
 
-    // FIXME
-//    public static Message valueOf(URI uri) {
-//        // FIXME
-//    }
-//
-//    public static Message valueOf(URL url) {
-//        try {
-//            return valueOf(url.toURI());
-//        } catch (URISyntaxException e) {
-//            throw new IllegalArgumentException(e);
-//        }
-//    }
 
+
+    public static Message valueOf(Nurl.Method method, URL url) {
+        try {
+            return valueOf(method, url.toURI());
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+
+    public static Message valueOf(Nurl.Method method, URI uri) {
+        // FIXME parse query and fragment into parameters
+        return newBuilder().setNurl(Nurl.valueOf(String.format("%s %s", method, uri))).build();
+    }
 
 
 
     public final Id id;
-    public final int priority;
+    // priority sets the priority of the group relative to other groups
+    // groups are equal based on *id only*
+    // on the send/receive side, when multiplexing, priority of a group should be the max of all queued messages
+    public final Id groupId;
+    public final int groupPriority;
     public final Nurl nurl;
     public final Map<WireValue, WireValue> headers;
     public final Map<WireValue, WireValue> parameters;
@@ -88,11 +95,12 @@ public class Message {
     // FIXME Id serialId;
 
 
-    private Message(Id id, int priority, Nurl nurl,
+    Message(Id id, Id groupId, int groupPriority, Nurl nurl,
                     Map<WireValue, WireValue> headers,
                     Map<WireValue, WireValue> parameters) {
         this.id = id;
-        this.priority = priority;
+        this.groupId = groupId;
+        this.groupPriority = groupPriority;
         this.nurl = nurl;
         this.headers = headers;
         this.parameters = parameters;
@@ -117,7 +125,8 @@ public class Message {
 
     public Builder toBuilder() {
         Builder b = newBuilder()
-                .setPriority(priority)
+                .setGroupId(groupId)
+                .setGroupPriority(groupPriority)
                 .setNurl(nurl);
 
         for (Map.Entry<WireValue, WireValue> e : headers.entrySet()) {
@@ -135,6 +144,14 @@ public class Message {
         return toBuilder().build();
     }
 
+    public Message parallel() {
+        return toBuilder().setGroupId(Id.create()).build();
+    }
+
+    public Message serial(Id serialGroupId) {
+        return toBuilder().setGroupId(serialGroupId).build();
+    }
+
 
 
     public static Builder newBuilder() {
@@ -144,7 +161,8 @@ public class Message {
     public static final class Builder {
         private final Id id = Id.create();
 
-        private int priority = 0;
+        private Id groupId = DEFAULT_GROUP_ID;
+        private int groupPriority = DEFAULT_GROUP_PRIORITY;
         @Nullable
         private Nurl.Target target = null;
         @Nullable
@@ -158,8 +176,13 @@ public class Message {
         }
 
 
-        public Builder setPriority(int priority) {
-            this.priority = priority;
+        public Builder setGroupId(Id groupId) {
+            this.groupId = groupId;
+            return this;
+        }
+
+        public Builder setGroupPriority(int groupPriority) {
+            this.groupPriority = groupPriority;
             return this;
         }
 
@@ -246,7 +269,7 @@ public class Message {
             } else {
                 nurl = Nurl.local(target);
             }
-            return new Message(id, priority, nurl,
+            return new Message(id, groupId, groupPriority, nurl,
                     ImmutableMap.copyOf(headers),
                     ImmutableMap.copyOf(parameters));
         }

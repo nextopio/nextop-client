@@ -7,16 +7,25 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 import io.nextop.Id;
+import io.nextop.Nextop;
+import io.nextop.NextopAndroid;
 import io.nextop.rx.RxActivity;
 import io.nextop.rx.RxViewGroup;
 import io.nextop.view.ImageView;
 import io.nextop.vm.ImageViewModel;
 import rx.Observable;
 import rx.Observer;
+import rx.Subscription;
+import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
+import rx.internal.util.SubscriptionList;
+import rx.subjects.PublishSubject;
+import rx.subscriptions.BooleanSubscription;
+import rx.subscriptions.CompositeSubscription;
 
 import javax.annotation.Nullable;
+import java.util.List;
 
 public class MainActivity extends RxActivity {
 
@@ -135,7 +144,6 @@ public class MainActivity extends RxActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            // FIXME demo hack - because rxVg.reset() doesn't work
             if (null == convertView) {
                 convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_feed_tile, parent, false);
                 @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
@@ -163,49 +171,9 @@ public class MainActivity extends RxActivity {
             ImageView imageView = (ImageView) view.findViewById(R.id.image);
             final TextView shortIntroView = (TextView) view.findViewById(R.id.short_intro);
 
-            // FIXME split out the image source into its own observable
-
-//            final Subscription[] HACK = new Subscription[1];
-            Observable<ImageViewModel> imageVmSource = flipVmSource
-
-                    // FIXME holy shit, massive demo hack because upload progress is not reactive
-//                    .take(1).repeat(AndroidSchedulers.mainThread()).delay(100, TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
-
-                    .flatMap(new Func1<FlipViewModel, Observable<ImageViewModel>>() {
-                        @Override
-                        public Observable<ImageViewModel> call(FlipViewModel flipVm) {
-                            int n = flipVm.size();
-                            if (0 < n) {
-                                // find the first with remaining upload progress
-                                for (int i = 0; i < n; ++i) {
-                                    FrameViewModel frameVm = flipVm.getFrameVm(flipVm.getFrameId(i));
-                                    if (frameVm.imageVm.uploadProgress < 1.f) {
-                                        return Observable.just(frameVm.imageVm);
-                                    }
-                                }
-                                // else return the first
-                                return Observable.just(flipVm.getFrameVm(flipVm.getFrameId(0)).imageVm);
-                            } else {
-//                                AndroidSchedulers.mainThread().createWorker().schedule(new Action0() {
-//                                                                                           @Override
-//                                                                                           public void call() {
-//                                                                                               HACK[0].unsubscribe();
-//                                                                                           }
-//                                                                                       });
-
-
-                                return Observable.empty();
-                            }
-                        }
-                    })
-
-
+            Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view), flipVmSource).out
             .distinctUntilChanged();
-            /*HACK[0] =*/
             imageVmSource.subscribe(new ImageView.Updater(imageView));
-
-
-
 
             Observable<String> shortIntroSource = flipInfoVmSource.map(new Func1<FlipInfoViewModel, String>() {
                 @Override
@@ -230,5 +198,126 @@ public class MainActivity extends RxActivity {
         public int getViewTypeCount() {
             return 1;
         }
+
+
+
+
+
+    }
+
+
+    // FIXME bug where tile grid is waffling on scroll
+
+    // TODO
+    static final class LoadingImageVmSource {
+        // flipVmSource subscribe X
+        // X onNext (
+        //    create observable for imagevm for frames
+        //    unsubscribe subject from old observable
+        //    subscribe subject to new observable
+        // )
+
+
+        Nextop nextop;
+        PublishSubject<ImageViewModel> subject;
+
+        Subscription flipVmSubscription = null;
+        final Observable<ImageViewModel> out;
+        Subscription emitSubscription;
+
+
+
+        LoadingImageVmSource(Nextop nextop, final Observable<FlipViewModel> flipVmSource) {
+            this.nextop = nextop;
+
+            subject = PublishSubject.create();
+
+            out = subject.doOnSubscribe(new Action0() {
+                @Override
+                public void call() {
+                    flipVmSubscription = flipVmSource.doOnNext(new Action1<FlipViewModel>() {
+                        @Override
+                        public void call(FlipViewModel flipVm) {
+
+                            if (null != emitSubscription) {
+                                emitSubscription.unsubscribe();
+                                emitSubscription = null;
+                            }
+
+                            int n = flipVm.size();
+                            FrameViewModel[] frameVms = new FrameViewModel[n];
+                            for (int i = 0; i < n; ++i) {
+                                frameVms[i] = flipVm.getFrameVm(flipVm.getFrameId(i));
+                            }
+
+
+                            CompositeSubscription s = new CompositeSubscription();
+                            emitSubscription = s;
+
+                            emit(frameVms, 0, s);
+
+
+
+
+
+                        }
+                    }).subscribe();
+                }
+            }).doOnUnsubscribe(new Action0() {
+                @Override
+                public void call() {
+                    if (null != emitSubscription) {
+                        emitSubscription.unsubscribe();
+                        emitSubscription = null;
+                    }
+                    flipVmSubscription.unsubscribe();
+                }
+            }).share();
+
+        }
+
+        void emit(final FrameViewModel[] frameVms, final int i, final CompositeSubscription s) {
+            if (s.isUnsubscribed()) {
+                return;
+            }
+            if (i < frameVms.length) {
+                final FrameViewModel frameVm = frameVms[i];
+                if (null != frameVm.imageVm.localId) {
+                    // TODO remove previous - need a "replace subscription"
+                    s.add(nextop.transferStatus(frameVm.id).subscribe(new Observer<Nextop.TransferStatus>() {
+                        int count = 0;
+
+                        @Override
+                        public void onNext(Nextop.TransferStatus transferStatus) {
+                            if (1 == ++count) {
+                                if (transferStatus.progress < 1.f) {
+                                    subject.onNext(frameVm.imageVm);
+                                }
+                            }
+                        }
+
+
+                        @Override
+                        public void onCompleted() {
+                            emit(frameVms, i + 1, s);
+                        }
+
+                        @Override
+                        public void onError(Throwable e) {
+
+                        }
+
+
+                    }));
+
+                } else {
+                    emit(frameVms, i + 1, s);
+                }
+            } else if (0 < frameVms.length) {
+                subject.onNext(frameVms[0].imageVm);
+            }
+        }
+
+
     }
 }

@@ -29,12 +29,4 @@ public class NextopApplication extends Application implements NextopContext {
         return nextop;
     }
 
-
-    // FIXME demo hack
-    public boolean isOnline() {
-        ConnectivityManager connectivityManager
-                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
-        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
-    }
 }

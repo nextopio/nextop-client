@@ -13,6 +13,8 @@ import java.util.UUID;
 public final class Id {
     private static final SecureRandom sr = new SecureRandom();
 
+    static final int LENGTH = 32;
+
     /** generate a 256-bit UUID as a 128-bit UUID + 128 bits of randomness
      * @see java.util.UUID */
     public static Id create() {
@@ -20,10 +22,18 @@ public final class Id {
         byte[] rand16 = new byte[16];
         sr.nextBytes(rand16);
 
-        return new Id(ByteBuffer.allocate(32
+        return new Id(ByteBuffer.allocate(LENGTH
         ).putLong(uuid16.getMostSignificantBits()
         ).putLong(uuid16.getLeastSignificantBits()
         ).put(rand16
+        ).array());
+    }
+    public static Id create(long a, long b, long c, long d) {
+        return new Id(ByteBuffer.allocate(LENGTH
+        ).putLong(a
+        ).putLong(b
+        ).putLong(c
+        ).putLong(d
         ).array());
     }
 
@@ -43,9 +53,9 @@ public final class Id {
 
 
 
-    private final byte[] bytes;
-    private final int offset;
-    private final long hashCode;
+    final byte[] bytes;
+    final int offset;
+    final long hashCode;
 
 
     Id(byte[] bytes) {
@@ -54,13 +64,13 @@ public final class Id {
     Id(byte[] bytes, int offset) {
         this.bytes = bytes;
         this.offset = offset;
-        hashCode = Hashing.murmur3_128().hashBytes(bytes, offset, 32).asLong();
+        hashCode = Hashing.murmur3_128().hashBytes(bytes, offset, LENGTH).asLong();
     }
 
 
     @Override
     public String toString() {
-        return HexBytes.toString(bytes, offset, 32);
+        return HexBytes.toString(bytes, offset, LENGTH);
     }
 
     @Override

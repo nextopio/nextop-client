@@ -26,9 +26,14 @@ public class Path {
 
         LinkedList<Segment> segments = new LinkedList<Segment>();
         for (int i = j; i <= n; ++i) {
-            if (n == i || '/' == s.charAt(i)) {
+            char c = s.charAt(i);
+            boolean end = n == i || '?' == c || '#' == c;
+            if (end || '/' == c) {
                 segments.add(Segment.valueOf(s.substring(j, i)));
                 j = i + 1;
+                if (end) {
+                    break;
+                }
             }
         }
 

@@ -239,6 +239,14 @@ public abstract class WireValue {
         public ByteBuffer asBlob() {
             throw new UnsupportedOperationException();
         }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class CBlobWireValue extends CompressedWireValue{
@@ -283,6 +291,14 @@ public abstract class WireValue {
             int length = intv(bytes, offset + 1);
             return ByteBuffer.wrap(bytes, offset + 5, length);
         }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
     }
 
 
@@ -321,7 +337,6 @@ public abstract class WireValue {
         }
         @Override
         public Map<WireValue, WireValue> asMap() {
-
             return new AbstractMap<WireValue, WireValue>() {
                 int ds = offset + 5;
                 List<WireValue> keys = valueOf(bytes, ds, cs).asList();
@@ -358,6 +373,14 @@ public abstract class WireValue {
         }
         @Override
         public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
             throw new UnsupportedOperationException();
         }
     }
@@ -438,6 +461,14 @@ public abstract class WireValue {
         public ByteBuffer asBlob() {
             throw new UnsupportedOperationException();
         }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
     }
 
 
@@ -480,6 +511,14 @@ public abstract class WireValue {
         }
         @Override
         public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
             throw new UnsupportedOperationException();
         }
     }
@@ -525,6 +564,14 @@ public abstract class WireValue {
         public ByteBuffer asBlob() {
             throw new UnsupportedOperationException();
         }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class CFloat32WireValue extends CompressedWireValue {
@@ -566,6 +613,14 @@ public abstract class WireValue {
         }
         @Override
         public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
             throw new UnsupportedOperationException();
         }
     }
@@ -611,6 +666,14 @@ public abstract class WireValue {
         public ByteBuffer asBlob() {
             throw new UnsupportedOperationException();
         }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class CMessageWireValue extends CompressedWireValue {
@@ -618,8 +681,50 @@ public abstract class WireValue {
             super(Type.MESSAGE, bytes, offset, cs);
         }
 
-        // FIXME codec
-
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            return MessageCodec.valueOf(bytes, offset, cs);
+        }
+        @Override
+        public EncodedImage asImage() {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class CImageWireValue extends CompressedWireValue {
@@ -627,7 +732,50 @@ public abstract class WireValue {
             super(Type.IMAGE, bytes, offset, cs);
         }
 
-        // FIXME codec
+        @Override
+        public String asString() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public int asInt() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public long asLong() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public float asFloat() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public double asDouble() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public boolean asBoolean() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public List<WireValue> asList() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Map<WireValue, WireValue> asMap() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public ByteBuffer asBlob() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Message asMessage() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public EncodedImage asImage() {
+            return ImageCodec.valueOf(bytes, offset);
+        }
     }
 
 
@@ -1241,7 +1389,7 @@ public abstract class WireValue {
         System.out.printf("body %d bytes\n", bytes);
 
     }
-    private void toBytes(WireValue value, Lb lb, ByteBuffer bb) {
+    private static void toBytes(WireValue value, Lb lb, ByteBuffer bb) {
         int luti = lb.luti(value);
         if (0 <= luti) {
             byte[] header = header(lb.lutNb, luti);
@@ -1251,7 +1399,7 @@ public abstract class WireValue {
             _toBytes(value, lb, bb);
         }
     }
-    private void _toBytes(WireValue value, Lb lb, ByteBuffer bb) {
+    private static void _toBytes(WireValue value, Lb lb, ByteBuffer bb) {
         switch (value.getType()) {
             case MAP: {
                 bb.put((byte) H_MAP);
@@ -1363,18 +1511,9 @@ public abstract class WireValue {
             case NULL:
                 bb.put((byte) H_NULL);
                 break;
-            case MESSAGE: {
-                Message message = value.asMessage();
-
-                message.id.toBytes(bb);
-                bb.putInt(message.priority);
-                // FIXME support serialID when it comes in
-                // FIXME support toBytes on NURL to avoid string conversion
-                toBytes(WireValue.of(message.nurl.toString()), lb, bb);
-                toBytes(WireValue.of(message.headers), lb, bb);
-                toBytes(WireValue.of(message.parameters), lb, bb);
+            case MESSAGE:
+                MessageCodec.toBytes(value.asMessage(), lb, bb);
                 break;
-            }
             case IMAGE:
                 // FIXME
                 break;
@@ -2241,22 +2380,20 @@ public abstract class WireValue {
 
 
 
-    static class IdCodec {
+    private static final class IdCodec {
+        static final int LENGTH = Id.LENGTH;
 
         public static Id valueOf(byte[] bytes, int offset) {
-
+            return new Id(bytes, offset);
         }
 
         public static void toBytes(Id id, ByteBuffer bb) {
-
+            bb.put(id.bytes, id.offset, Id.LENGTH);
         }
-
     }
 
 
-    static class EncodedImageCodec {
-
-
+    private static final class ImageCodec {
         static final int H_F_WEBP = 1;
         static final int H_F_JPEG = 2;
         static final int H_F_PNG = 3;
@@ -2265,16 +2402,100 @@ public abstract class WireValue {
         static final int H_O_FRONT_FACING = 2;
 
 
-
         public static EncodedImage valueOf(byte[] bytes, int offset) {
-
+            EncodedImage.Format format;
+            switch (intv(bytes, offset)) {
+                case H_F_WEBP:
+                    format = EncodedImage.Format.WEBP;
+                    break;
+                case H_F_JPEG:
+                    format = EncodedImage.Format.JPEG;
+                    break;
+                case H_F_PNG:
+                    format = EncodedImage.Format.PNG;
+                    break;
+                default:
+                    throw new IllegalArgumentException();
+            }
+            EncodedImage.Orientation orientation;
+            switch (intv(bytes, offset + 4)) {
+                case H_O_REAR_FACING:
+                    orientation = EncodedImage.Orientation.REAR_FACING;
+                    break;
+                case H_O_FRONT_FACING:
+                    orientation = EncodedImage.Orientation.FRONT_FACING;
+                    break;
+                default:
+                    throw new IllegalArgumentException();
+            }
+            int width = intv(bytes, offset + 8);
+            int height = intv(bytes, offset + 12);
+            int length = intv(bytes, offset + 16);
+            return new EncodedImage(format, orientation, width, height, bytes, offset + 20, length);
         }
-
-
 
         public static void toBytes(EncodedImage image, ByteBuffer bb) {
-
+            switch (image.format) {
+                case WEBP:
+                    bb.put((byte) H_F_WEBP);
+                    break;
+                case JPEG:
+                    bb.put((byte) H_F_JPEG);
+                    break;
+                case PNG:
+                    bb.put((byte) H_F_PNG);
+                    break;
+                default:
+                    throw new IllegalArgumentException();
+            }
+            switch (image.orientation) {
+                case REAR_FACING:
+                    bb.put((byte) H_O_REAR_FACING);
+                    break;
+                case FRONT_FACING:
+                    bb.put((byte) H_O_FRONT_FACING);
+                    break;
+                default:
+                    throw new IllegalArgumentException();
+            }
+            bb.putInt(image.width);
+            bb.putInt(image.height);
+            bb.putInt(image.length);
+            bb.put(image.bytes, image.offset, image.length);
         }
+    }
+
+    private static final class MessageCodec {
+
+
+        public static Message valueOf(byte[] bytes, int offset, CompressionState cs) {
+            int c = offset;
+            Id id = IdCodec.valueOf(bytes, c);
+            c += IdCodec.LENGTH;
+            Id groupId = IdCodec.valueOf(bytes, c);
+            c += IdCodec.LENGTH;
+            int groupPriority = intv(bytes, c);
+            c += 4;
+            Nurl nurl = Nurl.valueOf(WireValue.valueOf(bytes, c, cs).asString());
+            c += 5 + intv(bytes, c + 1);
+            Map<WireValue, WireValue> headers = WireValue.valueOf(bytes, c, cs).asMap();
+            c += 5 + intv(bytes, c + 1);
+            Map<WireValue, WireValue> parameters = WireValue.valueOf(bytes, c, cs).asMap();
+            return new Message(id, groupId, groupPriority, nurl, headers, parameters);
+        }
+
+        public static void toBytes(Message message, Lb lb, ByteBuffer bb) {
+            IdCodec.toBytes(message.id, bb);
+            IdCodec.toBytes(message.groupId, bb);
+            bb.putInt(message.groupPriority);
+            // FIXME support serialID when it comes in
+            // TODO (?) NURL codec to avoid string conversion
+            WireValue.toBytes(WireValue.of(message.nurl.toString()), lb, bb);
+            WireValue.toBytes(WireValue.of(message.headers), lb, bb);
+            WireValue.toBytes(WireValue.of(message.parameters), lb, bb);
+        }
+
+
 
     }
 
