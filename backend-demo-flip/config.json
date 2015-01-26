@@ -1,0 +1,17 @@
+{
+  "mysql": {
+    "host": "localhost",
+    "port": "3306",
+    "database": "demo_flip",
+    "user": "root",
+    "password": ""
+  },
+  "storage": "local",
+  "local": {
+    "dir": "./tmp"
+  },
+  "s3": {
+    "accessKeyId": "",
+    "secretAccessKey": ""
+  }
+}

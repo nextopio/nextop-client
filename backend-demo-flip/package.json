@@ -1,0 +1,16 @@
+{
+  "name": "backend-demo-flip",
+  "version": "0.1.0",
+  "description": "Backend for $platform-demo-flip apps",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "nextop.io",
+  "license": "ASL2.0",
+  "dependencies": {
+    "body-parser": "^1.10.2",
+    "express": "^4.11.1",
+    "mysql": "^2.5.4"
+  }
+}
