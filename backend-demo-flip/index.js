@@ -101,7 +101,7 @@ app.get('/flip/:flipId/info', function (req, res) {
     var flipId = req.params.flipId;
     if ('after' in req.query) {
         var after = req.query.after;
-        mysqlClient.query('SELECT flip_id, intro, most_recent_update_index FROM FlipInfo' +
+        mysqlClient.query('SELECT intro, most_recent_update_index FROM FlipInfo' +
             ' WHERE flip_id = ? AND deleted = false AND most_recent_update_index > ?',
             [flipId, after],
             function(err, result) {
@@ -112,7 +112,7 @@ app.get('/flip/:flipId/info', function (req, res) {
                 res.end();
             });
     } else {
-        mysqlClient.query('SELECT flip_id, intro, most_recent_update_index FROM FlipInfo' +
+        mysqlClient.query('SELECT intro, most_recent_update_index FROM FlipInfo' +
             ' WHERE flip_id = ? AND deleted = false AND most_recent_update_index > 0',
             [flipId],
             function(err, result) {

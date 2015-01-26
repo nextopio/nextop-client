@@ -5,7 +5,7 @@ import io.nextop.rx.RxManaged;
 
 public class FlipInfoViewModel extends RxManaged {
 
-
+    int updateIndex = 0;
 
     String intro;
     // id, name, top image uri,
@@ -18,5 +18,10 @@ public class FlipInfoViewModel extends RxManaged {
         super(flipId);
     }
 
+
+
+    int getUpdateIndex() {
+        return updateIndex;
+    }
 
 }

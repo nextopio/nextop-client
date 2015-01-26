@@ -107,9 +107,12 @@ public class Message {
     }
 
 
-    public Nurl receiverNurl() {
-        return receiverNurl(id);
+
+    @Nullable
+    public WireValue getContent() {
+        return parameters.get(P_CONTENT);
     }
+
 
 
     public URI toUri() throws URISyntaxException {

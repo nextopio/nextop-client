@@ -21,6 +21,7 @@ import rx.subjects.BehaviorSubject;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 // calls all receives on the MAIN thread
 @Beta
@@ -314,6 +315,30 @@ public class Nextop {
         TransferStatus(float progress) {
             this.progress = progress;
         }
+    }
+
+
+    /////// TIME ///////
+
+    private final long millis0 = System.currentTimeMillis();
+    private final long nanos0 = System.nanoTime();
+    private long headUniqueMillis = 0L;
+
+    // a best-guess at a coordinated time, in millis
+    public long millis() {
+        return millis0 + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - nanos0);
+    }
+
+    // each call guaranteed to be a unique timestamp
+    // colliding times are shifted into the future
+    public long uniqueMillis() {
+        long millis = millis();
+        if (millis <= headUniqueMillis) {
+            headUniqueMillis += 1;
+        } else {
+            headUniqueMillis = millis;
+        }
+        return headUniqueMillis;
     }
 
 

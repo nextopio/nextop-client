@@ -57,6 +57,8 @@ public abstract class WireValue {
         MAP,
         LIST,
 
+        // FIXME ID here
+
         // FIXME
         MESSAGE,
         // FIXME

@@ -23,28 +23,24 @@ import java.util.Set;
  *
  * TODO provide controls for caching the persistent state
  */
-public abstract class RxManager<M extends RxManaged> {
+// FIXME never expose ManagedState, just thread id+subscriptions or vm+subscriptions
+public abstract class RxManager<M extends RxManaged, /* FIXME remove */ MM extends RxManager.ManagedState<M>> {
 
 
-    private final Map<Id, ManagedState<M>> states = new HashMap<Id, ManagedState<M>>(32);
+    private final Map<Id, MM> states = new HashMap<Id, MM>(32);
 
 
     public Observable<M> peek(Id id) {
-        @Nullable ManagedState<M> state = states.get(id);
+        @Nullable MM state = states.get(id);
         if (null != state && state.complete) {
             return Observable.just(state.m);
         }
         return Observable.empty();
     }
     public Observable<M> get(Id id) {
-        return getState(id).filter(new Func1<ManagedState<M>, Boolean>() {
+        return getCompleteState(id).map(new Func1<MM, M>() {
             @Override
-            public Boolean call(ManagedState<M> state) {
-                return state.complete;
-            }
-        }).map(new Func1<ManagedState<M>, M>() {
-            @Override
-            public M call(ManagedState<M> state) {
+            public M call(MM state) {
                 return state.m;
             }
         });
@@ -55,27 +51,27 @@ public abstract class RxManager<M extends RxManaged> {
 
     // returned objects here are not guaranteed to have startUpdates/stopUpdates called before ejecting
     // creating these objects should have no side effects
-    protected abstract M create(Id id);
-    protected void startUpdates(ManagedState<M> state) {
+    protected abstract MM create(Id id);
+    protected void startUpdates(MM state) {
         // the default action is to publish the state in memory
         // in cases where the state has to be read from
         state.complete = true;
         publish(state);
     }
-    protected void stopUpdates(ManagedState<M> state) {
+    protected void stopUpdates(MM state) {
         // Do nothing
     }
 
 
 //    protected void publish(Id id) {
-//        @Nullable ManagedState<M> state = states.get(id);
+//        @Nullable MM state = states.get(id);
 //        if (null != state) {
 //            publish(state);
 //        }
 //    }
-    protected void publish(ManagedState<M> state) {
+    protected void publish(MM state) {
         int publishCount = ++state.publishCount;
-        for (Subscriber<? super ManagedState<M>> subscriber : state.subscribers) {
+        for (Subscriber<? super MM> subscriber : state.subscribers) {
             subscriber.onNext(state);
             // a nested publish cut off this publish
             // don't publish an older notification
@@ -86,44 +82,72 @@ public abstract class RxManager<M extends RxManaged> {
     }
 
 
-    // updates the view model
-    // publishes an update
-    protected void update(final Id id, final Action1<ManagedState<M>> updater) {
-        getState(id).take(1).subscribe(new Observer<ManagedState<M>>() {
-            @Nullable ManagedState<M> state = null;
-
+    protected void complete(Id id) {
+        update(id, new Action1<MM>() {
             @Override
-            public void onNext(ManagedState<M> state) {
-                // apply at most once
-                if (null != this.state) {
-                    throw new IllegalStateException();
-                }
-                this.state = state;
-                updater.call(state);
-                verifyState(state);
-            }
-
-            @Override
-            public void onCompleted() {
-                if (null != state) {
-                    publish(state);
-                }
-            }
-
-            @Override
-            public void onError(Throwable e) {
-                // TODO log
+            public void call(MM mm) {
+                mm.complete = true;
             }
         });
     }
 
+    protected void updateComplete(final Id id, final Action1<MM> updater) {
+        getCompleteState(id).take(1).subscribe(new UpdaterAdapter(updater));
+    }
+    // updates the view model
+    // publishes an update
+    protected void update(final Id id, final Action1<MM> updater) {
+        getState(id).take(1).subscribe(new UpdaterAdapter(updater));
+    }
+    final class UpdaterAdapter implements Observer<MM> {
+        final Action1<MM> updater;
+
+        @Nullable MM state = null;
 
 
-    private Observable<ManagedState<M>> getState(final Id id) {
-        return Observable.create(new Observable.OnSubscribe<ManagedState<M>>() {
+        UpdaterAdapter(Action1<MM> updater) {
+            this.updater = updater;
+        }
+
+
+        @Override
+        public void onNext(MM state) {
+            // apply at most once
+            if (null != this.state) {
+                throw new IllegalStateException();
+            }
+            this.state = state;
+            updater.call(state);
+            verifyState(state);
+        }
+
+        @Override
+        public void onCompleted() {
+            if (null != state) {
+                publish(state);
+            }
+        }
+
+        @Override
+        public void onError(Throwable e) {
+            // TODO log
+        }
+    }
+
+    private Observable<MM> getCompleteState(final Id id) {
+        return getState(id).filter(new Func1<MM, Boolean>() {
+                @Override
+                public Boolean call(MM state) {
+                    return state.complete;
+                }
+        });
+    }
+
+    private Observable<MM> getState(final Id id) {
+        return Observable.create(new Observable.OnSubscribe<MM>() {
             @Override
-            public void call(final Subscriber<? super ManagedState<M>> subscriber) {
-                final ManagedState<M> state = createState(id);
+            public void call(final Subscriber<? super MM> subscriber) {
+                final MM state = createState(id);
 
                 subscriber.add(BooleanSubscription.create(new Action0() {
                     @Override
@@ -137,7 +161,7 @@ public abstract class RxManager<M extends RxManaged> {
                 }));
                 int publishCount = state.publishCount;
 
-                state.subscribers.add(subscriber);
+                state.subscribers.add((Subscriber<ManagedState<M>>) subscriber);
                 if (1 == ++state.refCount) {
                     startUpdates(state);
                 }
@@ -150,12 +174,12 @@ public abstract class RxManager<M extends RxManaged> {
             }
         });
     }
-    private ManagedState<M> createState(Id id) {
-        ManagedState<M> state = states.get(id);
+    private MM createState(Id id) {
+        MM state = states.get(id);
         if (null != state) {
             return state;
         }
-        state = new ManagedState<M>(create(id));
+        state = create(id);
         if (!id.equals(state.id)) {
             throw new IllegalStateException("#create must return a managed object with the same id as input.");
         }
@@ -165,7 +189,7 @@ public abstract class RxManager<M extends RxManaged> {
     }
 
 
-    private void verifyState(ManagedState<M> state) {
+    private void verifyState(MM state) {
         if (null == state.m) {
             throw new IllegalStateException();
         }
@@ -173,7 +197,8 @@ public abstract class RxManager<M extends RxManaged> {
 
 
 
-    public static final class ManagedState<M extends RxManaged> {
+    // FIXME bring this back internally
+    public static class ManagedState<M extends RxManaged> {
         public final Id id;
         public final SubscriptionList subscriptions;
         public M m;

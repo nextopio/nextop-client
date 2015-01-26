@@ -10,6 +10,7 @@ import java.net.URL;
 // a url factored to work better with nextop concepts
 // in nextop, Authority.local() is an alias for "$access-key.nextop.io",
 // which the edge uses for control messages
+// FIXME rename to Route
 public final class Nurl {
     public static final Via LOCAL = new Via(Scheme.NEXTOP, Authority.local());
 
@@ -110,6 +111,7 @@ public final class Nurl {
         GET,
         HEAD,
         POST,
+        PUT
         // FIXME expand HTTP methods
     }
 
