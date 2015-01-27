@@ -77,8 +77,16 @@ uploadArchives {
     repositories {
         mavenDeployer {
             def console = System.console()
-            def userName = console.readLine('\nSonatype username: ').trim()
-            def password = console.readLine('\nSonatype password: ').trim()
+            def userName
+            def password
+            if (console) {
+                userName = console.readLine('\nSonatype username: ').trim()
+                password = console.readLine('\nSonatype password: ').trim()
+            } else {
+                userName = ''
+                password = ''
+            }
+
 
             repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
                 authentication(userName: userName, password: password)
