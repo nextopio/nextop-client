@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+           android:description="@string/light_on_water_description"
+           android:thumbnail="@drawable/icon"
+           android:settingsActivity="io.nextop.globaleye.MainActivity"
+        />
