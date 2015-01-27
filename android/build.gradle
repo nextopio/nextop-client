@@ -99,6 +99,20 @@ uploadArchives {
             pom.project {
                 groupId 'io.nextop'
                 artifactId 'android'
+                name 'Nextop for Android'
+                description 'Nextop client for Android 10+'
+                url 'http://nextop.io/android'
+                scm {
+                    url 'https://github.com/nextopio/nextop-client/tree/master/android'
+                }
+                developers {
+                    developer {
+                        name 'nextop.io'
+                        email 'support@nextop.io'
+                        organization 'Nextop Inc'
+                        organizationUrl 'http://nextop.io'
+                    }
+                }
 
                 licenses {
                     license {

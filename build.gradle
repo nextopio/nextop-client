@@ -9,9 +9,12 @@ buildscript {
     }
 }
 
-
-
-def versionName = { ->
+/** derive the version name from git tags.
+ * - exact tags are versions
+ * - follow ups to tags bump the tag minor version and add -SNAPSHOT
+ *
+ * @see http://ryanharter.com/blog/2013/07/30/automatic-versioning-with-git-and-gradle/ */
+def versionName() {
     def stdout = new ByteArrayOutputStream()
     exec {
         commandLine 'git', 'describe', '--tags'
