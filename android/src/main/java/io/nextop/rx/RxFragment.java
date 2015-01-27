@@ -2,6 +2,7 @@ package io.nextop.rx;
 
 import android.app.Fragment;
 import rx.Observable;
+import rx.Subscription;
 
 // connects to the fragment lifecycle (on resume, on pause)
 public class RxFragment extends Fragment implements RxLifecycleBinder {
@@ -24,23 +25,37 @@ public class RxFragment extends Fragment implements RxLifecycleBinder {
         return liftedRxLifecycleBinder.bind(source);
     }
 
+    @Override
+    public void bind(Subscription sub) {
+        liftedRxLifecycleBinder.bind(sub);
+    }
+
+    @Override
+    public void unsubscribe() {
+        liftedRxLifecycleBinder.unsubscribe();
+    }
+
+    @Override
+    public boolean isUnsubscribed() {
+        return liftedRxLifecycleBinder.isUnsubscribed();
+    }
 
     @Override
     public void onResume() {
         super.onResume();
-        liftedRxLifecycleBinder.onStart();
+        liftedRxLifecycleBinder.start();
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        liftedRxLifecycleBinder.onStop();
+        liftedRxLifecycleBinder.stop();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        liftedRxLifecycleBinder.onDestroy();
+        liftedRxLifecycleBinder.close();
     }
 
 }

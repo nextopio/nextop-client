@@ -35,14 +35,102 @@ android {
 }
 
 dependencies {
-    compile project(':java')
+    compile project(':java-common')
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }
+
+
+// @see http://stackoverflow.com/questions/17033878/generate-javadocs-with-android-gradle-plugin
+// @see http://stackoverflow.com/questions/19307341/android-library-gradle-release-jar
+
+//android.libraryVariants.all { variant ->
+//    task("package${variant.name.capitalize()}Sources", type: Jar) {
+//        description "Generates sources for $variant.name."
+//        classifier = 'sources'
+//        from variant.javaCompile.source
+//    }
+//}
+
+android.libraryVariants.all { variant ->
+    task("archive${variant.name.capitalize()}Sources", type: Jar) {
+        description "Generates sources for $variant.name."
+        classifier = 'sources'
+        from variant.javaCompile.source
+    }
+
+    task("generate${variant.name.capitalize()}Javadoc", type: Javadoc) {
+        description "Generates Javadoc for $variant.name."
+        // classifier = 'javadoc'
+        source = variant.javaCompile.source
+        ext.androidJar = "${android.sdkDirectory}/platforms/${android.compileSdkVersion}/android.jar"
+        classpath = files(variant.javaCompile.classpath.files) + files(ext.androidJar)
+        options.links("http://docs.oracle.com/javase/7/docs/api/");
+        options.links("http://d.android.com/reference/");
+        exclude '**/BuildConfig.java'
+        exclude '**/R.java'
+    }
+
+    task("archive${variant.name.capitalize()}Javadoc", type: Jar, dependsOn: "generate${variant.name.capitalize()}Javadoc") {
+        classifier = 'javadoc'
+        from tasks["generate${variant.name.capitalize()}Javadoc"].destinationDir
+    }
+
+    artifacts {
+        archives tasks["archive${variant.name.capitalize()}Sources"]
+        archives tasks["archive${variant.name.capitalize()}Javadoc"]
+    }
+}
+
+
+
+//task generateReleaseJavadoc(type: Javadoc) {
+//    description "Generates Javadoc for Release"
+//    // classifier = 'javadoc'
+//    source = android.libraryVariants.Release.javaCompile.source
+//    ext.androidJar = "${android.sdkDirectory}/platforms/${android.compileSdkVersion}/android.jar"
+//    classpath = files(android.libraryVariants.Release.javaCompile.classpath.files) + files(ext.androidJar)
+//    options.links("http://docs.oracle.com/javase/7/docs/api/");
+//    options.links("http://d.android.com/reference/");
+//    exclude '**/BuildConfig.java'
+//    exclude '**/R.java'
+//}
+
+
+
+//task packageReleaseSources(type: Jar, dependsOn: 'generateReleaseSources') {
+//    classifier = 'sources'
+//    from generateReleaseSources.destinationDir
+//}
+//task packageReleaseJavadoc(type: Jar, dependsOn: 'generateReleaseJavadoc') {
+//    classifier = 'javadoc'
+//    from project.tasks['generateReleaseJavadoc'].destinationDir
+//}
+
+
+
+
+//artifacts {
+//    archives packageReleaseSources
+//    archives packageReleaseJavadoc
+//}
+
 
 uploadArchives {
     repositories {
         mavenDeployer {
             repository(url: 'file://localhost' + new File(projectDir.getParent(), 'repository').getAbsolutePath())
+            pom.project {
+                groupId 'io.nextop'
+                artifactId 'android'
+
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution 'repo'
+                    }
+                }
+            }
         }
     }
 }

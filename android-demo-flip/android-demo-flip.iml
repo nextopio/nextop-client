@@ -92,7 +92,7 @@
     <orderEntry type="library" exported="" name="rxjava-1.0.4" level="project" />
     <orderEntry type="library" exported="" name="jsr305-3.0.0" level="project" />
     <orderEntry type="library" exported="" name="guava-18.0" level="project" />
+    <orderEntry type="module" module-name="java-common" exported="" />
     <orderEntry type="module" module-name="android" exported="" />
-    <orderEntry type="module" module-name="java" exported="" />
   </component>
 </module>

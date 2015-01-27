@@ -8,63 +8,84 @@ import io.nextop.rx.RxManager;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.functions.Func2;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class FlipInfoViewModelManager extends RxManager<FlipInfoViewModel> {
+public class FlipInfoViewModelManager extends ThinViewModelManager<FlipInfoViewModel> {
 
-    Nextop nextop;
+
+    FlipInfoViewModelManager(Nextop nextop) {
+        super(nextop);
+    }
 
 
     // CONTROLLER
 
     void setIntro(final Id flipId, final String intro) {
-        update(flipId, new Action1<ManagedState<FlipInfoViewModel>>() {
+        Map<WireValue, WireValue> content = Collections.singletonMap(
+                WireValue.of("intro"),
+                WireValue.of(intro));
+
+        Message update = Message.newBuilder()
+                .setRoute("POST http://" + Flip.REMOTE + "/flip/$flip-id/info")
+                .set("flip-id", flipId)
+                .setContent(content)
+                .build();
+        nextop.send(update);
+
+
+        update(flipId, new Func2<FlipInfoViewModel, RxState, FlipInfoViewModel>() {
             @Override
-            public void call(ManagedState<FlipInfoViewModel> state) {
-                state.m.intro = intro;
-
-
-                Map<WireValue, WireValue> content = Collections.singletonMap(
-                        WireValue.of("intro"),
-                        WireValue.of(intro));
-
-                Message update = Message.newBuilder()
-                        .setNurl("POST http://demo-flip.nextop.io/flip/$flip-id/info")
-                        .set("flip-id", flipId)
-                        .setContent(content)
-                        .build();
-                nextop.send(update);
-
+            public FlipInfoViewModel call(FlipInfoViewModel flipInfoVm, RxState rxState) {
+                flipInfoVm.set(intro, -1L);
+                return flipInfoVm;
             }
         });
     }
 
 
 
+
+    private void add(final Id flipId, final Message results) {
+        update(flipId, new Func2<FlipInfoViewModel, RxState, FlipInfoViewModel>() {
+            @Override
+            public FlipInfoViewModel call(FlipInfoViewModel flipInfoVm, RxState rxState) {
+                for (WireValue value : results.getContent().asList()) {
+                    Map<WireValue, WireValue> m = value.asMap();
+
+                    String intro = m.get("intro").asString();
+                    long updateIndex = m.get("most_recent_update_index").asLong();
+
+                    flipInfoVm.set(intro, updateIndex);
+                }
+                return flipInfoVm;
+            }
+        });
+    }
+
+
     // VMM
 
 
     @Override
-    protected void startUpdates(final ManagedState<FlipInfoViewModel> state) {
+    protected void startUpdates(final FlipInfoViewModel flipInfoVm, final RxState state) {
         // sync info
         // then subscribe to updates
 
 
         Message sync = Message.newBuilder()
-                .setNurl("GET http://demo-flip.nextop.io/flip/$flip-id/info")
-                .set("flip-id", state.id)
+                .setRoute("GET http://" + Flip.REMOTE + "/flip/$flip-id/info")
+                .set("flip-id", flipInfoVm.id)
                 .build();
-        state.subscriptions.add(nextop.send(sync)
+        state.add(nextop.send(sync)
                 .doOnNext(new Action1<Message>() {
                     @Override
                     public void call(Message message) {
-
-                        set(state.id, message);
-                        complete(state.id);
+                        add(flipInfoVm.id, message);
+                        complete(flipInfoVm.id);
                     }
                 }).doOnCompleted(new Action0() {
                     @Override
@@ -74,37 +95,23 @@ public class FlipInfoViewModelManager extends RxManager<FlipInfoViewModel> {
                             @Override
                             public void call() {
                                 Message poll = Message.newBuilder()
-                                        .setNurl("GET http://demo-flip.nextop.io/flip/$flip-id/info")
-                                        .set("flip-id", state.id)
-                                        .set("after", state.m.getUpdateIndex())
+                                        .setRoute("GET http://" + Flip.REMOTE + "/flip/$flip-id/info")
+                                        .set("flip-id", flipInfoVm.id)
+                                        .set("after", flipInfoVm.getUpdateIndex())
                                         .build();
-                                state.subscriptions.add(nextop.send(poll)
+                                state.add(nextop.send(poll)
                                         .doOnNext(new Action1<Message>() {
                                             @Override
                                             public void call(final Message message) {
-
-                                                set(state.id, message);
-
-
+                                                add(flipInfoVm.id, message);
                                             }
-                                        }).subscribe());
-
+                                        })).subscribe();
                             }
                         };
-                        int timeoutMs = 1000;
-
-                        state.subscriptions.add(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(poller,
-                                timeoutMs, timeoutMs, TimeUnit.MILLISECONDS));
-
-
+                        state.add(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(poller,
+                                pollTimeoutMs, pollTimeoutMs, TimeUnit.MILLISECONDS));
                     }
-                }).subscribe());
-
-    }
-
-
-    private void set(Id flipId, Message message) {
-        // FIXME parse out intro, most_recent_update_index
+                })).subscribe();
     }
 
 

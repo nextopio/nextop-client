@@ -3,19 +3,15 @@ package io.nextop.demo.flip;
 import io.nextop.Id;
 import io.nextop.rx.RxManaged;
 
-import java.util.ArrayList;
-import java.util.List;
+import javax.annotation.Nullable;
+import java.util.*;
 
 public class FeedViewModel extends RxManaged {
-    // ids
-    // model internally orders by last modified time
+    List<FlipState> orderedStates = new ArrayList<FlipState>(8);
+    Map<Id, FlipState> states = new HashMap<Id, FlipState>(8);
 
-    // last update id
-
-    // on change observer
-
-    // FIXME replace FlipIds with flipState, which tracks the most recent update index
-    List<FlipState> states = new ArrayList<FlipState>(50);
+    long maxUpdateIndex = 0L;
+    long minUpdateIndex = 0L;
 
 
     public FeedViewModel(Id feedId) {
@@ -34,36 +30,41 @@ public class FeedViewModel extends RxManaged {
 
 
 
-    void addFirst(FlipState state) {
-        // TODO use a tree-based sorted list
-        removeAll(state.flipId);
-        states.add(0, state);
-        // TODO assert states descending in update index
-    }
-    void addLast(FlipState state) {
-        // TODO use a tree-based sorted list
-        removeAll(state.flipId);
-        states.add(state);
-        // TODO assert states descending in update index
-    }
-    private void removeAll(Id flipId) {
-        for (int i = states.size() - 1; 0 <= i; --i) {
-            FlipState state = states.get(i);
-            if (flipId.equals(state.flipId)) {
-                states.remove(i);
+
+    void add(FlipState state) {
+        @Nullable FlipState pstate = states.put(state.flipId, state);
+        if (null != pstate) {
+            orderedStates.remove(pstate);
+        }
+        orderedStates.add(state);
+        Collections.sort(orderedStates, C_BY_UPDATE_INDEX);
+
+        if (0 < state.updateIndex) {
+            if (maxUpdateIndex < state.updateIndex) {
+                maxUpdateIndex = state.updateIndex;
+            } else if (state.updateIndex < minUpdateIndex) {
+                minUpdateIndex = state.updateIndex;
             }
         }
     }
-
-    long getFirstUpdateIndex() {
-        int n = states.size();
-        return 0 < n ? states.get(0).updateIndex : 0;
+    void remove(Id frameId) {
+        @Nullable FlipState state = states.remove(frameId);
+        if (null != state) {
+            orderedStates.remove(state);
+        }
     }
 
-    long getLastUpdateIndex() {
-        int n = states.size();
-        return 0 < n ? states.get(n - 1).updateIndex : 0;
+    long getMaxUpdateIndex() {
+        return maxUpdateIndex;
     }
+
+    long getMinUpdateIndex() {
+        return minUpdateIndex;
+    }
+
+
+
+
 
 
 
@@ -77,5 +78,24 @@ public class FeedViewModel extends RxManaged {
         }
     }
 
+
+
+    private static final Comparator<FlipState> C_BY_UPDATE_INDEX = new Comparator<FlipState>() {
+        @Override
+        public int compare(FlipState a, FlipState b) {
+            // negative (pending) first, then descending
+            boolean an = a.updateIndex < 0;
+            boolean bn = b.updateIndex < 0;
+            if (an && bn) {
+                return 0;
+            } else if (an) {
+                return -1;
+            } else if (bn) {
+                return 1;
+            } else {
+                return Long.compare(a.updateIndex, b.updateIndex);
+            }
+        }
+    };
 
 }

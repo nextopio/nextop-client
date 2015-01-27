@@ -6,12 +6,14 @@ import rx.Observer;
 import rx.Subscriber;
 import rx.Subscription;
 import rx.functions.Action0;
+import rx.internal.util.SubscriptionList;
 import rx.observers.Subscribers;
 import rx.subscriptions.BooleanSubscription;
+import rx.subscriptions.CompositeSubscription;
 
 import javax.annotation.Nullable;
 
-public interface RxLifecycleBinder {
+public interface RxLifecycleBinder extends Subscription {
 
     void reset();
 
@@ -24,27 +26,29 @@ public interface RxLifecycleBinder {
      * - the subscription is dropped from the source when stopped
      *   (onComplete is not called, because the subscription will resume when restarted) */
     <T> Observable<T> bind(Observable<T> source);
+    void bind(Subscription sub);
 
 
 
 
-    /** Binds to an internal lifecycle onStart/onStop. */
+    /** Binds to an internal lifecycle start/stop. */
     final class Lifted implements RxLifecycleBinder {
 
         private ImSet<Bind<?>> binds = ImSet.empty();
+        private final CompositeSubscription subscriptions = new CompositeSubscription();
 
         private boolean connected = false;
         private boolean closed = false;
 
         @Nullable
-        private Subscription cascadeDestroySubscription = null;
+        private Subscription cascadeSubscription = null;
 
 
         public Lifted() {
         }
 
 
-        public void onStart() {
+        public void start() {
             if (closed) {
                 throw new IllegalStateException();
             }
@@ -55,7 +59,7 @@ public interface RxLifecycleBinder {
                 }
             }
         }
-        public void onStop() {
+        public void stop() {
             if (closed) {
                 throw new IllegalStateException();
             }
@@ -66,40 +70,63 @@ public interface RxLifecycleBinder {
                 }
             }
         }
-        public void onDestroy() {
+
+        public void close() {
             if (closed) {
                 throw new IllegalStateException();
             }
             closed = true;
-            removeCascadeDestroy();
-            ImSet<Bind<?>> _binds = binds;
-            binds = ImSet.empty();
-            for (Bind bind : _binds) {
-                bind.close();
-            }
+            removeCascadeUnsubscribe();
+            clear();
+            subscriptions.unsubscribe();
         }
 
 
-        public void removeCascadeDestroy() {
-            if (null != cascadeDestroySubscription) {
-                cascadeDestroySubscription.unsubscribe();
-                cascadeDestroySubscription = null;
+        public void removeCascadeUnsubscribe() {
+            if (null != cascadeSubscription) {
+                cascadeSubscription.unsubscribe();
+                cascadeSubscription = null;
             }
         }
 
         // replaces previous cascade parent
-        public void cascadeDestroy(@Nullable RxLifecycleBinder parent) {
-            removeCascadeDestroy();
+        public void cascadeUnsubscribe(@Nullable RxLifecycleBinder parent) {
+            removeCascadeUnsubscribe();
             if (null != parent) {
-                cascadeDestroySubscription = parent.bind(MoreRx.hanging()).doOnCompleted(new Action0() {
+                cascadeSubscription = parent.bind(MoreRx.hanging()).doOnCompleted(new Action0() {
                     @Override
                     public void call() {
-                        onDestroy();
+                        unsubscribe();
                     }
                 }).subscribe();
             }
         }
 
+
+        private void clear() {
+            ImSet<Bind<?>> _binds = binds;
+            binds = ImSet.empty();
+            for (Bind bind : _binds) {
+                bind.close();
+            }
+            subscriptions.clear();
+        }
+
+
+
+        /////// Subscription ///////
+
+        @Override
+        public void unsubscribe() {
+            close();
+        }
+
+        @Override
+        public boolean isUnsubscribed() {
+            return closed;
+        }
+
+        /////// RxLifecycleBinder ///////
 
 
         @Override
@@ -107,17 +134,13 @@ public interface RxLifecycleBinder {
             if (closed) {
                 throw new IllegalStateException();
             }
-            ImSet<Bind<?>> _binds = binds;
-            binds = ImSet.empty();
-            for (Bind bind : _binds) {
-                bind.close();
-            }
+            clear();
         }
 
         @Override
         public <T> Observable<T> bind(Observable<T> source) {
             if (closed) {
-                throw new IllegalStateException();
+                return Observable.empty();
             }
             Bind<T> bind = new Bind<T>(source);
             binds = binds.adding(bind);
@@ -127,6 +150,14 @@ public interface RxLifecycleBinder {
             return bind.adapter;
         }
 
+        @Override
+        public void bind(Subscription sub) {
+            if (closed) {
+                sub.unsubscribe();
+            } else {
+                subscriptions.add(sub);
+            }
+        }
 
         private static final class Bind<T> {
             private final Observable<T> source;

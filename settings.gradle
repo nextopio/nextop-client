@@ -1,4 +1,4 @@
-include 'java'
+include 'java-common'
 
 include 'android'
 

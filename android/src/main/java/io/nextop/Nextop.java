@@ -11,6 +11,7 @@ import com.google.common.annotations.Beta;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.nextop.client.MessageControlNode;
+import io.nextop.client.SubjectNode;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpUriRequest;
 import rx.Observable;
@@ -86,15 +87,16 @@ public class Nextop {
 
 
     public Nextop start() {
-        if (null != auth) {
-            // in this case the access key might still be bad/disabled/unreachable,
-            // and the client will fall back
-            return Full.start(this);
-        } else {
+        // FIXME 0.2 see roadmap
+//        if (null != auth) {
+//            // in this case the access key might still be bad/disabled/unreachable,
+//            // and the client will fall back
+//            return Full.start(this);
+//        } else {
             // in this case the client won't waste time negotiating with the nextop service
             // it will start in fall back
             return Limited.start(this);
-        }
+//        }
     }
 
     /** Typically this should not be called outside of testing - an app should run indefinitely until terminated by the OS.
@@ -113,7 +115,7 @@ public class Nextop {
         throw new IllegalStateException("Call on a started nextop.");
     }
 
-    public Receiver<Message> receive(Nurl nurl) {
+    public Receiver<Message> receive(Route route) {
         throw new IllegalStateException("Call on a started nextop.");
     }
 
@@ -121,6 +123,7 @@ public class Nextop {
     /////// HTTPCLIENT MIGRATION HELPER ///////
 
     public HttpResponse execute(HttpUriRequest request) {
+        // FIXME 0.2
         HttpResponse noResponse = null;
         return send(request).onErrorReturn(new Func1<Throwable, HttpResponse>() {
             @Override
@@ -130,13 +133,14 @@ public class Nextop {
                 return null;
             }
         }).defaultIfEmpty(
-        /* FIXME OK result -- no response if using NX protocol (messages don't have to have a response) */noResponse
+        /* FIXME OK result -- no response if using NX protocol (messages don't have to have a response)
+         * FIXME this needs to be on a timeout */noResponse
         ).toBlocking().single();
     }
 
     public Receiver<HttpResponse> send(HttpUriRequest request) {
         Message message = Message.fromHttpRequest(request);
-        return new Receiver<HttpResponse>(message.receiverNurl(),
+        return new Receiver<HttpResponse>(message.inboxRoute(),
                 send(message).map(new Func1<Message, HttpResponse>() {
                     @Override
                     public HttpResponse call(Message message) {
@@ -145,8 +149,8 @@ public class Nextop {
                 }));
     }
 
-    public Receiver<Layer> send(HttpUriRequest request, LayersConfig config) {
-        return send(Message.fromHttpRequest(request), config);
+    public Receiver<Layer> send(HttpUriRequest request, @Nullable LayersConfig config) {
+        return send(Layer.message(Message.fromHttpRequest(request)), config);
     }
 
 
@@ -154,11 +158,11 @@ public class Nextop {
 
     // send can be GET for image, POST/PUT of new image
     // config controls both up and down, when present
-    public Receiver<Layer> send(Message message, LayersConfig config) {
+    public Receiver<Layer> send(Layer layer, @Nullable LayersConfig config) {
         throw new IllegalStateException("Call on a started nextop.");
     }
 
-    public Receiver<Layer> receive(Nurl nurl, LayersConfig config) {
+    public Receiver<Layer> receive(Route route, @Nullable LayersConfig config) {
         throw new IllegalStateException("Call on a started nextop.");
     }
 
@@ -253,26 +257,36 @@ public class Nextop {
     public static final class Layer {
         public static enum Type {
             BITMAP,
-            UNPARSEABLE
+            MESSAGE
         }
 
 
-        public static Layer bitmap(Bitmap bitmap, boolean bestQuality) {
-            return new Layer(Type.BITMAP, bitmap, null, bestQuality);
+        public static Layer bitmap(Bitmap bitmap) {
+            return bitmap(bitmap, true);
         }
 
-        public static Layer unknown(Message message, boolean bestQuality) {
-            return new Layer(Type.UNPARSEABLE, null, message, bestQuality);
+        public static Layer bitmap(Bitmap bitmap, boolean last) {
+            return new Layer(Type.BITMAP, bitmap, null, last);
+        }
+
+        public static Layer message(Message message) {
+            return message(message, true);
+        }
+
+        public static Layer message(Message message, boolean last) {
+            return new Layer(Type.MESSAGE, null, message, last);
         }
 
 
         public final Type type;
-        public final @Nullable Bitmap bitmap;
-        /** set if {@link Type#UNPARSEABLE} */
-        public final @Nullable Message message;
+        @Nullable
+        public final Bitmap bitmap;
+        /** set if {@link Type#MESSAGE} */
+        @Nullable
+        public final Message message;
         public final boolean last;
 
-        Layer(Type type, Bitmap bitmap, Message message, boolean last) {
+        Layer(Type type, @Nullable Bitmap bitmap, @Nullable Message message, boolean last) {
             this.type = type;
             this.bitmap = bitmap;
             this.message = message;
@@ -300,7 +314,7 @@ public class Nextop {
     /////// TRANSFER STATUS ///////
 
     public Observable<TransferStatus> transferStatus(Id id) {
-        Message statusMessage = Message.newBuilder().setNurl(Message.statusNurl(id)).build();
+        Message statusMessage = Message.newBuilder().setRoute(Message.statusRoute(id)).build();
         return send(statusMessage).map(new Func1<Message, TransferStatus>() {
             @Override
             public TransferStatus call(Message message) {
@@ -396,31 +410,29 @@ public class Nextop {
 
 
     public static final class Receiver<T> extends Observable<T> {
-        public final Nurl nurl;
+        public final Route route;
 
-        Receiver(Nurl nurl, final Observable<T> in) {
+        Receiver(Route route, final Observable<T> in) {
             super(new OnSubscribe<T>() {
                 @Override
                 public void call(Subscriber<? super T> subscriber) {
                     in.subscribe(subscriber);
                 }
             });
-            this.nurl = nurl;
+            this.route = route;
         }
 
         // return the localId of the outgoing message that this receiver is tied to
         // return null if there is no outgoing message for this nurl
         @Nullable
         public Id getId() {
-            return nurl.getLocalId();
+            return route.getLocalId();
         }
     }
 
 
 
-
-    private static abstract class GoNoded extends Nextop {
-
+    private static class GoNoded extends Nextop {
 
         // CAMERA
 
@@ -431,16 +443,20 @@ public class Nextop {
         private boolean cameraConnected = false;
         private BehaviorSubject<CameraAdapter> cameraSubject = BehaviorSubject.create();
 
+        SubjectNode subjectNode;
+        MessageControlNode node;
 
 
-        protected GoNoded(Context context, @Nullable Auth auth) {
+
+        protected GoNoded(Context context, @Nullable Auth auth, MessageControlNode node) {
             super(context, auth);
 
-            // FIXME create Nextop nodes, init, and start
+            this.node = node;
+
+            // FIXME
+            node.init(null);
+            node.start();
         }
-
-
-        protected abstract MessageControlNode createNode();
 
 
         @Override
@@ -450,7 +466,8 @@ public class Nextop {
 
         @Override
         public Nextop stop() {
-            // FIXME stop nodes, close all observers
+            node.stop();
+            closeCamera();
 
             return Nextop.create(context, this);
         }
@@ -463,25 +480,24 @@ public class Nextop {
 
         @Override
         public Receiver<Message> send(Message message) {
-            // FIXME
+            subjectNode.send(message);
+            return receive(message.inboxRoute());
+        }
+
+        @Override
+        public Receiver<Message> receive(Route route) {
+            return new Receiver<Message>(route, subjectNode.receive(route));
+        }
+
+        @Override
+        public Receiver<Layer> send(Layer layer, @Nullable LayersConfig config) {
+            // FIXME !!
             return null;
         }
 
         @Override
-        public Receiver<Message> receive(Nurl nurl) {
-            // FIXME
-            return null;
-        }
-
-        @Override
-        public Receiver<Layer> send(Message message, LayersConfig config) {
-            // FIXME
-            return null;
-        }
-
-        @Override
-        public Receiver<Layer> receive(Nurl nurl, LayersConfig config) {
-            // FIXME
+        public Receiver<Layer> receive(Route route, @Nullable LayersConfig config) {
+            // FIXME !!
             return null;
         }
 
@@ -583,38 +599,31 @@ public class Nextop {
 
     }
 
-
-    private static final class Full extends GoNoded {
-        static Full start(Nextop copy) {
-            return new Full(copy.context, copy.auth);
-        }
-
-        private Full(Context context, @Nullable Auth auth) {
-            super(context, auth);
-
-        }
-
-        @Override
-        protected MessageControlNode createNode() {
-            // FIXME
-            return null;
-        }
-    }
+    // FIXME 0.2 see roadmap
+//    private static final class Full extends GoNoded {
+//        static Full start(Nextop copy) {
+//            return new Full(copy.context, copy.auth);
+//        }
+//
+//        private Full(Context context, @Nullable Auth auth) {
+//            super(context, auth);
+//
+//        }
+//    }
 
     private static final class Limited extends GoNoded {
         static Limited start(Nextop copy) {
             return new Limited(copy.context, copy.auth);
         }
 
-        private Limited(Context context, @Nullable Auth auth) {
-            super(context, auth);
-
+        private static MessageControlNode createLimitedNode() {
+            // FIXME !!
+            return null;
         }
 
-        @Override
-        protected MessageControlNode createNode() {
-            // FIXME
-            return null;
+        private Limited(Context context, @Nullable Auth auth) {
+            super(context, auth, createLimitedNode());
+
         }
     }
 

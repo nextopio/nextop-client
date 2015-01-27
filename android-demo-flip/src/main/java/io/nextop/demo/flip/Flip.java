@@ -4,11 +4,15 @@ import io.nextop.Id;
 import io.nextop.NextopApplication;
 
 public class Flip extends NextopApplication {
+    static final String REMOTE = "localhost:3770";
+            //"demo-flip.nextop.io";
+
+    /** @see backend-demo-flip index.js */
     private final Id feedId = Id.valueOf("0000000000000000000000000000000000000000000000000000000000000000");
 
-    private FeedViewModelManager feedVmm = new FeedViewModelManager();
-    private FlipInfoViewModelManager flipInfoVmm = new FlipInfoViewModelManager();
-    private FlipViewModelManager flipVmm = new FlipViewModelManager();
+    private FeedViewModelManager feedVmm;
+    private FlipInfoViewModelManager flipInfoVmm;
+    private FlipViewModelManager flipVmm;
 
 
     public Id getFeedId() {
@@ -29,6 +33,16 @@ public class Flip extends NextopApplication {
         return flipVmm;
     }
 
+
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        feedVmm = new FeedViewModelManager(getNextop());
+        flipInfoVmm = new FlipInfoViewModelManager(getNextop());
+        flipVmm = new FlipViewModelManager(getNextop());
+    }
 
 
 }

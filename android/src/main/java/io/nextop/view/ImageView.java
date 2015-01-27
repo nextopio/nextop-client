@@ -234,7 +234,7 @@ public class ImageView extends android.widget.ImageView {
         if (null != nextop) {
             loadSubscriptions = new SubscriptionList();
 
-            Message message = MessageAndroid.valueOf(Nurl.Method.GET, uri);
+            Message message = MessageAndroid.valueOf(Route.Method.GET, uri);
 
             Observable<Progress> downProgressSource = Observable.combineLatest(nextop.transferStatus(message.id), nextop.connectionStatus(),
                     new Func2<Nextop.TransferStatus, Nextop.ConnectionStatus, Progress>() {
@@ -250,7 +250,7 @@ public class ImageView extends android.widget.ImageView {
 
             LayerLoader loader = new LayerLoader();
             loader.immediate = true;
-            loadSubscriptions.add(nextop.send(message,
+            loadSubscriptions.add(nextop.send(Nextop.Layer.message(message),
                     createLayersConfig()).doOnNext(new Action1<Nextop.Layer>() {
                 @Override
                 public void call(Nextop.Layer layer) {
@@ -269,7 +269,7 @@ public class ImageView extends android.widget.ImageView {
         if (null != nextop) {
             loadSubscriptions = new SubscriptionList();
 
-            Message message = Message.newBuilder().setNurl(Message.echoNurl(id)).build();
+            Message message = Message.newBuilder().setRoute(Message.echoRoute(id)).build();
 
 
             Observable<Progress> upProgressSource = Observable.combineLatest(nextop.transferStatus(message.id), nextop.connectionStatus(),
@@ -285,7 +285,7 @@ public class ImageView extends android.widget.ImageView {
 
             LayerLoader loader = new LayerLoader();
             loader.immediate = true;
-            loadSubscriptions.add(nextop.send(message,
+            loadSubscriptions.add(nextop.send(Nextop.Layer.message(message),
                     createLayersConfig()).subscribe(loader));
             loader.immediate = false;
         }

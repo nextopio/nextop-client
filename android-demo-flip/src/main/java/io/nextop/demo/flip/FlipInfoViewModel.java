@@ -5,13 +5,13 @@ import io.nextop.rx.RxManaged;
 
 public class FlipInfoViewModel extends RxManaged {
 
-    int updateIndex = 0;
-
     String intro;
-    // id, name, top image uri,
-    // last modified time
-    // last update id
+
     // boolean uploading
+    // last update id
+    // last modified time
+    // id, name, top image uri,
+    long updateIndex = 0;
 
 
     public FlipInfoViewModel(Id flipId) {
@@ -19,8 +19,16 @@ public class FlipInfoViewModel extends RxManaged {
     }
 
 
+    void set(String intro, long updateIndex) {
+        this.intro = intro;
+        if (0 < updateIndex) {
+            this.updateIndex = updateIndex;
+        }
+    }
 
-    int getUpdateIndex() {
+
+
+    long getUpdateIndex() {
         return updateIndex;
     }
 

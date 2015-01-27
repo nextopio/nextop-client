@@ -3,10 +3,8 @@ package io.nextop.demo.flip;
 import io.nextop.Id;
 import io.nextop.rx.RxManaged;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import javax.annotation.Nullable;
+import java.util.*;
 
 public class FlipViewModel extends RxManaged {
     // ids
@@ -14,10 +12,41 @@ public class FlipViewModel extends RxManaged {
 
     // last update id
 
-    List<Id> frameIds = new ArrayList<Id>(8);
 
-    Map<Id, FrameViewModel> frameVms = new HashMap<Id, FrameViewModel>(8);
+    List<FrameState> orderedStates = new ArrayList<FrameState>(8);
 
+    Map<Id, FrameState> states = new HashMap<Id, FrameState>(8);
+
+    long maxUpdateIndex = 0;
+
+
+
+
+    void add(FrameState state) {
+        @Nullable FrameState pstate = states.put(state.frameVm.id, state);
+        if (null != pstate) {
+            orderedStates.remove(pstate);
+        }
+        orderedStates.add(state);
+        Collections.sort(orderedStates, C_BY_CREATION_TIME);
+
+        if (0 < state.updateIndex) {
+            if (maxUpdateIndex < state.updateIndex) {
+                maxUpdateIndex = state.updateIndex;
+            }
+        }
+    }
+    void remove(Id frameId) {
+        @Nullable FrameState state = states.remove(frameId);
+        if (null != state) {
+            orderedStates.remove(state);
+        }
+    }
+
+
+    long getMaxUpdateIndex() {
+        return maxUpdateIndex;
+    }
 
 
 
@@ -28,16 +57,36 @@ public class FlipViewModel extends RxManaged {
 
 
     public int size() {
-        return frameIds.size();
+        return orderedStates.size();
     }
 
 
-    public Id getFrameId(int index) {
-        return frameIds.get(index);
+    public FrameViewModel getFrameVm(int index) {
+        return orderedStates.get(index).frameVm;
     }
 
     public FrameViewModel getFrameVm(Id frameId) {
-        return frameVms.get(frameId);
+        return states.get(frameId).frameVm;
     }
 
+
+    static final class FrameState {
+        final FrameViewModel frameVm;
+        final long updateIndex;
+
+        FrameState(FrameViewModel frameVm, long updateIndex) {
+            this.frameVm = frameVm;
+            this.updateIndex = updateIndex;
+        }
+
+    }
+
+
+    private static final Comparator<FrameState> C_BY_CREATION_TIME = new Comparator<FrameState>() {
+        @Override
+        public int compare(FrameState lhs, FrameState rhs) {
+            // descending
+            return Long.compare(rhs.frameVm.creationTime, lhs.frameVm.creationTime);
+        }
+    };
 }

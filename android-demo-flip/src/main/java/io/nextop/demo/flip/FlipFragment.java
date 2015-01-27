@@ -366,7 +366,7 @@ public class FlipFragment extends RxFragment {
 
         @Override
         public Id getItem(int position) {
-            return flipVm.getFrameId(position);
+            return flipVm.getFrameVm(position).id;
         }
 
         @Override
@@ -395,7 +395,7 @@ public class FlipFragment extends RxFragment {
                 updateIndefinitely(convertView, rxVg.bind(flip.getFlipVmm().get(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
                     @Override
                     public FrameViewModel call(FlipViewModel flipVm) {
-                        return flipVm.frameVms.get(frameId);
+                        return flipVm.getFrameVm(frameId);
                     }
                 })));
             } else {
@@ -403,7 +403,7 @@ public class FlipFragment extends RxFragment {
                 updateIndefinitely(convertView, flip.getFlipVmm().peek(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
                     @Override
                     public FrameViewModel call(FlipViewModel flipVm) {
-                        return flipVm.frameVms.get(frameId);
+                        return flipVm.getFrameVm(frameId);
                     }
                 }));
             }

@@ -11,6 +11,7 @@ public class FrameViewModel extends RxManaged {
     // frame id
     // snap time
     // last update id
+    long creationTime = 0L;
 
 
     public FrameViewModel(Id frameId) {

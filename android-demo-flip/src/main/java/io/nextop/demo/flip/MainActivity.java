@@ -247,7 +247,7 @@ public class MainActivity extends RxActivity {
                             int n = flipVm.size();
                             FrameViewModel[] frameVms = new FrameViewModel[n];
                             for (int i = 0; i < n; ++i) {
-                                frameVms[i] = flipVm.getFrameVm(flipVm.getFrameId(i));
+                                frameVms[i] = flipVm.getFrameVm(i);
                             }
 
 

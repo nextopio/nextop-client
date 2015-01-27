@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.widget.FrameLayout;
 import rx.Observable;
+import rx.Subscription;
 
 import javax.annotation.Nullable;
 
@@ -48,26 +49,41 @@ public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder 
         return liftedRxLifecycleBinder.bind(source);
     }
 
+    @Override
+    public void bind(Subscription sub) {
+        liftedRxLifecycleBinder.bind(sub);
+    }
+
+    @Override
+    public void unsubscribe() {
+        liftedRxLifecycleBinder.unsubscribe();
+    }
+
+    @Override
+    public boolean isUnsubscribed() {
+        return liftedRxLifecycleBinder.isUnsubscribed();
+    }
+
 
     public void onDispose() {
-        liftedRxLifecycleBinder.onDestroy();
+        liftedRxLifecycleBinder.close();
     }
 
     public void cascadeDispose(@Nullable RxLifecycleBinder parent) {
-        liftedRxLifecycleBinder.cascadeDestroy(parent);
+        liftedRxLifecycleBinder.cascadeUnsubscribe(parent);
     }
 
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        liftedRxLifecycleBinder.onStart();
+        liftedRxLifecycleBinder.start();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        liftedRxLifecycleBinder.onStop();
+        liftedRxLifecycleBinder.stop();
     }
 
 
