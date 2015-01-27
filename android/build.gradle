@@ -43,14 +43,6 @@ dependencies {
 // @see http://stackoverflow.com/questions/17033878/generate-javadocs-with-android-gradle-plugin
 // @see http://stackoverflow.com/questions/19307341/android-library-gradle-release-jar
 
-//android.libraryVariants.all { variant ->
-//    task("package${variant.name.capitalize()}Sources", type: Jar) {
-//        description "Generates sources for $variant.name."
-//        classifier = 'sources'
-//        from variant.javaCompile.source
-//    }
-//}
-
 android.libraryVariants.all { variant ->
     task("archive${variant.name.capitalize()}Sources", type: Jar) {
         description "Generates sources for $variant.name."
@@ -81,44 +73,21 @@ android.libraryVariants.all { variant ->
     }
 }
 
-
-
-//task generateReleaseJavadoc(type: Javadoc) {
-//    description "Generates Javadoc for Release"
-//    // classifier = 'javadoc'
-//    source = android.libraryVariants.Release.javaCompile.source
-//    ext.androidJar = "${android.sdkDirectory}/platforms/${android.compileSdkVersion}/android.jar"
-//    classpath = files(android.libraryVariants.Release.javaCompile.classpath.files) + files(ext.androidJar)
-//    options.links("http://docs.oracle.com/javase/7/docs/api/");
-//    options.links("http://d.android.com/reference/");
-//    exclude '**/BuildConfig.java'
-//    exclude '**/R.java'
-//}
-
-
-
-//task packageReleaseSources(type: Jar, dependsOn: 'generateReleaseSources') {
-//    classifier = 'sources'
-//    from generateReleaseSources.destinationDir
-//}
-//task packageReleaseJavadoc(type: Jar, dependsOn: 'generateReleaseJavadoc') {
-//    classifier = 'javadoc'
-//    from project.tasks['generateReleaseJavadoc'].destinationDir
-//}
-
-
-
-
-//artifacts {
-//    archives packageReleaseSources
-//    archives packageReleaseJavadoc
-//}
-
-
 uploadArchives {
     repositories {
         mavenDeployer {
-            repository(url: 'file://localhost' + new File(projectDir.getParent(), 'repository').getAbsolutePath())
+            def console = System.console()
+            def userName = console.readLine('\nSonatype username: ').trim()
+            def password = console.readLine('\nSonatype password: ').trim()
+
+            repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
+                authentication(userName: userName, password: password)
+            }
+            snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
+                authentication(userName: userName, password: password)
+            }
+            //'file://localhost' + new File(projectDir.getParent(), 'repository').getAbsolutePath())
+
             pom.project {
                 groupId 'io.nextop'
                 artifactId 'android'
