@@ -1141,7 +1141,7 @@ public abstract class WireValue {
 
 
     public String toString() {
-        return toJson();
+        return toText();
     }
 
 
@@ -1165,6 +1165,12 @@ public abstract class WireValue {
                 return toJson();
             case LIST:
                 return toJson();
+            case MESSAGE:
+                return toJson();
+            case IMAGE:
+                return toJson();
+            case NULL:
+                return "null";
             default:
                 throw new IllegalArgumentException();
         }
@@ -1230,6 +1236,17 @@ public abstract class WireValue {
                     toJson(v, w);
                 }
                 w.endArray();
+                break;
+            case MESSAGE:
+                // FIXME 0.1.1 write as object
+                w.value("[message]");
+                break;
+            case IMAGE:
+                // FIXME 0.1.1 write as object
+                w.value("[image]");
+                break;
+            case NULL:
+                w.nullValue();
                 break;
             default:
                 throw new IllegalArgumentException();

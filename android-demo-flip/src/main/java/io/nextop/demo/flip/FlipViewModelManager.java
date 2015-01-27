@@ -26,7 +26,7 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
 
     void addFrame(Id flipId, final FrameViewModel frameVm) {
         if (null != frameVm.imageVm.bitmap) {
-            // vms should be treated as immutable, but here the caller gave up control
+            // TODO vms should be treated as immutable
             // upload the image
 
             Message update = Message.newBuilder()
@@ -34,7 +34,7 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
                     .set("flip-id", flipId)
                     .set("frame-id", frameVm.id)
                     .build();
-            Id localId = nextop.send(Nextop.Layer.bitmap(frameVm.imageVm.bitmap), null).getId();
+            Id localId = nextop.send(Nextop.Layer.bitmap(update, frameVm.imageVm.bitmap), null).getId();
             frameVm.imageVm = ImageViewModel.local(localId);
         }
 
@@ -85,6 +85,7 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
 
         Message sync = Message.newBuilder()
                 .setRoute("GET http://" + Flip.REMOTE + "/flip/$flip-id/frame")
+                .set("flip-id", flipVm.id)
                 .build();
         state.add(nextop.send(sync)
                 .doOnNext(new Action1<Message>() {
@@ -102,6 +103,7 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
                             public void call() {
                                 Message poll = Message.newBuilder()
                                         .setRoute("GET http://" + Flip.REMOTE + "/flip/$flip-id/frame")
+                                        .set("flip-id", flipVm.id)
                                         .set("after", flipVm.getMaxUpdateIndex())
                                         .build();
                                 state.add(nextop.send(poll)

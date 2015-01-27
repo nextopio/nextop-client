@@ -39,8 +39,7 @@ public class ClientDemo {
                                 new MultiNode(
                                         new MultiNode.WeightedDownstream(new NextopNode(nWifiWireFactory, nextopState), 4),
                                         new MultiNode.WeightedDownstream(new NextopNode(nCellWireFactory, nextopState), 3),
-                                        new MultiNode.WeightedDownstream(new HttpNode(hWifiWireFactory), 2),
-                                        new MultiNode.WeightedDownstream(new HttpNode(hCellWireFactory), 1)
+                                        new MultiNode.WeightedDownstream(new HttpNode(), 2)
                                 )
                         )
                 )

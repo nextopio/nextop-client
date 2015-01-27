@@ -36,7 +36,7 @@ public class SubjectNode extends AbstractMessageControlNode {
 
 
     public void send(Message message) {
-        downstream.onMessageControl(new MessageControl(MessageControl.Type.SEND, message));
+        onMessageControl(new MessageControl(MessageControl.Type.SEND, message));
     }
 
 
@@ -59,7 +59,7 @@ public class SubjectNode extends AbstractMessageControlNode {
                         downstream.post(new Runnable() {
                             @Override
                             public void run() {
-                                downstream.onMessageControl(new MessageControl(MessageControl.Type.UNSUBSCRIBE,
+                                onMessageControl(new MessageControl(MessageControl.Type.UNSUBSCRIBE,
                                         Message.newBuilder().setRoute(route).build()));
                                 // FIXME CHANGE_SUBSCRIPTION with new spec if another instead of unsubscribe (?)
                             }
@@ -72,7 +72,7 @@ public class SubjectNode extends AbstractMessageControlNode {
                 downstream.post(new Runnable() {
                     @Override
                     public void run() {
-                        downstream.onMessageControl(new MessageControl(MessageControl.Type.SUBSCRIBE,
+                        onMessageControl(new MessageControl(MessageControl.Type.SUBSCRIBE,
                                 Message.newBuilder().setRoute(route).build()));
                     }
                 });
@@ -111,7 +111,7 @@ public class SubjectNode extends AbstractMessageControlNode {
         downstream.post(new Runnable() {
             @Override
             public void run() {
-                downstream.onMessageControl(new MessageControl(MessageControl.Type.SEND_NACK,
+                onMessageControl(new MessageControl(MessageControl.Type.SEND_NACK,
                         Message.newBuilder().setRoute(Message.outboxRoute(id)).build()));
             }
         });
@@ -120,58 +120,101 @@ public class SubjectNode extends AbstractMessageControlNode {
 
 
 
+
+
     @Override
-    public void onMessageControl(MessageControl mc) {
-        switch (mc.type) {
-            case RECEIVE: {
-                @Nullable Subscriber firstSubscriber = Iterables.getFirst(
-                        Iterables.concat(receivers.get(mc.message.route), defaultReceivers),
-                        null);
-                if (null != firstSubscriber) {
-                    try {
-                        firstSubscriber.onNext(mc.message);
-                        downstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ACK,
-                                Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                    } catch (Throwable t) {
-                        downstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_NACK,
-                                Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                        // FIXME log
+    protected void initDownstream() {
+        downstream.init(new MessageControlChannel() {
+            @Override
+            public void onActive(boolean active, MessageControlMetrics metrics) {
+                upstream.onActive(active, metrics);
+            }
+
+            @Override
+            public void onTransfer(MessageControlState mcs) {
+                upstream.onTransfer(mcs);
+            }
+
+            @Override
+            public void onMessageControl(MessageControl mc) {
+                switch (mc.type) {
+                    case RECEIVE: {
+                        @Nullable Subscriber firstSubscriber = Iterables.getFirst(
+                                Iterables.concat(receivers.get(mc.message.route), defaultReceivers),
+                                null);
+                        if (null != firstSubscriber) {
+                            try {
+                                firstSubscriber.onNext(mc.message);
+                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ACK,
+                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
+                            } catch (Throwable t) {
+                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_NACK,
+                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
+                                // FIXME log
+                            }
+                        }
+                        // else the downstream will resend on subscribe
+                        break;
+                    }
+                    case RECEIVE_ERROR: {
+                        @Nullable Subscriber firstSubscriber = Iterables.getFirst(
+                                Iterables.concat(receivers.get(mc.message.route), defaultReceivers),
+                                null);
+                        if (null != firstSubscriber) {
+                            try {
+                                firstSubscriber.onError(new ReceiveException(mc.message));
+                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ACK,
+                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
+                            } catch (Throwable t) {
+                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_NACK,
+                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
+                                // FIXME log
+                            }
+                        }
+                        // else the downstream will resend on subscribe
+                        break;
                     }
                 }
-                // else the downstream will resend on subscribe
-                break;
             }
-            case RECEIVE_ERROR: {
-                @Nullable Subscriber firstSubscriber = Iterables.getFirst(
-                        Iterables.concat(receivers.get(mc.message.route), defaultReceivers),
-                        null);
-                if (null != firstSubscriber) {
-                    try {
-                        firstSubscriber.onError(new ReceiveException(mc.message));
-                        downstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ACK,
-                                Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                    } catch (Throwable t) {
-                        downstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_NACK,
-                                Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                        // FIXME log
-                    }
-                }
-                // else the downstream will resend on subscribe
-                break;
+
+            @Override
+            public void post(Runnable r) {
+                upstream.post(r);
             }
-        }
+
+            @Override
+            public void postDelayed(Runnable r, int delayMs) {
+                upstream.postDelayed(r, delayMs);
+            }
+        });
+    }
+
+    @Override
+    protected void startDownstream() {
+        downstream.start();
+    }
+
+    @Override
+    protected void stopDownstream() {
+        downstream.stop();
     }
 
 
     @Override
     public void onActive(boolean active, MessageControlMetrics metrics) {
-        upstream.onActive(active, metrics);
+        downstream.onActive(active, metrics);
     }
 
     @Override
     public void onTransfer(MessageControlState mcs) {
-        upstream.onTransfer(mcs);
+        downstream.onTransfer(mcs);
     }
+
+    @Override
+    public void onMessageControl(MessageControl mc) {
+        downstream.onMessageControl(mc);
+    }
+
 
 
 

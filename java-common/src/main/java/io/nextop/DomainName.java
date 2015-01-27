@@ -30,7 +30,7 @@ public final class DomainName {
                 j = i;
             }
         }
-        if (1 == j) {
+        if (0 == j) {
             throw new IllegalArgumentException();
         }
         // normalize to lower case (domain names are case-insensitive)

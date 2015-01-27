@@ -174,7 +174,7 @@ public class WireValueTest extends TestCase {
             assertEquals(v, v2);
 
             t = System.nanoTime();
-            String js2 = v2.toJsonString();
+            String js2 = v2.toJson();
             System.out.printf("to json %.3fms\n", ((System.nanoTime() - t) / 1000) / 1000.f);
 
             t = System.nanoTime();

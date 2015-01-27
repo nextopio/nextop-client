@@ -1,4 +1,4 @@
-version '0.1-SNAPSHOT'
+version '0.1.0-SNAPSHOT'
 
 buildscript {
     repositories {
@@ -52,7 +52,6 @@ android.libraryVariants.all { variant ->
 
     task("generate${variant.name.capitalize()}Javadoc", type: Javadoc) {
         description "Generates Javadoc for $variant.name."
-        // classifier = 'javadoc'
         source = variant.javaCompile.source
         ext.androidJar = "${android.sdkDirectory}/platforms/${android.compileSdkVersion}/android.jar"
         classpath = files(variant.javaCompile.classpath.files) + files(ext.androidJar)

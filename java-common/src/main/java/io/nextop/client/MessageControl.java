@@ -2,7 +2,7 @@ package io.nextop.client;
 
 import io.nextop.Message;
 
-class MessageControl {
+public final class MessageControl {
     static enum Type {
 
         SUBSCRIBE, // <->

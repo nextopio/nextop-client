@@ -6,7 +6,6 @@ import rx.Observer;
 import rx.Subscriber;
 import rx.Subscription;
 import rx.functions.Action0;
-import rx.internal.util.SubscriptionList;
 import rx.observers.Subscribers;
 import rx.subscriptions.BooleanSubscription;
 import rx.subscriptions.CompositeSubscription;
@@ -93,7 +92,7 @@ public interface RxLifecycleBinder extends Subscription {
         public void cascadeUnsubscribe(@Nullable RxLifecycleBinder parent) {
             removeCascadeUnsubscribe();
             if (null != parent) {
-                cascadeSubscription = parent.bind(MoreRx.hanging()).doOnCompleted(new Action0() {
+                cascadeSubscription = parent.bind(MoreObservables.hanging()).doOnCompleted(new Action0() {
                     @Override
                     public void call() {
                         unsubscribe();

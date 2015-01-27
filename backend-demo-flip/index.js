@@ -39,8 +39,18 @@ function setMysqlClient(config) {
 
 var feedId = '0000000000000000000000000000000000000000000000000000000000000000';
 
+var logger = function(req, res, next) {
+    console.log("" + req.url);
+    next();
+}
+
+
 var app = express();
 app.use(bodyParser.json());
+app.use(logger);
+
+
+
 
 
 /* @see http://expressjs.com/api.html

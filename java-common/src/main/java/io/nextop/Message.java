@@ -11,10 +11,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.*;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.StringEntity;
@@ -149,14 +146,18 @@ public class Message {
     }
 
 
-
-
+    public Builder buildOn() {
+        return toBuilder(false);
+    }
     public Builder toBuilder() {
-        Builder b = newBuilder()
+        return toBuilder(true);
+    }
+
+    private Builder toBuilder(boolean newId) {
+        Builder b = (newId ? newBuilder() : newBuilder(id))
                 .setGroupId(groupId)
                 .setGroupPriority(groupPriority)
                 .setRoute(route);
-
         for (Map.Entry<WireValue, WireValue> e : headers.entrySet()) {
             b = b.setHeader(e.getKey(), e.getValue());
         }
@@ -168,26 +169,32 @@ public class Message {
     }
 
 
-    public Message newId() {
-        return toBuilder().build();
-    }
-
-    public Message parallel() {
-        return toBuilder().setGroupId(Id.create()).build();
-    }
-
-    public Message serial(Id serialGroupId) {
-        return toBuilder().setGroupId(serialGroupId).build();
-    }
+//    public Message newId() {
+//        return toBuilder().build();
+//    }
+//
+//    public Message parallel() {
+//        return buildOn().setGroupId(Id.create()).build();
+//    }
+//
+//    public Message serial(Id serialGroupId) {
+//        return buildOn().setGroupId(serialGroupId).build();
+//    }
 
 
 
     public static Builder newBuilder() {
-        return new Builder();
+        return newBuilder(Id.create());
     }
 
+    public static Builder newBuilder(Id id) {
+        return new Builder(id);
+    }
+
+
+
     public static final class Builder {
-        private final Id id = Id.create();
+        private final Id id;
 
         private Id groupId = DEFAULT_GROUP_ID;
         private int groupPriority = DEFAULT_GROUP_PRIORITY;
@@ -200,7 +207,8 @@ public class Message {
         private Map<WireValue, WireValue> parameters = new HashMap<WireValue, WireValue>(8);
 
 
-        private Builder() {
+        private Builder(Id id) {
+            this.id = id;
         }
 
 
@@ -322,24 +330,57 @@ public class Message {
                 return message.parameters.get(WireValue.of(s));
             }
         });
-
-        URIBuilder builder = new URIBuilder();
-        builder.setScheme(message.route.via.scheme.toString());
-        builder.setHost(message.route.via.authority.getHost());
-        if (0 < message.route.via.authority.port) {
-            builder.setPort(message.route.via.authority.port);
-        }
-        builder.setPath(fixedPath.toString());
-
-        for (Map.Entry<WireValue, WireValue> e : message.parameters.entrySet()) {
-            WireValue key = e.getKey();
-            WireValue value = e.getValue();
-            if (!P_CONTENT.equals(key)) {
-                builder.addParameter(key.toString(), value.toString());
+        Set<String> pathVariableNames = new HashSet<String>(4);
+        for (Path.Segment segment : message.route.target.path.segments) {
+            if (Path.Segment.Type.VARIABLE.equals(segment.type)) {
+                pathVariableNames.add(segment.value);
             }
         }
 
-        return builder.build();
+        // FIXME 0.1.1 jarjar get this on android
+//        URIBuilder builder = new URIBuilder();
+//        builder.setScheme(message.route.via.scheme.toString());
+//        builder.setHost(message.route.via.authority.getHost());
+//        if (0 < message.route.via.authority.port) {
+//            builder.setPort(message.route.via.authority.port);
+//        }
+//        builder.setPath(fixedPath.toString());
+//
+//        for (Map.Entry<WireValue, WireValue> e : message.parameters.entrySet()) {
+//            WireValue key = e.getKey();
+//            WireValue value = e.getValue();
+//            if (!P_CONTENT.equals(key)) {
+//                builder.addParameter(key.toText(), value.toText());
+//            }
+//        }
+//
+//        return builder.build();
+
+        StringBuilder sb = new StringBuilder(1024);
+        sb.append(message.route.via.scheme);
+        sb.append("://");
+        sb.append(message.route.via.authority);
+        sb.append(fixedPath);
+
+        int c = 0;
+        for (Map.Entry<WireValue, WireValue> e : message.parameters.entrySet()) {
+            WireValue key = e.getKey();
+            WireValue value = e.getValue();
+
+            if (!P_CONTENT.equals(key) && !pathVariableNames.contains(key.toText())) {
+                ++c;
+                if (1 == c) {
+                    sb.append("?");
+                } else {
+                    sb.append("&");
+                }
+                sb.append(key.toText()).append("=").append(value.toText());
+            }
+        }
+
+
+        return URI.create(sb.toString());
+
     }
 
 
@@ -348,6 +389,8 @@ public class Message {
     private static final String H_PRAGMA_ID_PREFIX = "nextop-id";
     // FIXME serialID
     private static final String H_PRAGMA_PREFIX = "nextop-header";
+    private static final String H_PRAGMA_IMAGE_SIZE_PREFIX = "image-size";
+
 
     // IMAGE
     // FIXME maxTransferWidth, maxTransferHeight
@@ -369,6 +412,13 @@ public class Message {
                 attachContent(message, post);
                 return post;
             }
+            case PUT: {
+                HttpPut put = new HttpPut();
+                put.setURI(message.toUri());
+                attachHeaders(message, put);
+                attachContent(message, put);
+                return put;
+            }
             default:
                 throw new IllegalArgumentException();
         }
@@ -387,13 +437,13 @@ public class Message {
 
     /** inverse of {@link #toHttpRequest} */
     public static Message fromHttpRequest(HttpUriRequest request) {
-        // FIXME
+        // FIXME 0.1.1
         return null;
     }
 
     /** inverse of {@link #fromHttpResponse} */
     public static HttpResponse toHttpResponse(Message message) {
-        // FIXME
+        // FIXME 0.1.1
         return null;
     }
 
@@ -423,9 +473,51 @@ public class Message {
     private static void attachContent(Message message, HttpEntityEnclosingRequestBase request) {
         WireValue content = message.parameters.get(Message.P_CONTENT);
         if (null != content) {
-            HttpEntity entity = createEntity(message, content);
-            assert entity.isRepeatable();
+            HttpEntity entity;
+            MediaType contentType = getContentType(message, content);
+            if (contentType.is(MediaType.JSON_UTF_8)) {
+                try {
+                    entity = new StringEntity(content.toJson());
+                } catch (UnsupportedEncodingException e) {
+                    throw new IllegalArgumentException(e);
+                }
+            } else if (contentType.is(MediaType.ANY_TEXT_TYPE)) {
+                try {
+                    entity = new StringEntity(content.toText());
+                } catch (UnsupportedEncodingException e) {
+                    throw new IllegalArgumentException(e);
+                }
+            } else if (contentType.is(MediaType.ANY_IMAGE_TYPE)) {
+                switch (content.getType()) {
+                    case IMAGE:
+                        EncodedImage image = content.asImage();
+                        // FIXME 0.1.1
+//                        entity = new ByteArrayEntity(image.bytes, image.offset, image.length);
+                        entity = new ByteArrayEntity(Arrays.copyOfRange(image.bytes, image.offset, image.length));
+
+                        if (0 < image.width || 0 < image.height) {
+                            // attach headers for image width and height
+                            request.addHeader(HttpHeaders.PRAGMA, String.format("%s %d %d",
+                                    H_PRAGMA_IMAGE_SIZE_PREFIX, image.width, image.height));
+                        }
+                        break;
+                    default:
+                        ByteBuffer bb = content.asBlob();
+                        byte[] bytes = new byte[bb.remaining()];
+                        bb.get(bytes);
+                        entity = new ByteArrayEntity(bytes);
+                        break;
+                }
+            } else {
+                // send as binary
+                ByteBuffer bb = content.asBlob();
+                byte[] bytes = new byte[bb.remaining()];
+                bb.get(bytes);
+                entity = new ByteArrayEntity(bytes);
+            }
+
             request.setEntity(entity);
+
 
             // TODO
 //            if ("http".equalsIgnoreCase(request.getURI().getScheme())
@@ -435,30 +527,6 @@ public class Message {
         }
     }
 
-    private static HttpEntity createEntity(Message message, WireValue content) {
-        HttpEntity entity;
-        MediaType contentType = getContentType(message, content);
-        if (contentType.is(MediaType.JSON_UTF_8)) {
-            try {
-                entity = new StringEntity(content.toJson());
-            } catch (UnsupportedEncodingException e) {
-                throw new IllegalArgumentException(e);
-            }
-        } else if (contentType.is(MediaType.ANY_TEXT_TYPE)) {
-            try {
-                entity = new StringEntity(content.toString());
-            } catch (UnsupportedEncodingException e) {
-                throw new IllegalArgumentException(e);
-            }
-        } else {
-            // send as binary
-            ByteBuffer bb = content.asBlob();
-            byte[] bytes = new byte[bb.remaining()];
-            bb.get(bytes);
-            entity = new ByteArrayEntity(bytes);
-        }
-        return entity;
-    }
     private static MediaType getContentType(Message message, WireValue content) {
         @Nullable WireValue contentTypeValue = message.headers.get(WireValue.of(HttpHeaders.CONTENT_TYPE));
         if (null != contentTypeValue) {
@@ -466,6 +534,17 @@ public class Message {
         }
         // else use a default content type
         switch (content.getType()) {
+            case IMAGE:
+                switch (content.asImage().format) {
+                    case WEBP:
+                        return MediaType.WEBP;
+                    case JPEG:
+                        return MediaType.JPEG;
+                    case PNG:
+                        return MediaType.PNG;
+                    default:
+                        throw new IllegalArgumentException();
+                }
             case BLOB:
                 return MediaType.APPLICATION_BINARY;
             case UTF8:

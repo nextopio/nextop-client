@@ -21,10 +21,13 @@ public class HexBytes {
         return bytes;
     }
 
+
+    public static String toString(byte[] bytes) {
+        return toString(bytes, 0, bytes.length);
+    }
     public static String toString(byte[] bytes, int offset, int length) {
-        int n = bytes.length;
-        CharBuffer cb = CharBuffer.allocate(2 * n);
-        toString(bytes, 0, n, cb);
+        CharBuffer cb = CharBuffer.allocate(2 * length);
+        toString(bytes, offset, length, cb);
         return new String(cb.array());
     }
     public static void toString(byte[] bytes, int offset, int n, CharBuffer cb) {

@@ -20,12 +20,12 @@ public class FeedViewModel extends RxManaged {
 
 
     public int size() {
-        return states.size();
+        return orderedStates.size();
     }
 
 
     public Id getFlipId(int index) {
-        return states.get(index).flipId;
+        return orderedStates.get(index).flipId;
     }
 
 

@@ -3,7 +3,7 @@ package io.nextop.rx;
 import rx.Observable;
 import rx.Subscriber;
 
-public final class MoreRx {
+public final class MoreObservables {
 
     public static <T> Observable<T> hanging() {
         return Observable.create(new Observable.OnSubscribe<T>() {
@@ -15,6 +15,6 @@ public final class MoreRx {
     }
 
 
-    private MoreRx() {
+    private MoreObservables() {
     }
 }

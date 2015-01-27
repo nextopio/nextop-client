@@ -402,14 +402,9 @@ public class ImageView extends android.widget.ImageView {
 
         @Override
         public void onNext(Nextop.Layer layer) {
-            switch (layer.type) {
-                case BITMAP:
-                    set(layer.bitmap);
-                    break;
-                default:
-                    // ignore
-                    break;
-            }
+            if (null != layer.bitmap) {
+                set(layer.bitmap);
+            } // else ignore
         }
 
         @Override

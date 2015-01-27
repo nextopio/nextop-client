@@ -48,7 +48,7 @@ public abstract class AbstractMessageControlNode implements MessageControlNode {
 
     @Override
     public final void init(MessageControlChannel upstream) {
-        if (null != upstream) {
+        if (null != this.upstream) {
             throw new IllegalStateException();
         }
         this.upstream = upstream;

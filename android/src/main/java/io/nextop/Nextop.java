@@ -3,6 +3,7 @@ package io.nextop;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.hardware.Camera;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -10,7 +11,9 @@ import android.os.Bundle;
 import com.google.common.annotations.Beta;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.nextop.client.HttpNode;
 import io.nextop.client.MessageControlNode;
+import io.nextop.client.MessageControlState;
 import io.nextop.client.SubjectNode;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpUriRequest;
@@ -20,6 +23,7 @@ import rx.functions.Func1;
 import rx.subjects.BehaviorSubject;
 
 import javax.annotation.Nullable;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -162,10 +166,6 @@ public class Nextop {
         throw new IllegalStateException("Call on a started nextop.");
     }
 
-    public Receiver<Layer> receive(Route route, @Nullable LayersConfig config) {
-        throw new IllegalStateException("Call on a started nextop.");
-    }
-
     public static final class LayersConfig {
         public static LayersConfig send(Bound... bounds) {
             return new LayersConfig(ImmutableList.copyOf(bounds), ImmutableList.<Bound>of());
@@ -255,41 +255,35 @@ public class Nextop {
     }
 
     public static final class Layer {
-        public static enum Type {
-            BITMAP,
-            MESSAGE
-        }
-
-
-        public static Layer bitmap(Bitmap bitmap) {
-            return bitmap(bitmap, true);
-        }
-
-        public static Layer bitmap(Bitmap bitmap, boolean last) {
-            return new Layer(Type.BITMAP, bitmap, null, last);
-        }
 
         public static Layer message(Message message) {
             return message(message, true);
         }
 
         public static Layer message(Message message, boolean last) {
-            return new Layer(Type.MESSAGE, null, message, last);
+            return new Layer(message, null, last);
+        }
+
+        public static Layer bitmap(Message message, Bitmap bitmap) {
+            return bitmap(message, bitmap, true);
+        }
+
+        public static Layer bitmap(Message message, Bitmap bitmap, boolean last) {
+            return new Layer(message, bitmap, last);
         }
 
 
-        public final Type type;
+        public final Message message;
         @Nullable
         public final Bitmap bitmap;
-        /** set if {@link Type#MESSAGE} */
-        @Nullable
-        public final Message message;
         public final boolean last;
 
-        Layer(Type type, @Nullable Bitmap bitmap, @Nullable Message message, boolean last) {
-            this.type = type;
-            this.bitmap = bitmap;
+        Layer(Message message, @Nullable Bitmap bitmap, boolean last) {
+            if (null == message) {
+                throw new IllegalArgumentException();
+            }
             this.message = message;
+            this.bitmap = bitmap;
             this.last = last;
         }
     }
@@ -453,9 +447,10 @@ public class Nextop {
 
             this.node = node;
 
-            // FIXME
-            node.init(null);
-            node.start();
+            subjectNode = new SubjectNode(node);
+            MessageControlState mcs = new MessageControlState();
+            subjectNode.init(new AndroidMessageContext(mcs));
+            subjectNode.start();
         }
 
 
@@ -491,14 +486,47 @@ public class Nextop {
 
         @Override
         public Receiver<Layer> send(Layer layer, @Nullable LayersConfig config) {
-            // FIXME !!
-            return null;
-        }
+            // FIXME 0.1.1
+            // FIXME   send layers should manipulate the route here (base route + parameters per layer)
+            // FIXME   this has to be coordinated with the receive/decode step
+            // FIXME   get threading right and general correctness
+            Message tmessage;
+            if (null != layer.bitmap) {
+                Bitmap bitmap = layer.bitmap;
 
-        @Override
-        public Receiver<Layer> receive(Route route, @Nullable LayersConfig config) {
-            // FIXME !!
-            return null;
+                ByteArrayOutputStream baos = new ByteArrayOutputStream(1024 * 1024);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, baos);
+                byte[] bytes = baos.toByteArray();
+
+                EncodedImage image = new EncodedImage(EncodedImage.Format.JPEG, EncodedImage.Orientation.REAR_FACING,
+                        bitmap.getWidth(), bitmap.getHeight(),
+                        bytes, 0, bytes.length);
+
+                tmessage = layer.message.buildOn()
+                        .setContent(WireValue.of(image))
+                        .build();
+            } else {
+                tmessage = layer.message;
+            }
+
+            subjectNode.send(tmessage);
+            Route route = tmessage.inboxRoute();
+            return new Receiver(route, subjectNode.receive(route).map(new Func1<Message, Layer>() {
+                @Override
+                public Layer call(Message message) {
+                    WireValue content = message.getContent();
+                    switch (content.getType()) {
+                        case IMAGE:
+                            EncodedImage image = content.asImage();
+
+                            Bitmap bitmap = BitmapFactory.decodeByteArray(image.bytes, image.offset, image.length);
+                            return Layer.bitmap(message.buildOn().setContent(null).build(),
+                                    bitmap);
+                        default:
+                            return Layer.message(message);
+                    }
+                }
+            }));
         }
 
 
@@ -586,6 +614,7 @@ public class Nextop {
 
 
 
+        // FIXME 0.1.1
         // FIXME use broadcasts to receive connectivity messages
         // FIXME for now, just poll this:
 
@@ -617,8 +646,9 @@ public class Nextop {
         }
 
         private static MessageControlNode createLimitedNode() {
-            // FIXME !!
-            return null;
+            // FIXME 0.2 see ClientDemo for where we want to be
+            MessageControlNode node = new HttpNode();
+            return node;
         }
 
         private Limited(Context context, @Nullable Auth auth) {

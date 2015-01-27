@@ -1,10 +1,12 @@
 package io.nextop.client;
 
 import io.nextop.Message;
+import io.nextop.Route;
 import io.nextop.client.retry.SendStrategy;
-import org.apache.http.client.methods.*;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.impl.client.DefaultHttpClient;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -14,19 +16,27 @@ import java.util.concurrent.Executors;
 public class HttpNode extends AbstractMessageControlNode {
 
     private Executor executor;
-    private CloseableHttpClient httpClient;
+    private HttpClient httpClient;
 
     private SendStrategy sendStrategy = SendStrategy.INDEFINITE;
 
 
-    public HttpNode(Wire.Factory wireFactory) {
-        this(wireFactory, Executors.newCachedThreadPool());
+    // FIXME 0.1.1
+//    Map<Route, TransferProgress> progresses;
+
+
+
+    public HttpNode() {
+        // FIXME 0.2 ordering and expand to multiple threads
+        this(Executors.newSingleThreadExecutor());
     }
 
-    public HttpNode(Wire.Factory wireFactory, Executor executor) {
+    public HttpNode(Executor executor) {
 
         this.executor = executor;
-        httpClient = HttpClients.createDefault();
+        // FIXME 0.1.1 jarjar httpclient
+        httpClient = new DefaultHttpClient();
+                //HttpClients.createDefault();
     }
 
 
@@ -74,7 +84,12 @@ public class HttpNode extends AbstractMessageControlNode {
 
 
     private void onSend(Message message) {
-        executor.execute(new RequestWorker(message));
+        if (message.route.via.isLocal()) {
+            // FIXME 0.1.1 a control message
+            // leave it hanging for now
+        } else {
+            executor.execute(new RequestWorker(message));
+        }
     }
 
     private void onSendError(Message message) {
@@ -116,8 +131,13 @@ public class HttpNode extends AbstractMessageControlNode {
                 return;
             }
 
+            // FIXME 0.1.1
+            // FIXME   surface progress
+            // FIXME   retry on transfer up and down if idempotent (resend)
+            // FIXME   use jarjar on latest httpclient to have a stable version to work with on android
+
             // FIXME can do retry here while active {  use supplied retry strategy
-            final CloseableHttpResponse response;
+            final HttpResponse response;
             try {
                 response = httpClient.execute(request);
             } catch (Exception e) {
@@ -131,7 +151,6 @@ public class HttpNode extends AbstractMessageControlNode {
             }
             // FIXME }
 
-            // FIXME surface progress
 
             // FIXME can't do retry here if not idempotent
             // FIXME *can do* retry here on idempotent (GET, HEAD)
@@ -158,5 +177,16 @@ public class HttpNode extends AbstractMessageControlNode {
     }
 
 
+
+    private static final class TransferProgressState {
+        final Route route;
+        float progress;
+
+        TransferProgressState(Route route, float progress) {
+            this.route = route;
+            this.progress = progress;
+        }
+
+    }
 
 }
