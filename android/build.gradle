@@ -75,6 +75,8 @@ android.libraryVariants.all { variant ->
 uploadArchives {
     repositories {
         mavenDeployer {
+            // FIXME only ask this when deploying to maven central
+            // FIXME (currently run every time the gradle build is parsed)
             def console = System.console()
             def userName
             def password
