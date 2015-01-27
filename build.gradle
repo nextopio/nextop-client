@@ -8,3 +8,26 @@ buildscript {
         classpath group: 'com.android.tools.build', name: 'gradle', version: '0.14.2'
     }
 }
+
+
+
+def versionName = { ->
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'describe', '--tags'
+        standardOutput = stdout
+    }
+    def gitName = stdout.toString().trim()
+    if (gitName.contains("-")) {
+        // increment the minor + snapshot
+        def vs = gitName.split('-')[0].split('\\.')
+        vs[-1] = vs[-1].toInteger() + 1
+        return vs.join('.') + '-SNAPSHOT'
+    } else {
+        return gitName
+    }
+}
+
+subprojects {
+    version versionName()
+}
