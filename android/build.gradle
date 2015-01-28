@@ -10,6 +10,7 @@ buildscript {
 
 apply plugin: 'com.android.library'
 apply plugin: 'maven'
+apply plugin: 'signing'
 
 
 repositories {
@@ -71,30 +72,23 @@ android.libraryVariants.all { variant ->
     }
 }
 
+
+// properties defined in $HOME/gradle.properties
+// @see http://central.sonatype.org/pages/gradle.html
+
+signing {
+    sign configurations.archives
+}
+
 uploadArchives {
     repositories {
         mavenDeployer {
-            // FIXME only ask this when deploying to maven central
-            // FIXME (currently run every time the gradle build is parsed)
-            def console = System.console()
-            def userName
-            def password
-            if (console) {
-                userName = console.readLine('\nSonatype username: ').trim()
-                password = console.readLine('\nSonatype password: ').trim()
-            } else {
-                userName = ''
-                password = ''
-            }
-
-
             repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
-                authentication(userName: userName, password: password)
+                authentication(userName: ossrhUsername, password: ossrhPassword)
             }
             snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
-                authentication(userName: userName, password: password)
+                authentication(userName: ossrhUsername, password: ossrhPassword)
             }
-            //'file://localhost' + new File(projectDir.getParent(), 'repository').getAbsolutePath())
 
             pom.project {
                 groupId 'io.nextop'
