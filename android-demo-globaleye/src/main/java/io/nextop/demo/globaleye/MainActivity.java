@@ -1,4 +1,4 @@
-package io.nextop.globaleye;
+package io.nextop.demo.globaleye;
 
 import android.app.Activity;
 import android.os.Bundle;

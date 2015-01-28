@@ -1,4 +1,4 @@
-package io.nextop.globaleye.wallpaper;
+package io.nextop.demo.globaleye.wallpaper;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
