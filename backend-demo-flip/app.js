@@ -27,6 +27,7 @@ function setMysqlClient(config) {
             if ('PROTOCOL_CONNECTION_LOST' == err.code) {
                 setMysqlClient(config);
             } else if (err.fatal) {
+                // FIXME keep polling retry; don't crash
                 throw err;
             }
         }
@@ -55,6 +56,11 @@ app.use(logger);
 
 /* @see http://expressjs.com/api.html
  */
+
+app.get("/status", function(req, res) {
+    res.status(200);
+    res.end();
+});
 
 // ?count= for top count
 // ?before= to go backward from index
