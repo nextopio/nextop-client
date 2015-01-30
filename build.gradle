@@ -32,5 +32,6 @@ def versionName() {
 }
 
 subprojects {
+    group 'io.nextop'
     version versionName()
 }

@@ -82,8 +82,8 @@ uploadArchives {
             }
 
             pom.project {
-                groupId 'io.nextop'
-                artifactId 'java-common'
+                groupId project.group
+                artifactId project.name
                 name 'Nextop Java Common'
                 description 'Platform-agnostic Java core for Nextop'
                 url 'http://nextop.io'
@@ -94,10 +94,7 @@ uploadArchives {
                     developer {
                         name 'nextop.io'
                         email 'support@nextop.io'
-                        organization {
-                            name 'Nextop Inc'
-                            url 'http://nextop.io'
-                        }
+                        organizationUrl 'http://nextop.io'
                     }
                 }
 

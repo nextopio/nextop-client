@@ -1,4 +1,3 @@
-
 buildscript {
     repositories {
         mavenCentral()
@@ -95,8 +94,8 @@ uploadArchives {
             }
 
             pom.project {
-                groupId 'io.nextop'
-                artifactId 'android'
+                groupId project.group
+                artifactId project.name
                 name 'Nextop for Android'
                 description 'Nextop client for Android 10+'
                 url 'http://nextop.io/android'
@@ -107,10 +106,7 @@ uploadArchives {
                     developer {
                         name 'nextop.io'
                         email 'support@nextop.io'
-                        organization {
-                            name 'Nextop Inc'
-                            url 'http://nextop.io'
-                        }
+                        organizationUrl 'http://nextop.io'
                     }
                 }
 
