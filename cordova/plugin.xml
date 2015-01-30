@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        id="io.nextop.cordova"
+        version="0.1.0">
+    <name>Nextop</name>
+    <description>Nextop Cordova Plugin</description>
+    <license>Apache Sotware License 2.0</license>
+    <keywords>cordova,nextop,transfer</keywords>
+    <repo>https://github.com/nextopio/nextop-cordova.git</repo>
+    <issue>https://github.com/nextopio/nextop-cordova/issues</issue>
+
+    <js-module src="www/Nextop.js" name="Nextop">
+        <clobbers target="window.XMLHttpRequest" />
+    </js-module>
+
+    <!-- android -->
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="Nextop" >
+                <param name="android-package" value="io.nextop.cordova.Nextop"/>
+            </feature>
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/*">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+        </config-file>
+
+        <source-file src="src/android/Nextop.java" target-dir="src/io/nextop/cordova" />
+    </platform>
+</plugin>

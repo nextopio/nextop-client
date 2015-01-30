@@ -57,7 +57,7 @@ app.use(logger);
 /* @see http://expressjs.com/api.html
  */
 
-app.get("/status", function(req, res) {
+app.get('/status', function(req, res) {
     res.status(200);
     res.end();
 });
@@ -242,11 +242,11 @@ app.get('/flip/:flipId/frame/:frameId', function (req, res) {
 
 
 
-var server = app.listen(3770, function () {
+var server = app.listen(process.env.PORT || configObj.http.port, function () {
     var host = server.address().address;
     var port = server.address().port;
 
-    console.log('demo-flip listening at http://%s:%s', host, port)
+    console.log('backend-demo-flip listening at http://%s:%s', host, port)
 });
 
 

@@ -1,4 +1,4 @@
-include ':android-demo-globaleye'
+include 'android-demo-globaleye'
 include 'java-common'
 
 include 'android'

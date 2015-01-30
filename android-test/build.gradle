@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath group: 'com.android.tools.build', name: 'gradle', version: '0.14.2'
+        classpath group: 'com.android.tools.build', name: 'gradle', version: '1.0.1'
     }
 }
 
@@ -24,7 +24,7 @@ android {
         targetSdkVersion 21
         versionCode 1
 
-        testPackageName "io.nextop.test.test"
+        testApplicationId "io.nextop.test.test"
         testInstrumentationRunner "android.test.InstrumentationTestRunner"
         testHandleProfiling true
         testFunctionalTest true

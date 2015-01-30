@@ -1,4 +1,7 @@
 {
+  "http": {
+    "port": 3777
+  },
   "mysql": {
     "host": "localhost",
     "port": "3306",

@@ -123,6 +123,9 @@ public class Nextop {
         throw new IllegalStateException("Call on a started nextop.");
     }
 
+    public void cancelSend(Id id) {
+        throw new IllegalStateException("Call on a started nextop.");
+    }
 
     /////// HTTPCLIENT MIGRATION HELPER ///////
 
@@ -482,6 +485,11 @@ public class Nextop {
         @Override
         public Receiver<Message> receive(Route route) {
             return new Receiver<Message>(route, subjectNode.receive(route));
+        }
+
+        @Override
+        public void cancelSend(Id id) {
+            subjectNode.cancelSend(id);
         }
 
         @Override
