@@ -107,8 +107,10 @@ uploadArchives {
                     developer {
                         name 'nextop.io'
                         email 'support@nextop.io'
-                        organization 'Nextop Inc'
-                        organizationUrl 'http://nextop.io'
+                        organization {
+                            name 'Nextop Inc'
+                            url 'http://nextop.io'
+                        }
                     }
                 }
 

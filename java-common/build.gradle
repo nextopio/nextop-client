@@ -1,6 +1,7 @@
 
 apply plugin: 'java'
 apply plugin: 'maven'
+apply plugin: 'signing'
 
 sourceCompatibility = JavaVersion.VERSION_1_6
 targetCompatibility = JavaVersion.VERSION_1_6
@@ -42,10 +43,72 @@ dependencies {
     testCompile 'junit:junit:4.11'
 }
 
+
+task archiveSources(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task archiveJavadoc(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives archiveSources
+    archives archiveJavadoc
+}
+
+
+// properties defined in $HOME/gradle.properties
+// @see http://central.sonatype.org/pages/gradle.html
+
+signing {
+    sign configurations.archives
+}
+
 uploadArchives {
     repositories {
         mavenDeployer {
-            repository(url: 'file://localhost' + new File(projectDir.getParent(), 'repository').getAbsolutePath())
+            beforeDeployment {
+                MavenDeployment deployment -> signing.signPom(deployment)
+            }
+
+            repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+            snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            pom.project {
+                groupId 'io.nextop'
+                artifactId 'java-common'
+                name 'Nextop Java Common'
+                description 'Platform-agnostic Java core for Nextop'
+                url 'http://nextop.io'
+                scm {
+                    url 'https://github.com/nextopio/nextop-client/tree/master/java-common'
+                }
+                developers {
+                    developer {
+                        name 'nextop.io'
+                        email 'support@nextop.io'
+                        organization {
+                            name 'Nextop Inc'
+                            url 'http://nextop.io'
+                        }
+                    }
+                }
+
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution 'repo'
+                    }
+                }
+            }
         }
     }
 }
