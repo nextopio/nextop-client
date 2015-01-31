@@ -367,6 +367,11 @@ public abstract class WireValue {
                                     int j = i++;
                                     return new SimpleImmutableEntry<WireValue, WireValue>(keys.get(j), values.get(j));
                                 }
+
+                                @Override
+                                public void remove() {
+                                    throw new UnsupportedOperationException();
+                                }
                             };
                         }
                     };
@@ -1069,15 +1074,17 @@ public abstract class WireValue {
             case BLOB:
                 return value.asBlob().hashCode();
             case INT32:
-                return Integer.hashCode(value.asInt());
+                return value.asInt();
             case INT64:
-                return Long.hashCode(value.asLong());
+                long n = value.asLong();
+                return (int) (n ^ (n >>> 32));
             case FLOAT32:
-                return Float.hashCode(value.asFloat());
+                return Float.floatToIntBits(value.asFloat());
             case FLOAT64:
-                return Double.hashCode(value.asDouble());
+                long dn = Double.doubleToLongBits(value.asDouble());
+                return (int) (dn ^ (dn >>> 32));
             case BOOLEAN:
-                return Boolean.hashCode(value.asBoolean());
+                return value.asBoolean() ? 1231 : 1237;
             case MAP: {
                 Map<WireValue, WireValue> map = value.asMap();
                 List<WireValue> keys = stableKeys(map);
@@ -1639,13 +1646,24 @@ public abstract class WireValue {
                     if (a == b) {
                         return 0;
                     }
-                    int d = Integer.compare(a.maxd, b.maxd);
-                    if (0 != d) {
-                        return d;
+
+                    // maxd
+                    if (a.maxd < b.maxd) {
+                        return -1;
                     }
-                    d = Integer.compare(a.maxi, b.maxi);
-                    assert 0 != d;
-                    return d;
+                    if (b.maxd < a.maxd) {
+                        return 1;
+                    }
+
+                    // maxi
+                    if (a.maxi < b.maxi) {
+                        return -1;
+                    }
+                    if (b.maxi < a.maxi) {
+                        return 1;
+                    }
+
+                    return 0;
                 }
             });
             for (S s : rs) {
@@ -1854,9 +1872,25 @@ public abstract class WireValue {
                 case UTF8:
                     return a.asString().compareTo(b.asString());
                 case INT32:
-                    return Integer.compare(a.asInt(), b.asInt());
+                    int ai = a.asInt();
+                    int bi = b.asInt();
+                    if (ai < bi) {
+                        return -1;
+                    }
+                    if (bi < ai) {
+                        return 1;
+                    }
+                    return 0;
                 case INT64:
-                    return Long.compare(a.asLong(), b.asLong());
+                    long an = a.asLong();
+                    long bn = b.asLong();
+                    if (an < bn) {
+                        return -1;
+                    }
+                    if (bn < an) {
+                        return 1;
+                    }
+                    return 0;
                 case FLOAT32:
                     return Float.compare(a.asFloat(), b.asFloat());
                 case FLOAT64:

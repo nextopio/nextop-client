@@ -144,7 +144,7 @@ public final class Authority {
         int m = 31;
         int c = type.hashCode();
         c = m * c + Objects.hashCode(host);
-        c = m * c + Integer.hashCode(port);
+        c = m * c + port;
         return c;
     }
 

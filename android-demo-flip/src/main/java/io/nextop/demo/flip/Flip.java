@@ -4,8 +4,9 @@ import io.nextop.Id;
 import io.nextop.NextopApplication;
 
 public class Flip extends NextopApplication {
-    static final String REMOTE = "localhost:3770";
-            //"demo-flip.nextop.io";
+    static final String REMOTE =
+            //"localhost:3770";
+            "flip.nextop.io";
 
     /** @see backend-demo-flip index.js */
     private final Id feedId = Id.valueOf("0000000000000000000000000000000000000000000000000000000000000000");

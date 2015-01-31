@@ -2,11 +2,9 @@ package io.nextop;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.regex.Pattern;
 
 public final class DomainName {
@@ -21,7 +19,7 @@ public final class DomainName {
         List<String> labels = new LinkedList<String>();
         int j = n;
         for (int i = n - 1; 0 <= i; --i) {
-            if ('.' == i) {
+            if ('.' == s.charAt(i)) {
                 if (i + 1 == j) {
                     throw new IllegalArgumentException();
                 }
@@ -62,7 +60,7 @@ public final class DomainName {
 
     @Override
     public String toString() {
-        return Joiner.on('.').join(labels);
+        return Joiner.on('.').join(Lists.reverse(labels));
     }
 
     @Override

@@ -357,7 +357,7 @@ public class Message {
 //        return builder.build();
 
         StringBuilder sb = new StringBuilder(1024);
-        sb.append(message.route.via.scheme);
+        sb.append(message.route.via.scheme.toString().toLowerCase());
         sb.append("://");
         sb.append(message.route.via.authority);
         sb.append(fixedPath);
@@ -585,9 +585,19 @@ public class Message {
 //            }
 //        }
 
+        @Nullable Header contentTypeHeader = entity.getContentType();
+        if (null == contentTypeHeader) {
+            contentTypeHeader = response.getFirstHeader(HttpHeaders.CONTENT_TYPE);
+        }
+
 
         WireValue value;
-        MediaType contentType = MediaType.parse(entity.getContentType().getValue());
+        MediaType contentType;
+        if (null != contentTypeHeader) {
+            contentType = MediaType.parse(contentTypeHeader.getValue());
+        } else {
+            contentType = MediaType.APPLICATION_BINARY;
+        }
         if (contentType.is(MediaType.JSON_UTF_8)) {
             try {
                 value = WireValue.valueOfJson(new InputStreamReader(entity.getContent(), Charsets.UTF_8));
