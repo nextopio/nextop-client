@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.UUID;
 
 /** 256-bit UUID.
+ * @see http://www.ietf.org/rfc/rfc4122.txt
  * @see #create */
 public final class Id {
     private static final SecureRandom sr = new SecureRandom();
@@ -16,6 +17,7 @@ public final class Id {
     static final int LENGTH = 32;
 
     /** generate a 256-bit UUID as a 128-bit UUID + 128 bits of randomness
+     * @see http://www.ietf.org/rfc/rfc4122.txt
      * @see java.util.UUID */
     public static Id create() {
         UUID uuid16 = UUID.randomUUID();

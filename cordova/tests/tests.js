@@ -105,12 +105,10 @@ exports.defineManualTests = function(contentEl, createActionButton) {
 
         function appendW3cTestDiff(file) {
             var base = 'http://w3c-test.org/XMLHttpRequest/';
-            // IMPORTANT: you must edit plugin.xml and comment out <clobbers target="XMLHttpRequest" />
-            // IMPORTANT: else window.XMLHttpRequest and window.Nextop will be the same class
             var top1 = '<base href="' + base + '" />' +
-                '<script type="text/javascript">if (parent) {window.XMLHttpRequest = parent.window.XMLHttpRequest;}</script>';
+                '<script type="text/javascript">if (parent) {window.XMLHttpRequest = parent.window.XMLHttpRequest.XMLHttpRequest;}</script>';
             var top2 = '<base href="' + base + '" />' +
-                '<script type="text/javascript">if (parent) {window.XMLHttpRequest = parent.window.Nextop;}</script>';
+                '<script type="text/javascript">if (parent) {window.XMLHttpRequest = parent.window.XMLHttpRequest;}</script>';
 
             var xhr = new XMLHttpRequest();
             xhr.open('GET', base + file, false);
