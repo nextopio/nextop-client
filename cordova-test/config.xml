@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="io.nextop.cordova.test" version="0.1.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>Nextop Cordova Plugin Test</name>
+    <description>
+    </description>
+    <author email="support@nextop.io" href="http://nextop.io">
+        nextop.io
+    </author>
+    <content src="cdvtests/index.html" />
+    <access origin="*" />
+</widget>

@@ -6,3 +6,5 @@ include 'android'
 include 'android-test'
 
 include 'android-demo-flip'
+
+include 'cordova'

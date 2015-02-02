@@ -14,7 +14,7 @@ import java.lang.Override;
 // see http://stackoverflow.com/questions/15945118/detecting-ajax-requests-on-nodejs-with-express
 public class Nextop extends CordovaPlugin implements NextopContext {
 
-    private Nextop nextop;
+    private io.nextop.Nextop nextop;
 
     // JS id to Nextop Id translation
     Map<Integer, Id> idTranslationMap = new HashMap<Integer, Id>(32);
@@ -30,7 +30,7 @@ public class Nextop extends CordovaPlugin implements NextopContext {
         // TODO
         String[] grantKeys = new String[0];
 
-        nextop = Nextop.create(cordova.getActivity(), accessKey, grantKeys).start();
+        nextop = io.nextop.Nextop.create(cordova.getActivity(), accessKey, grantKeys).start();
     }
 
     @Override

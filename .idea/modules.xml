@@ -8,6 +8,8 @@
       <module fileurl="file://$PROJECT_DIR$/android-test/android-test.iml" filepath="$PROJECT_DIR$/android-test/android-test.iml" />
       <module fileurl="file://$PROJECT_DIR$/backend-demo-flip/backend-demo-flip.iml" filepath="$PROJECT_DIR$/backend-demo-flip/backend-demo-flip.iml" />
       <module fileurl="file://$PROJECT_DIR$/backend-tests/backend-tests.iml" filepath="$PROJECT_DIR$/backend-tests/backend-tests.iml" />
+      <module fileurl="file://$PROJECT_DIR$/cordova/cordova.iml" filepath="$PROJECT_DIR$/cordova/cordova.iml" />
+      <module fileurl="file://$PROJECT_DIR$/cordova-test/cordova-test.iml" filepath="$PROJECT_DIR$/cordova-test/cordova-test.iml" />
       <module fileurl="file://$PROJECT_DIR$/java-common/java-common.iml" filepath="$PROJECT_DIR$/java-common/java-common.iml" />
       <module fileurl="file://$PROJECT_DIR$/nextop-client.iml" filepath="$PROJECT_DIR$/nextop-client.iml" />
     </modules>

@@ -43,6 +43,11 @@ dependencies {
 // @see http://stackoverflow.com/questions/19307341/android-library-gradle-release-jar
 
 android.libraryVariants.all { variant ->
+    task("archive${variant.name.capitalize()}Jar", type: Jar) {
+        description "Jar for $variant.name."
+        print variant.javaCompile
+    }
+
     task("archive${variant.name.capitalize()}Sources", type: Jar) {
         description "Generates sources for $variant.name."
         classifier = 'sources'
@@ -66,6 +71,7 @@ android.libraryVariants.all { variant ->
     }
 
     artifacts {
+        archives tasks["archive${variant.name.capitalize()}Jar"]
         archives tasks["archive${variant.name.capitalize()}Sources"]
         archives tasks["archive${variant.name.capitalize()}Javadoc"]
     }
