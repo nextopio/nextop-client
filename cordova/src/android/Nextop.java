@@ -1,18 +1,23 @@
 package io.nextop.cordova;
 
 import io.nextop.Id;
-import io.nextop.Nextop;
-import io.nextop.NextopContext;
+
 import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.CordovaArgs;
+import org.apache.cordova.CallbackContext;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONException;
+
+import java.util.Map;
+import java.util.HashMap;
 
 import java.lang.Override;
 
 // FIXME set e X-Requested-With header to XMLHttpRequest
 // see http://stackoverflow.com/questions/15945118/detecting-ajax-requests-on-nodejs-with-express
-public class Nextop extends CordovaPlugin implements NextopContext {
+public class Nextop extends CordovaPlugin implements io.nextop.NextopContext {
 
     private io.nextop.Nextop nextop;
 
@@ -21,6 +26,12 @@ public class Nextop extends CordovaPlugin implements NextopContext {
 
 
     public Nextop() {
+    }
+
+
+    @Override
+    public io.nextop.Nextop getNextop() {
+        return nextop;
     }
 
 

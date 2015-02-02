@@ -3,6 +3,17 @@
 exports.defineAutoTests = function () {
     describe('tests.nextop.io', function () {
 
+        it('XMLHttpRequest properties subset of Nextop properties', function() {
+            // Nextop should be a super set of XMLHttpRequest
+
+            var a = new XMLHttpRequest.XMLHttpRequest();
+            var b = new XMLHttpRequest();
+            for (p in a) {
+                expect(p in b).toBe(true, 'missing ' + p);
+            }
+        });
+
+
     });
 };
 

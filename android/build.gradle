@@ -45,7 +45,7 @@ dependencies {
 android.libraryVariants.all { variant ->
     task("archive${variant.name.capitalize()}Jar", type: Jar) {
         description "Jar for $variant.name."
-        print variant.javaCompile
+        from variant.javaCompile
     }
 
     task("archive${variant.name.capitalize()}Sources", type: Jar) {
