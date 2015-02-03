@@ -1,4 +1,4 @@
-package io.nextop.test.test.rx;
+package io.nextop.test.rx;
 
 import junit.framework.TestCase;
 
@@ -10,6 +10,7 @@ public class RxLifecycleBinderTest extends TestCase {
 
     // FIXME
     public void testPublish() {
-//        fail();
+        fail();
+
     }
 }

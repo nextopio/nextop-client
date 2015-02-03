@@ -6,6 +6,11 @@
     <author email="support@nextop.io" href="http://nextop.io">
         nextop.io
     </author>
+    <!-- this requires the Cordova Plugin Test Framework
+    `cordova plugin add http://git-wip-us.apache.org/repos/asf/cordova-plugin-test-framework.git`
+    see https://github.com/apache/cordova-plugin-test-framework -->
     <content src="cdvtests/index.html" />
     <access origin="*" />
+
+    <preference name="NextopAccessKey" value="fe65db02417840db99f2536fe76b6d66b21eeadf2035813b147e7f1e350e49fd" />
 </widget>
