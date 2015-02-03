@@ -4,11 +4,11 @@
         id="io.nextop.cordova"
         version="0.1.0">
     <name>Nextop</name>
-    <description>Nextop Cordova Plugin</description>
+    <description>Nextop Mobile CDN</description>
     <license>Apache Sotware License 2.0</license>
-    <keywords>cordova,nextop,transfer</keywords>
-    <repo>https://github.com/nextopio/nextop-cordova.git</repo>
-    <issue>https://github.com/nextopio/nextop-cordova/issues</issue>
+    <keywords>cordova,nextop,transfer,cdn</keywords>
+    <repo>https://github.com/nextopio/nextop-client.git#:/cordova</repo>
+    <issue>https://github.com/nextopio/nextop-client/labels/cordova</issue>
 
     <js-module src="www/Nextop.js" name="Nextop">
         <!-- see notes in Nextop.js why the Nextop path cannot replace XMLHttpRequest completely.
@@ -33,10 +33,10 @@
 
         <source-file src="src/android/Nextop.java" target-dir="src/io/nextop/cordova" />
 
-        <!-- GENERATED WITH GRADLE copyLibs
-             copy the XML output from task below
-             TODO figure out a better way to have an aar dependency -->
-        <source-file src="libs/android/android-0.1.3-SNAPSHOT.jar" target-dir="libs" />
-        <source-file src="libs/android/java-common-0.1.3-SNAPSHOT-all.jar" target-dir="libs" />
+        <!-- (for development) GENERATED WITH GRADLE copyLibs
+             copy the XML output from task below -->
+        <!--<source-file src="libs/android/android-0.1.3-SNAPSHOT.jar" target-dir="libs" />-->
+        <!--<source-file src="libs/android/java-common-0.1.3-SNAPSHOT-all.jar" target-dir="libs" />-->
+        <framework src="libs/android/nextop.gradle" custom="true" type="gradleReference" />
     </platform>
 </plugin>
