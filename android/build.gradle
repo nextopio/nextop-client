@@ -33,16 +33,6 @@ android {
     }
 }
 
-//android {
-//    sourceSets {
-//        androidTest {
-//            java {
-//                srcDir 'src/androidTest/java'
-//            }
-//        }
-//    }
-//}
-
 
 dependencies {
     compile project(':java-common')
@@ -92,9 +82,10 @@ android.libraryVariants.all { variant ->
 // properties defined in $HOME/gradle.properties
 // @see http://central.sonatype.org/pages/gradle.html
 
-signing {
-    sign configurations.archives
-}
+// FIXME
+//signing {
+//    sign configurations.archives
+//}
 
 uploadArchives {
     repositories {
