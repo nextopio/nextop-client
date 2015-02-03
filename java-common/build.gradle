@@ -73,10 +73,9 @@ artifacts {
 // properties defined in $HOME/gradle.properties
 // @see http://central.sonatype.org/pages/gradle.html
 
-// FIXME
-//signing {
-//    sign configurations.archives
-//}
+signing {
+    sign configurations.archives
+}
 
 uploadArchives {
     repositories {

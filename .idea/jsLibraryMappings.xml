@@ -1,2 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project version="4" />
+<project version="4">
+  <component name="JavaScriptLibraryMappings">
+    <file url="file://$PROJECT_DIR$/backend-demo-flip" libraries="{backend-demo-flip node_modules}" />
+    <file url="file://$PROJECT_DIR$/backend-tests" libraries="{backend-tests node_modules}" />
+  </component>
+</project>

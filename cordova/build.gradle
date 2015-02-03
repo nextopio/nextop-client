@@ -3,20 +3,22 @@ apply plugin: 'java'
 def libJavaCommonXml = ''
 def libAndroidXml = ''
 
+def androidDevLibs = 'libs/android/dev';
+
 task copyLibAndroid(type: Copy, dependsOn: ':android:archiveReleaseJar') {
     def p = project(':android');
     def jarName = p.getName() + '-' + p.getVersion() + '.jar'
     from new File(p.getBuildDir(), 'libs/' + jarName)
-    into 'libs/android'
-    libAndroidXml = '<source-file src="libs/android/' + jarName + '" target-dir="libs" />'
+    into androidDevLibs
+    libAndroidXml = '<source-file src="' + androidDevLibs + '/' + jarName + '" target-dir="libs" />'
 }
 
 task copyLibJavaCommon(type: Copy, dependsOn: ':java-common:shadowJar') {
     def p = project(':java-common');
     def jarName = p.getName() + '-' + p.getVersion() + '-all.jar'
     from new File(p.getBuildDir(), 'libs/' + jarName)
-    into 'libs/android'
-    libJavaCommonXml = '<source-file src="libs/android/' + jarName + '" target-dir="libs" />'
+    into androidDevLibs
+    libJavaCommonXml = '<source-file src="' + androidDevLibs + '/' + jarName + '" target-dir="libs" />'
 }
 
 task copyLibs(dependsOn: [copyLibJavaCommon, copyLibAndroid]) << {
