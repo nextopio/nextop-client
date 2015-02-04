@@ -4,6 +4,11 @@ This plugin replaces `window.XMLHttpRequest` with an implementation backed
 by Nextop, the mobile CDN. Nextop mitigates network issues
 and speeds up all requests. Read more about Nextop at http://nextop.io.
 
+## Update (0.1.1)
+
+The Nextop path is disabled while we fix an issue.
+The next update will re-enable the Nextop path.
+
 ## Installation
 
 ```

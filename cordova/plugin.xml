@@ -2,7 +2,7 @@
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
         id="io.nextop.cordova"
-        version="0.1.0">
+        version="0.1.1">
     <name>Nextop</name>
     <description>Nextop Mobile CDN</description>
     <license>Apache Sotware License 2.0</license>
@@ -14,7 +14,8 @@
         <!-- see notes in Nextop.js why the Nextop path cannot replace XMLHttpRequest completely.
              the tl;dr is that a Cordova plugin cannot support synchronous calls
              (so async=false falls back to legacy XHR). -->
-        <clobbers target="XMLHttpRequest" />
+        <!-- FIXME bring back when bugs are fixed -->
+        <!--<clobbers target="XMLHttpRequest" />-->
         <clobbers target="Nextop" />
     </js-module>
 
