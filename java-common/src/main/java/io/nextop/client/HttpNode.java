@@ -3,10 +3,10 @@ package io.nextop.client;
 import io.nextop.Message;
 import io.nextop.Route;
 import io.nextop.client.retry.SendStrategy;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.impl.client.DefaultHttpClient;
+import io.nextop.org.apache.http.HttpResponse;
+import io.nextop.org.apache.http.client.HttpClient;
+import io.nextop.org.apache.http.client.methods.HttpUriRequest;
+import io.nextop.org.apache.http.impl.client.DefaultHttpClient;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;

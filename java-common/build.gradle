@@ -48,12 +48,11 @@ repositories {
 
 
 dependencies {
-    compile 'commons-codec:commons-codec:1.10'
     compile 'com.google.guava:guava:18.0'
     compile 'com.google.code.findbugs:jsr305:3.0.0'
     compile 'com.google.code.gson:gson:2.3.1'
     compile 'io.reactivex:rxjava:1.0.3'
-    compile 'org.apache.httpcomponents:httpclient:4.3.6'
+    compile 'commons-codec:commons-codec:1.10'
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.11'
 }
@@ -73,14 +72,6 @@ artifacts {
     archives shadowJar
     archives archiveSources
     archives archiveJavadoc
-}
-
-
-shadowJar {
-    dependencies {
-        include(dependency('org.apache.httpcomponents:httpclient:4.3.6'))
-    }
-    relocate 'org.apache', 'io.nextop.org.apache'
 }
 
 
