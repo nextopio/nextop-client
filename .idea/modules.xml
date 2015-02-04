@@ -13,6 +13,7 @@
       <module fileurl="file://$PROJECT_DIR$/cordova-test/cordova-test.iml" filepath="$PROJECT_DIR$/cordova-test/cordova-test.iml" />
       <module fileurl="file://$PROJECT_DIR$/java-common/java-common.iml" filepath="$PROJECT_DIR$/java-common/java-common.iml" />
       <module fileurl="file://$PROJECT_DIR$/nextop-client.iml" filepath="$PROJECT_DIR$/nextop-client.iml" />
+      <module fileurl="file://$PROJECT_DIR$/org-apache-http-jarjar/org-apache-http-jarjar.iml" filepath="$PROJECT_DIR$/org-apache-http-jarjar/org-apache-http-jarjar.iml" />
     </modules>
   </component>
 </project>

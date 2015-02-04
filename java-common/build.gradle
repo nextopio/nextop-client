@@ -1,16 +1,21 @@
 buildscript {
     repositories {
         jcenter()
+        maven {
+            url 'https://raw.github.com/vRallev/mvn-repo/master/'
+        }
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.0'
     }
 }
 
+
 apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'signing'
 apply plugin: 'com.github.johnrengelman.shadow'
+
 
 sourceCompatibility = JavaVersion.VERSION_1_6
 targetCompatibility = JavaVersion.VERSION_1_6
@@ -41,6 +46,7 @@ repositories {
     mavenCentral()
 }
 
+
 dependencies {
     compile 'commons-codec:commons-codec:1.10'
     compile 'com.google.guava:guava:18.0'
@@ -67,6 +73,14 @@ artifacts {
     archives shadowJar
     archives archiveSources
     archives archiveJavadoc
+}
+
+
+shadowJar {
+    dependencies {
+        include(dependency('org.apache.httpcomponents:httpclient:4.3.6'))
+    }
+    relocate 'org.apache', 'io.nextop.org.apache'
 }
 
 
