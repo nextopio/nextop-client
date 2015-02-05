@@ -26,4 +26,7 @@ repositories {
 
 dependencies {
     compile group: 'org.apache.httpcomponents', name: 'httpclient', version: project.version
+    // this is a transitive dependency of httpclient that is used elsewhere in the project
+    // package it into the jarjar to have control over the version used
+    compile 'commons-codec:commons-codec:1.10'
 }

@@ -13,7 +13,7 @@
             <option value="$PROJECT_DIR$/android-demo-globaleye" />
             <option value="$PROJECT_DIR$/cordova" />
             <option value="$PROJECT_DIR$/java-common" />
-            <option value="$PROJECT_DIR$/org.apache.http-jarjar" />
+            <option value="$PROJECT_DIR$/org.apache-jarjar" />
           </set>
         </option>
       </GradleProjectSettings>

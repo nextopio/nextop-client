@@ -8,7 +8,7 @@ import com.google.gson.JsonPrimitive;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
-import org.apache.commons.codec.binary.Base64OutputStream;
+import io.nextop.org.apache.commons.codec.binary.Base64OutputStream;
 
 import javax.annotation.Nullable;
 import java.io.*;

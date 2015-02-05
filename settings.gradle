@@ -6,5 +6,5 @@ include 'android'
 include 'android-demo-flip'
 
 include 'cordova'
-include 'org.apache.http-jarjar'
+include 'org.apache-jarjar'
 

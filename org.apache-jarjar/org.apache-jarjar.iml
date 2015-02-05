@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module external.linked.project.id=":org.apache.http-jarjar" external.linked.project.path="$MODULE_DIR$" external.root.project.path="$MODULE_DIR$/.." external.system.id="GRADLE" external.system.module.group="io.nextop" external.system.module.version="4.4" type="JAVA_MODULE" version="4">
+<module external.linked.project.id=":org.apache-jarjar" external.linked.project.path="$MODULE_DIR$" external.root.project.path="$MODULE_DIR$/.." external.system.id="GRADLE" external.system.module.group="io.nextop" external.system.module.version="4.4" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
-    <facet type="android-gradle" name="Android-Gradle">
-      <configuration>
-        <option name="GRADLE_PROJECT_PATH" value=":org.apache.http-jarjar" />
-      </configuration>
-    </facet>
     <facet type="java-gradle" name="Java-Gradle">
       <configuration>
         <option name="BUILD_FOLDER_PATH" />
+      </configuration>
+    </facet>
+    <facet type="android-gradle" name="Android-Gradle">
+      <configuration>
+        <option name="GRADLE_PROJECT_PATH" value=":org.apache-jarjar" />
       </configuration>
     </facet>
   </component>
@@ -27,8 +27,8 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" exported="" name="httpclient-4.4" level="project" />
+    <orderEntry type="library" exported="" name="commons-codec-1.10" level="project" />
     <orderEntry type="library" exported="" name="httpcore-4.4" level="project" />
     <orderEntry type="library" exported="" name="commons-logging-1.2" level="project" />
-    <orderEntry type="library" exported="" name="commons-codec-1.9" level="project" />
   </component>
 </module>
