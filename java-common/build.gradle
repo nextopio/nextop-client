@@ -1,9 +1,6 @@
 buildscript {
     repositories {
         jcenter()
-        maven {
-            url 'https://raw.github.com/vRallev/mvn-repo/master/'
-        }
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.0'
@@ -19,35 +16,53 @@ apply plugin: 'com.github.johnrengelman.shadow'
 
 sourceCompatibility = JavaVersion.VERSION_1_6
 targetCompatibility = JavaVersion.VERSION_1_6
+//
+//sourceSets {
+//    main {
+//        java {
+//            srcDir 'src/main/java'
+//        }
+//        resources {
+//            srcDir 'src/main/resources'
+//        }
+//    }
+//    test {
+//        java {
+//            srcDir 'src/test/java'
+//        }
+//        resources {
+//            srcDir 'src/test/resources'
+//        }
+//    }
+//}
+//
+//
 
-sourceSets {
-    main {
-        java {
-            srcDir 'src/main/java'
-        }
-        resources {
-            srcDir 'src/main/resources'
-        }
-    }
-    test {
-        java {
-            srcDir 'src/test/java'
-        }
-        resources {
-            srcDir 'src/test/resources'
-        }
-    }
+
+
+task copyLibOrgApache(type: Copy, dependsOn: ':org.apache-jarjar:jarjar') {
+    def p = project(':org.apache-jarjar');
+    def jarName = p.getName() + '.jar'
+    from new File(p.getBuildDir(), 'libs/' + jarName)
+    into 'libs'
 }
+
+task copyLibs(dependsOn: [copyLibOrgApache]) << {
+}
+
+
 
 repositories {
     maven {
-        url 'https://repository.apache.org'
+        url 'https://repository.apache.org/content/groups/public/'
     }
     mavenCentral()
 }
 
 
 dependencies {
+//    shadow project(":org.apache-jarjar")
+
     compile 'com.google.guava:guava:18.0'
     compile 'com.google.code.findbugs:jsr305:3.0.0'
     compile 'com.google.code.gson:gson:2.3.1'

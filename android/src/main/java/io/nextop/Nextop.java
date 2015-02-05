@@ -42,19 +42,23 @@ public class Nextop {
 
     public static Nextop create(Context context) {
         try {
-            Bundle metaData = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA).metaData;
+            @Nullable Bundle metaData = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA).metaData;
 
-            @Nullable String accessKey = metaData.getString(M_ACCESS_KEY);
+            if (null != metaData) {
+                @Nullable String accessKey = metaData.getString(M_ACCESS_KEY);
 
-            @Nullable String[] grantKeys = metaData.getStringArray(M_GRANT_KEYS);
-            if (null == grantKeys) {
-                @Nullable String oneGrantKey = metaData.getString(M_GRANT_KEYS);
-                if (null != oneGrantKey) {
-                    grantKeys = new String[]{oneGrantKey};
+                @Nullable String[] grantKeys = metaData.getStringArray(M_GRANT_KEYS);
+                if (null == grantKeys) {
+                    @Nullable String oneGrantKey = metaData.getString(M_GRANT_KEYS);
+                    if (null != oneGrantKey) {
+                        grantKeys = new String[]{oneGrantKey};
+                    }
                 }
-            }
 
-            return create(context, Auth.create(accessKey, grantKeys));
+                return create(context, Auth.create(accessKey, grantKeys));
+            } else {
+                return create(context, (Auth) null);
+            }
         } catch (IllegalArgumentException e) {
             // FIXME log this
             return create(context, (Auth) null);
@@ -87,6 +91,12 @@ public class Nextop {
         this.context = context;
         this.auth = auth;
 
+    }
+
+
+    @Nullable
+    public Auth getAuth() {
+        return auth;
     }
 
 
@@ -668,7 +678,7 @@ public class Nextop {
 
     /////// AUTH ///////
 
-    private static final class Auth {
+    public static final class Auth {
         @Nullable
         static Auth create(@Nullable String accessKey, @Nullable String[] grantKeys) {
             if (null != accessKey) {

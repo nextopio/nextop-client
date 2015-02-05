@@ -11,22 +11,25 @@ buildscript {
 apply plugin: 'java'
 apply plugin: 'com.github.johnrengelman.shadow'
 
-version = '4.4'
-
-shadowJar {
-    dependencies {
-        include(dependency('.*:.*:.*'))
-    }
-    relocate 'org.apache', 'io.nextop.org.apache'
-}
-
 repositories {
+    maven {
+        url 'https://repository.apache.org/content/groups/public/'
+    }
     mavenCentral()
 }
 
 dependencies {
-    compile group: 'org.apache.httpcomponents', name: 'httpclient', version: project.version
+    compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.3.6'
     // this is a transitive dependency of httpclient that is used elsewhere in the project
     // package it into the jarjar to have control over the version used
     compile 'commons-codec:commons-codec:1.10'
+}
+
+task jarjar(type:Exec, dependsOn: shadowJar) {
+    // jarjar the fat jar
+    def fatJar = new File(project.buildDir, 'libs/' + project.name + '-' + project.version + '-all.jar')
+    def jarjarJar = new File(project.buildDir, 'libs/' + project.name + '.jar')
+//    workingDir project.buildDir.getParentFile()
+    commandLine 'java', '-jar', 'jarjar/jarjar-1.4.jar', 'process', 'jarjar/rules.txt', fatJar, jarjarJar
+//    commandLine 'pwd'
 }

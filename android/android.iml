@@ -84,9 +84,9 @@
     </content>
     <orderEntry type="jdk" jdkName="Android API 21 Platform" jdkType="Android SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" exported="" name="org.apache-jarjar" level="project" />
     <orderEntry type="library" exported="" name="rxandroid-0.24.0" level="project" />
     <orderEntry type="library" exported="" name="gson-2.3.1" level="project" />
-    <orderEntry type="library" exported="" name="org.apache-jarjar-4.4-all" level="project" />
     <orderEntry type="library" exported="" name="rxjava-1.0.5" level="project" />
     <orderEntry type="library" exported="" name="immutableCollections-1.0.beta" level="project" />
     <orderEntry type="library" exported="" name="jsr305-3.0.0" level="project" />

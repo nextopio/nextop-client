@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="io.nextop.test">
+
+    <application>
+
+        <meta-data android:name="NextopAccessKey" android:value="fe65db02417840db99f2536fe76b6d66b21eeadf2035813b147e7f1e350e49fd" />
+
+    </application>
+</manifest>
