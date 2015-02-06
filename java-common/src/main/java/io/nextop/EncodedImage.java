@@ -17,6 +17,34 @@ public class EncodedImage {
         FRONT_FACING
     }
 
+    public static final int UNKNOWN_WIDTH = -1;
+    public static final int UNKNOWN_HEIGHT = -1;
+
+
+    public static EncodedImage webp(byte[] bytes) {
+        return webp(UNKNOWN_WIDTH, UNKNOWN_HEIGHT, bytes);
+    }
+    public static EncodedImage webp(int width, int height,
+                                    byte[] bytes) {
+        return create(Format.WEBP, Orientation.REAR_FACING, width, height, bytes, 0, bytes.length);
+    }
+
+    public static EncodedImage jpeg(byte[] bytes) {
+        return jpeg(UNKNOWN_WIDTH, UNKNOWN_HEIGHT, bytes);
+    }
+    public static EncodedImage jpeg(int width, int height,
+                                      byte[] bytes) {
+        return create(Format.JPEG, Orientation.REAR_FACING, width, height, bytes, 0, bytes.length);
+    }
+
+    public static EncodedImage png(byte[] bytes) {
+        return jpeg(UNKNOWN_WIDTH, UNKNOWN_HEIGHT, bytes);
+    }
+    public static EncodedImage png(int width, int height,
+                                    byte[] bytes) {
+        return create(Format.PNG, Orientation.REAR_FACING, width, height, bytes, 0, bytes.length);
+    }
+
 
     public static EncodedImage create(Format format, Orientation orientation, int width, int height,
                                       byte[] bytes, int offset, int length) {
@@ -44,5 +72,10 @@ public class EncodedImage {
         this.bytes = bytes;
         this.offset = offset;
         this.length = length;
+    }
+
+
+    protected ByteBuffer toBuffer() {
+        return ByteBuffer.wrap(bytes, offset, length);
     }
 }

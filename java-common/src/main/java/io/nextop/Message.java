@@ -12,6 +12,7 @@ import io.nextop.org.apache.http.HttpEntity;
 import io.nextop.org.apache.http.HttpRequest;
 import io.nextop.org.apache.http.HttpResponse;
 import io.nextop.org.apache.http.client.methods.*;
+import io.nextop.org.apache.http.client.utils.URIBuilder;
 import io.nextop.org.apache.http.entity.ByteArrayEntity;
 import io.nextop.org.apache.http.entity.StringEntity;
 import rx.functions.Func1;
@@ -33,7 +34,8 @@ import static io.nextop.Route.Target;
 public class Message {
     public static final WireValue P_CONTENT = WireValue.of("$content");
     public static final WireValue P_FRAGMENT = WireValue.of("$fragment");
-
+    public static final WireValue P_CODE = WireValue.of("$code");
+    public static final WireValue P_REASON = WireValue.of("$reason");
 
     public static final Id DEFAULT_GROUP_ID = Id.create(0L, 0L, 0L, 0L);
     public static final int DEFAULT_GROUP_PRIORITY = 0;
@@ -134,6 +136,17 @@ public class Message {
         return parameters.get(P_CONTENT);
     }
 
+    public int getCode() {
+        @Nullable WireValue codeValue = parameters.get(P_CODE);
+        return null != codeValue ? codeValue.asInt() : -1;
+    }
+
+    @Nullable
+    public String getReason() {
+        WireValue reasonValue = parameters.get(P_REASON);
+        return null != reasonValue ? reasonValue.asString() : null;
+    }
+
 
 
     public URI toUri() throws URISyntaxException {
@@ -167,6 +180,12 @@ public class Message {
         return b;
     }
 
+    public Message toSpec() {
+        return newBuilder()
+                .setRoute(route)
+                .build();
+    }
+
 
 //    public Message newId() {
 //        return toBuilder().build();
@@ -188,6 +207,17 @@ public class Message {
 
     public static Builder newBuilder(Id id) {
         return new Builder(id);
+    }
+
+
+
+    @Override
+    public String toString() {
+        try {
+            return String.format("%s", toUri());
+        } catch (URISyntaxException e) {
+            return String.format("<%s>", route);
+        }
     }
 
 
@@ -283,6 +313,14 @@ public class Message {
             return set(P_CONTENT, value);
         }
 
+        public Builder setCode(@Nullable Integer code) {
+            return set(P_CODE, code);
+        }
+
+        public Builder setReason(@Nullable String reason) {
+            return set(P_REASON, reason);
+        }
+
         public Builder set(Object name, @Nullable Object value) {
             if (null != value) {
                 parameters.put(WireValue.of(name), WireValue.of(value));
@@ -336,49 +374,23 @@ public class Message {
             }
         }
 
-        // FIXME 0.1.1 jarjar get this on android
-//        URIBuilder builder = new URIBuilder();
-//        builder.setScheme(message.route.via.scheme.toString());
-//        builder.setHost(message.route.via.authority.getHost());
-//        if (0 < message.route.via.authority.port) {
-//            builder.setPort(message.route.via.authority.port);
-//        }
-//        builder.setPath(fixedPath.toString());
-//
-//        for (Map.Entry<WireValue, WireValue> e : message.parameters.entrySet()) {
-//            WireValue key = e.getKey();
-//            WireValue value = e.getValue();
-//            if (!P_CONTENT.equals(key)) {
-//                builder.addParameter(key.toText(), value.toText());
-//            }
-//        }
-//
-//        return builder.build();
+        URIBuilder builder = new URIBuilder();
+        builder.setScheme(message.route.via.scheme.toString());
+        builder.setHost(message.route.via.authority.getHost());
+        if (0 < message.route.via.authority.port) {
+            builder.setPort(message.route.via.authority.port);
+        }
+        builder.setPath(fixedPath.toString());
 
-        StringBuilder sb = new StringBuilder(1024);
-        sb.append(message.route.via.scheme.toString().toLowerCase());
-        sb.append("://");
-        sb.append(message.route.via.authority);
-        sb.append(fixedPath);
-
-        int c = 0;
         for (Map.Entry<WireValue, WireValue> e : message.parameters.entrySet()) {
             WireValue key = e.getKey();
             WireValue value = e.getValue();
-
-            if (!P_CONTENT.equals(key) && !pathVariableNames.contains(key.toText())) {
-                ++c;
-                if (1 == c) {
-                    sb.append("?");
-                } else {
-                    sb.append("&");
-                }
-                sb.append(key.toText()).append("=").append(value.toText());
+            if (!P_CONTENT.equals(key)) {
+                builder.addParameter(key.toText(), value.toText());
             }
         }
 
-
-        return URI.create(sb.toString());
+        return builder.build();
 
     }
 
@@ -428,6 +440,9 @@ public class Message {
 
         Message.Builder builder = Message.newBuilder();
 
+        builder.setCode(response.getStatusLine().getStatusCode());
+        builder.setReason(response.getStatusLine().getReasonPhrase());
+
         attachHeaders(response, builder);
         attachContent(response, builder);
 
@@ -474,6 +489,12 @@ public class Message {
         if (null != content) {
             HttpEntity entity;
             MediaType contentType = getContentType(message, content);
+
+            // attach the content type header if missing
+            if (!request.containsHeader(HttpHeaders.CONTENT_TYPE)) {
+                request.setHeader(HttpHeaders.CONTENT_TYPE, contentType.toString());
+            }
+
             if (contentType.is(MediaType.JSON_UTF_8)) {
                 try {
                     entity = new StringEntity(content.toJson());

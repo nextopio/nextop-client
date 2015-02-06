@@ -99,12 +99,11 @@ public class HttpNode extends AbstractMessageControlNode {
 
     private void onReceive(Message message) {
         upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE, message));
-
+        upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_COMPLETE, message.toSpec()));
     }
 
     private void onReceiveError(Message message) {
         upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ERROR, message));
-
     }
 
 

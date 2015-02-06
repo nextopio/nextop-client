@@ -98,7 +98,6 @@ public abstract class WireValue {
                 | (0xFFL & bytes[offset + 7]);
     }
 
-    // FIXME use ByteBuffer here
     static WireValue valueOf(byte[] bytes) {
         int offset = 0;
         int h = 0xFF & bytes[offset];
@@ -1088,13 +1087,11 @@ public abstract class WireValue {
             case MAP: {
                 Map<WireValue, WireValue> map = value.asMap();
                 List<WireValue> keys = stableKeys(map);
-                List<WireValue> values = stableValues(map, keys);
+//                List<WireValue> values = stableValues(map, keys);
                 int c = 0;
-                for (WireValue v : keys) {
-                    c = 31 * c + _hashCode(v);
-                }
-                for (WireValue v : values) {
-                    c = 31 * c + _hashCode(v);
+                for (WireValue key : keys) {
+                    c = 31 * c + _hashCode(key);
+                    c = 31 * c + _hashCode(map.get(key));
                 }
                 return c;
              }
@@ -1173,11 +1170,13 @@ public abstract class WireValue {
             case LIST:
                 return toJson();
             case MESSAGE:
-                return toJson();
+                // TODO
+                return "[message]";
             case IMAGE:
-                return toJson();
+                return base64(asImage().toBuffer());
             case NULL:
-                return "null";
+                // TODO
+                return "";
             default:
                 throw new IllegalArgumentException();
         }
@@ -1231,9 +1230,10 @@ public abstract class WireValue {
                 break;
             case MAP:
                 w.beginObject();
-                for (Map.Entry<WireValue, WireValue> e : value.asMap().entrySet()) {
-                    w.name(e.getKey().toText());
-                    toJson(e.getValue(), w);
+                Map<WireValue, WireValue> map = value.asMap();
+                for (WireValue key : stableKeys(map)) {
+                    w.name(key.toText());
+                    toJson(map.get(key), w);
                 }
                 w.endObject();
                 break;
@@ -1246,6 +1246,7 @@ public abstract class WireValue {
                 break;
             case MESSAGE:
                 // FIXME 0.1.1 write as object
+                // TODO base64(asImage().toBuffer());
                 w.value("[message]");
                 break;
             case IMAGE:
@@ -1791,7 +1792,7 @@ public abstract class WireValue {
 
     static List<WireValue> stableKeys(Map<WireValue, WireValue> m) {
         List<WireValue> keys = new ArrayList<WireValue>(m.keySet());
-        Collections.sort(keys, stableComparator);
+        Collections.sort(keys, COMPARATOR_STABLE);
         return keys;
     }
 
@@ -1804,7 +1805,7 @@ public abstract class WireValue {
     }
 
 
-    static final Comparator<WireValue> stableComparator = new StableComparator();
+    static final Comparator<WireValue> COMPARATOR_STABLE = new StableComparator();
 
     // stable ordering for all values
     static final class StableComparator implements Comparator<WireValue> {

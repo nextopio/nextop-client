@@ -12,6 +12,7 @@ import rx.subscriptions.BooleanSubscription;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class SubjectNode extends AbstractMessageControlNode {
@@ -156,10 +157,24 @@ public class SubjectNode extends AbstractMessageControlNode {
                         // else the downstream will resend on subscribe
                         break;
                     }
+                    case RECEIVE_COMPLETE: {
+                        @Nullable Subscriber firstSubscriber = Iterables.getFirst(receivers.get(mc.message.route), null);
+                        if (null != firstSubscriber) {
+                            try {
+                                firstSubscriber.onCompleted();
+                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ACK,
+                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
+                            } catch (Throwable t) {
+                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_NACK,
+                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
+                                // FIXME log
+                            }
+                        }
+                        // else the downstream will resend on subscribe
+                        break;
+                    }
                     case RECEIVE_ERROR: {
-                        @Nullable Subscriber firstSubscriber = Iterables.getFirst(
-                                Iterables.concat(receivers.get(mc.message.route), defaultReceivers),
-                                null);
+                        @Nullable Subscriber firstSubscriber = Iterables.getFirst(receivers.get(mc.message.route), null);
                         if (null != firstSubscriber) {
                             try {
                                 firstSubscriber.onError(new ReceiveException(mc.message));
