@@ -11,14 +11,18 @@ import io.nextop.org.apache.http.Header;
 import io.nextop.org.apache.http.HttpEntity;
 import io.nextop.org.apache.http.HttpRequest;
 import io.nextop.org.apache.http.HttpResponse;
+import io.nextop.org.apache.http.client.NonRepeatableRequestException;
 import io.nextop.org.apache.http.client.methods.*;
 import io.nextop.org.apache.http.client.utils.URIBuilder;
 import io.nextop.org.apache.http.entity.ByteArrayEntity;
 import io.nextop.org.apache.http.entity.StringEntity;
+import io.nextop.util.NoCopyByteArrayOutputStream;
 import rx.functions.Func1;
+import sun.nio.ch.IOUtil;
 
 import javax.annotation.Nullable;
 import java.io.*;
+import java.lang.annotation.Repeatable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.net.URI;
@@ -618,11 +622,23 @@ public class Message {
         } else {
             contentType = MediaType.APPLICATION_BINARY;
         }
+
         if (contentType.is(MediaType.JSON_UTF_8)) {
+            RepetableEntity re = RepetableEntity.create(entity);
             try {
-                value = WireValue.valueOfJson(new InputStreamReader(entity.getContent(), Charsets.UTF_8));
+                value = WireValue.valueOfJson(new InputStreamReader(re.entity.getContent(), Charsets.UTF_8));
             } catch (IOException e) {
-                throw new IllegalArgumentException(e);
+                // return as text
+                try {
+                    Reader r = new InputStreamReader(re.entity.getContent(), Charsets.UTF_8);
+                    try {
+                        return WireValue.of(CharStreams.toString(r));
+                    } finally {
+                        r.close();
+                    }
+                } catch (IOException e2) {
+                    throw new IllegalArgumentException(e2);
+                }
             }
         } else if (contentType.is(MediaType.ANY_TEXT_TYPE)) {
             try {
@@ -637,20 +653,94 @@ public class Message {
             }
         } else {
             // receive as binary
-            try {
-                InputStream is = entity.getContent();
-                try {
-                    value = WireValue.of(ByteStreams.toByteArray(is));
-                } finally {
-                    is.close();
-                }
-            } catch (IOException e) {
-                throw new IllegalArgumentException(e);
-            }
+            RepetableEntity re = RepetableEntity.create(entity);
+            re.setBytes();
+
+            return WireValue.of(re.bytes, re.offset, re.length);
         }
         return value;
     }
 
+
+    static final class RepetableEntity {
+        static RepetableEntity create(HttpEntity entity) {
+
+            // create a repeatable entity
+            // this is needed because the type will fall back if parsing fails
+            HttpEntity repeatableEntity;
+            @Nullable byte[] bytes = null;
+            int offset = 0;
+            int length = 0;
+            if (entity.isRepeatable()) {
+                repeatableEntity = entity;
+            } else {
+                int contentLength = (int) entity.getContentLength();
+                if (contentLength < 0) {
+                    contentLength = 1024;
+                }
+                NoCopyByteArrayOutputStream out = new NoCopyByteArrayOutputStream(contentLength);
+                try {
+                    try {
+                        InputStream is = entity.getContent();
+                        try {
+                            ByteStreams.copy(is, out);
+                        } finally {
+                            is.close();
+                        }
+                    } finally {
+                        out.close();
+                    }
+                } catch (IOException e) {
+                    throw new IllegalArgumentException(e);
+                }
+                bytes = out.getBytes();
+                offset = out.getOffset();
+                length = out.getLength();
+                repeatableEntity = new ByteArrayEntity(bytes, offset, length);
+            }
+
+            if (!repeatableEntity.isRepeatable()) {
+                throw new IllegalStateException();
+            }
+
+            return new RepetableEntity(repeatableEntity, bytes, offset, length);
+        }
+
+
+        final HttpEntity entity;
+        @Nullable byte[] bytes;
+        int offset;
+        int length;
+
+
+        RepetableEntity(HttpEntity entity, @Nullable byte[] bytes, int offset, int length) {
+            this.entity = entity;
+            this.bytes = bytes;
+            this.offset = offset;
+            this.length = length;
+        }
+
+
+        void setBytes() {
+            if (null == bytes) {
+                // TODO this could be improved by extracting the buffer from the repeatable entity
+
+                try {
+                    InputStream is = entity.getContent();
+                    try {
+                        bytes = ByteStreams.toByteArray(is);
+                        offset = 0;
+                        length = bytes.length;
+                    } finally {
+                        is.close();
+                    }
+                } catch (IOException e) {
+                    throw new IllegalArgumentException(e);
+                }
+            }
+        }
+
+    }
 
 
 

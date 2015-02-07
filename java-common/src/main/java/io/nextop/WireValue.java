@@ -73,7 +73,7 @@ public abstract class WireValue {
 
 
     // FIXME parse
-//    public static WireValue valueOf(byte[] bytes, int offset, int n) {
+//    public static WireValue of(byte[] bytes, int offset, int n) {
 //
 //        // expect compressed format here
 //
@@ -98,8 +98,19 @@ public abstract class WireValue {
                 | (0xFFL & bytes[offset + 7]);
     }
 
+
+    static WireValue valueOf(ByteBuffer bb) {
+        int n = bb.remaining();
+        byte[] bytes = new byte[n];
+        bb.get(bytes, 0, n);
+        return valueOf(bytes, 0);
+    }
+
     static WireValue valueOf(byte[] bytes) {
-        int offset = 0;
+        return valueOf(bytes, 0);
+    }
+
+    static WireValue valueOf(byte[] bytes, int offset) {
         int h = 0xFF & bytes[offset];
         if ((h & H_COMPRESSED) == H_COMPRESSED) {
             int nb = h & ~H_COMPRESSED;
@@ -808,7 +819,7 @@ public abstract class WireValue {
 
 
 
-    public static WireValue valueOf(JsonElement e) {
+    public static WireValue of(JsonElement e) {
         if (e.isJsonPrimitive()) {
             JsonPrimitive p = e.getAsJsonPrimitive();
             if (p.isBoolean()) {
@@ -838,14 +849,14 @@ public abstract class WireValue {
             JsonObject object = e.getAsJsonObject();
             Map<WireValue, WireValue> m = new HashMap<WireValue, WireValue>(4);
             for (Map.Entry<String, JsonElement> oe : object.entrySet()) {
-                m.put(of(oe.getKey()), valueOf(oe.getValue()));
+                m.put(of(oe.getKey()), of(oe.getValue()));
             }
             return of(m);
         } else if (e.isJsonArray()) {
             JsonArray array = e.getAsJsonArray();
             List<WireValue> list = new ArrayList<WireValue>(4);
             for (JsonElement ae : array) {
-                list.add(valueOf(ae));
+                list.add(of(ae));
             }
             return of(list);
         } else {
@@ -976,6 +987,9 @@ public abstract class WireValue {
         if (value instanceof EncodedImage) {
             return of((EncodedImage) value);
         }
+        if (value instanceof JsonElement) {
+            return of((JsonElement) value);
+        }
         // FIXME ID
         if (value instanceof Id) {
             return of(value.toString());
@@ -984,8 +998,12 @@ public abstract class WireValue {
     }
 
     static WireValue of(byte[] value) {
-        return new BlobWireValue(value);
+        return of(value, 0, value.length);
     }
+    static WireValue of(byte[] value, int offset, int length) {
+        return new BlobWireValue(value, offset, length);
+    }
+
     // FIXME of(ByteBuffer)
 
     static WireValue of(String value) {
@@ -1086,12 +1104,13 @@ public abstract class WireValue {
                 return value.asBoolean() ? 1231 : 1237;
             case MAP: {
                 Map<WireValue, WireValue> map = value.asMap();
-                List<WireValue> keys = stableKeys(map);
+//                List<WireValue> keys = stableKeys(map);
 //                List<WireValue> values = stableValues(map, keys);
+                // important: order should not affect hash code
                 int c = 0;
-                for (WireValue key : keys) {
-                    c = 31 * c + _hashCode(key);
-                    c = 31 * c + _hashCode(map.get(key));
+                for (Map.Entry<WireValue, WireValue> e : map.entrySet()) {
+                    c += _hashCode(e.getKey());
+                    c += _hashCode(e.getValue());
                 }
                 return c;
              }
@@ -1144,8 +1163,13 @@ public abstract class WireValue {
     }
 
 
+    @Override
     public String toString() {
         return toText();
+    }
+
+    public String toDebugString() {
+        return String.format("%s %s", type, toString());
     }
 
 
@@ -1929,15 +1953,19 @@ public abstract class WireValue {
 
     private static class BlobWireValue extends WireValue {
         final byte[] value;
+        final int offset;
+        final int length;
 
-        BlobWireValue(byte[] value) {
+        BlobWireValue(byte[] value, int offset, int length) {
             super(Type.BLOB);
             this.value = value;
+            this.offset = offset;
+            this.length = length;
         }
 
         @Override
         public String asString() {
-            return base64(ByteBuffer.wrap(value));
+            return base64(ByteBuffer.wrap(value, offset, length));
         }
         @Override
         public int asInt() {
@@ -1969,7 +1997,7 @@ public abstract class WireValue {
         }
         @Override
         public ByteBuffer asBlob() {
-            return ByteBuffer.wrap(value);
+            return ByteBuffer.wrap(value, offset, length);
         }
         @Override
         public Message asMessage() {

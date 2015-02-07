@@ -5,8 +5,6 @@
       <module fileurl="file://$PROJECT_DIR$/android/android.iml" filepath="$PROJECT_DIR$/android/android.iml" />
       <module fileurl="file://$PROJECT_DIR$/android-demo-flip/android-demo-flip.iml" filepath="$PROJECT_DIR$/android-demo-flip/android-demo-flip.iml" />
       <module fileurl="file://$PROJECT_DIR$/android-demo-globaleye/android-demo-globaleye.iml" filepath="$PROJECT_DIR$/android-demo-globaleye/android-demo-globaleye.iml" />
-      <module fileurl="file://$PROJECT_DIR$/android-test/android-test.iml" filepath="$PROJECT_DIR$/android-test/android-test.iml" />
-      <module fileurl="file://$PROJECT_DIR$/android-test/android-test.iml" filepath="$PROJECT_DIR$/android-test/android-test.iml" />
       <module fileurl="file://$PROJECT_DIR$/backend-demo-flip/backend-demo-flip.iml" filepath="$PROJECT_DIR$/backend-demo-flip/backend-demo-flip.iml" />
       <module fileurl="file://$PROJECT_DIR$/backend-tests/backend-tests.iml" filepath="$PROJECT_DIR$/backend-tests/backend-tests.iml" />
       <module fileurl="file://$PROJECT_DIR$/cordova/cordova.iml" filepath="$PROJECT_DIR$/cordova/cordova.iml" />
@@ -14,7 +12,6 @@
       <module fileurl="file://$PROJECT_DIR$/java-common/java-common.iml" filepath="$PROJECT_DIR$/java-common/java-common.iml" />
       <module fileurl="file://$PROJECT_DIR$/nextop-client.iml" filepath="$PROJECT_DIR$/nextop-client.iml" />
       <module fileurl="file://$PROJECT_DIR$/org.apache-jarjar/org.apache-jarjar.iml" filepath="$PROJECT_DIR$/org.apache-jarjar/org.apache-jarjar.iml" />
-      <module fileurl="file://$PROJECT_DIR$/org.apache.http-jarjar/org.apache.http-jarjar.iml" filepath="$PROJECT_DIR$/org.apache.http-jarjar/org.apache.http-jarjar.iml" />
     </modules>
   </component>
 </project>

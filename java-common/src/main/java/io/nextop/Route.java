@@ -29,11 +29,13 @@ public final class Route {
         int k = s.indexOf('/', j + d.length());
 
         Method method = Method.valueOf(s.substring(0, i).toUpperCase());
-        Via via = Via.valueOf(s.substring(i + 1, k));
+        Via via;
         Path path;
         if (k < 0) {
+            via = Via.valueOf(s.substring(i + 1, n));
             path = Path.empty();
         } else {
+            via = Via.valueOf(s.substring(i + 1, k));
             path = Path.valueOf(s.substring(k + 1, n));
         }
         return new Route(new Target(method, path), via);

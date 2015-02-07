@@ -10,6 +10,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import io.nextop.*;
+import io.nextop.client.SubjectNode;
 import io.nextop.util.HexBytes;
 
 import java.io.IOException;
@@ -66,7 +67,7 @@ public class NextopTest extends InstrumentationTestCase {
         };
 
 
-        Route.Via via = Route.Via.valueOf("http://tests.nextop.io");
+        Route.Via via = Route.Via.valueOf("http://tests2.nextop.io");
         for (int i = 0; i < n; ++i) {
             // methods
             Route.Method method = methods[r.nextInt(methods.length)];
@@ -84,7 +85,8 @@ public class NextopTest extends InstrumentationTestCase {
                 Map<WireValue, WireValue> response = new HashMap<WireValue, WireValue>(4);
                 response.put(WireValue.of("code"), WireValue.of(responseCode));
                 response.put(WireValue.of("headers"), WireValue.of(responseHeaders));
-                response.put(WireValue.of("body"), responseBody);
+                // send the response body as a string TODO
+                response.put(WireValue.of("body"), WireValue.of(responseBody.toString()));
 
 
                 content.put(WireValue.of("response"), WireValue.of(response));
@@ -98,22 +100,24 @@ public class NextopTest extends InstrumentationTestCase {
 
             Log.i("NextopTest", String.format("Send %s", request));
 
-            Message response = nextop.send(request)
-//                    .timeout(timeoutMs, TimeUnit.MILLISECONDS)
-                    .toBlocking().single();
+            Message response;
+                response = nextop.send(request)
+                .timeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .toBlocking().single();
 
             MediaType actualResponseType = MediaType.parse(response.headers.get(WireValue.of(HttpHeaders.CONTENT_TYPE)).asString());
 
             assertEquals(responseCode, response.getCode());
-            assertTrue(String.format("%s %s", responseType, actualResponseType), actualResponseType.is(responseType));
+            assertTrue(String.format("%s <> %s", responseType, actualResponseType), actualResponseType.is(responseType));
             // test that the response parsing worked correctly
-            assertEquals(responseBody, response.getContent());
+            assertEquals(String.format("%s <> %s", responseBody.toDebugString(), response.getContent().toDebugString()),
+                    responseBody, response.getContent());
         }
     }
 
     private WireValue createRandomResponseBody(Random r, MediaType responseType) {
         if (responseType.is(MediaType.JSON_UTF_8)) {
-            return WireValue.of(randomJson(r, 4).toString());
+            return WireValue.of(randomJson(r, 2));
         }
         if (responseType.is(MediaType.APPLICATION_BINARY)) {
             return WireValue.of(randomBytes(r, 128));
@@ -153,8 +157,23 @@ public class NextopTest extends InstrumentationTestCase {
 
     /** from WireValueTest */
     private static JsonElement randomJson(Random r, int d) {
+        return randomJson(r, d, 0);
+    }
+    private static JsonElement randomJson(Random r, int d, int u) {
         // list, map, long, double, string, bool
-        switch (r.nextInt(0 < d ? 14 : 4)) {
+        int min, max;
+        if (0 == u) {
+            min = 4;
+            max = 13;
+        } else if (0 < d) {
+            min = 0;
+            max = 14;
+        } else {
+            min = 0;
+            max = 4;
+        }
+
+        switch (min + r.nextInt(max - min)) {
             case 0: {
                 int m = r.nextInt(16);
                 byte[] bytes = new byte[m];
@@ -175,7 +194,7 @@ public class NextopTest extends InstrumentationTestCase {
                 int n = r.nextInt(16);
                 JsonArray array = new JsonArray();
                 for (int i = 0; i < n; ++i) {
-                    array.add(randomJson(r, d - 1));
+                    array.add(randomJson(r, d - 1, u + 1));
                 }
                 return array;
             }
@@ -191,7 +210,7 @@ public class NextopTest extends InstrumentationTestCase {
                     byte[] keyBytes = new byte[m];
                     r.nextBytes(keyBytes);
                     String key = HexBytes.toString(keyBytes);
-                    object.add(key, randomJson(r, d - 1));
+                    object.add(key, randomJson(r, d - 1, u + 1));
                 }
                 return object;
             }
