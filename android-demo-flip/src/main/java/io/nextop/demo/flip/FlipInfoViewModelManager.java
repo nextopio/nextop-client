@@ -4,7 +4,6 @@ import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Nextop;
 import io.nextop.WireValue;
-import io.nextop.rx.RxManager;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
 import rx.functions.Action1;
@@ -85,7 +84,7 @@ public class FlipInfoViewModelManager extends ThinViewModelManager<FlipInfoViewM
                     @Override
                     public void call(Message message) {
                         add(flipInfoVm.id, message);
-                        complete(flipInfoVm.id);
+                        setSyncd(flipInfoVm.id);
                     }
                 }).doOnCompleted(new Action0() {
                     @Override

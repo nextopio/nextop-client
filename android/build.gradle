@@ -47,7 +47,7 @@ dependencies {
 
 //    compile fileTree(dir: 'libs', include: ['*.jar'])
 
-//    androidTestCompile 'junit:junit:4.12'
+    androidTestCompile 'junit:junit:3.8.2'
     /* (source of warnings) this has a transitive dependency on
     org.apache.httpcomponents:httpclient:4.0.3
     commons-logging:commons-logging:1.1.1 */

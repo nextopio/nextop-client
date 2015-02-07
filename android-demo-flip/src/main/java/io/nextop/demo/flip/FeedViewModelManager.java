@@ -1,7 +1,6 @@
 package io.nextop.demo.flip;
 
 import io.nextop.*;
-import io.nextop.rx.RxManager;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
 import rx.functions.Action1;
@@ -90,7 +89,7 @@ public class FeedViewModelManager extends ThinViewModelManager<FeedViewModel> {
 
     @Override
     protected void startUpdates(final FeedViewModel feedVm, final RxState state) {
-        // 1. sync the state. on sync, mark it as complete
+        // 1. sync the state. on sync, mark it as syncd
         // 2. poll for incremental updates. incremental updates take the previous known update id (given from the state sync),
         //    and return a list of changes (id) that should be moved or added to the top
         // 3. changes update vm
@@ -105,7 +104,7 @@ public class FeedViewModelManager extends ThinViewModelManager<FeedViewModel> {
                     public void call(Message message) {
 
                         add(feedVm.id, message);
-                        complete(feedVm.id);
+                        setSyncd(feedVm.id);
                     }
                 }).doOnCompleted(new Action0() {
                     @Override

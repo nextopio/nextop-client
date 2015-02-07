@@ -47,7 +47,7 @@ public interface RxLifecycleBinder extends Subscription {
         }
 
 
-        public void start() {
+        public void connect() {
             if (closed) {
                 throw new IllegalStateException();
             }
@@ -58,7 +58,7 @@ public interface RxLifecycleBinder extends Subscription {
                 }
             }
         }
-        public void stop() {
+        public void disconnect() {
             if (closed) {
                 throw new IllegalStateException();
             }

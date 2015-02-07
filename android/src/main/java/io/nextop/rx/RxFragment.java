@@ -43,13 +43,13 @@ public class RxFragment extends Fragment implements RxLifecycleBinder {
     @Override
     public void onResume() {
         super.onResume();
-        liftedRxLifecycleBinder.start();
+        liftedRxLifecycleBinder.connect();
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        liftedRxLifecycleBinder.stop();
+        liftedRxLifecycleBinder.disconnect();
     }
 
     @Override
