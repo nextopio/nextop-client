@@ -67,7 +67,7 @@ public class NextopTest extends InstrumentationTestCase {
         };
 
 
-        Route.Via via = Route.Via.valueOf("http://tests2.nextop.io");
+        Route.Via via = Route.Via.valueOf("http://tests.nextop.io");
         for (int i = 0; i < n; ++i) {
             // methods
             Route.Method method = methods[r.nextInt(methods.length)];

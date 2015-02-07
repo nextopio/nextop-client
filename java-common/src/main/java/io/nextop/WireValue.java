@@ -1,6 +1,7 @@
 package io.nextop;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.ForwardingMap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -349,7 +350,7 @@ public abstract class WireValue {
         }
         @Override
         public Map<WireValue, WireValue> asMap() {
-            return new AbstractMap<WireValue, WireValue>() {
+            Map<WireValue, WireValue> map = new AbstractMap<WireValue, WireValue>() {
                 int ds = offset + 5;
                 List<WireValue> keys = valueOf(bytes, ds, cs).asList();
                 List<WireValue> values = valueOf(bytes, ds + byteSize(bytes, ds, cs), cs).asList();
@@ -387,6 +388,7 @@ public abstract class WireValue {
                     };
                 }
             };
+            return duckMap(map);
         }
         @Override
         public ByteBuffer asBlob() {
@@ -2253,7 +2255,7 @@ public abstract class WireValue {
 
         MapWireValue(Map<WireValue, WireValue> value) {
             super(Type.MAP);
-            this.value = value;
+            this.value = duckMap(value);
         }
 
         @Override
@@ -2585,5 +2587,51 @@ public abstract class WireValue {
 
     }
 
+
+    // FIXME config
+    private static final boolean WV_MAP_STRICT_TYPES = false;
+
+    /** coerces arguments to {@link WireValue} where the {@link Map} interfaces
+     * uses an object type (which won't trigger compile errors).
+     * While not good practice to not use {@link WireValue} arguments,
+     * the intention is clearly to use them and the program should work. */
+    private static Map<WireValue, WireValue> duckMap(final Map<WireValue, WireValue> map) {
+        return new ForwardingMap<WireValue, WireValue>() {
+            @Override
+            protected Map<WireValue, WireValue> delegate() {
+                return map;
+            }
+
+
+            private WireValue coerce(@Nullable Object arg) {
+                WireValue value = WireValue.of(arg);
+                if (value != arg && WV_MAP_STRICT_TYPES) {
+                    throw new IllegalArgumentException();
+                }
+                return value;
+            }
+
+
+            @Override
+            public WireValue get(@Nullable Object key) {
+                return super.get(coerce(key));
+            }
+
+            @Override
+            public WireValue remove(Object object) {
+                return super.remove(coerce(object));
+            }
+
+            @Override
+            public boolean containsKey(@Nullable Object key) {
+                return super.containsKey(coerce(key));
+            }
+
+            @Override
+            public boolean containsValue(@Nullable Object value) {
+                return super.containsValue(coerce(value));
+            }
+        };
+    }
 
 }

@@ -324,13 +324,16 @@ public abstract class RxManager<M extends RxManaged> {
         boolean cached = false;
 
 
-        final RxLifecycleBinder binder = new RxLifecycleBinder.Lifted();
+        final RxLifecycleBinder.Lifted binder = new RxLifecycleBinder.Lifted();
 
 
 
         public ManagedState(M m) {
             this.m = m;
             id = m.id;
+
+            // always connected
+            binder.connect();
         }
 
 
@@ -375,12 +378,12 @@ public abstract class RxManager<M extends RxManaged> {
         /////// RxState ///////
 
         @Override
-        public <T> Observable<T> add(Observable<T> source) {
+        public <T> Observable<T> bind(Observable<T> source) {
             return binder.bind(source);
         }
 
         @Override
-        public void add(Subscription s) {
+        public void bind(Subscription s) {
             binder.bind(s);
         }
 
@@ -396,8 +399,8 @@ public abstract class RxManager<M extends RxManaged> {
 
 
     public static interface RxState {
-        <T> Observable<T> add(Observable<T> source);
-        void add(Subscription s);
+        <T> Observable<T> bind(Observable<T> source);
+        void bind(Subscription s);
 
         /** call this when the state in memory has caught up with some version of the truth */
         void sync();

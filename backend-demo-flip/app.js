@@ -180,12 +180,13 @@ app.put('/flip/:flipId', function (req, res) {
         [feedId, flipId],
         function(err, result) {
             if (err) throw err;
+
+
+            bumpFeed(feedId, flipId);
+
+            res.status(200);
+            res.end();
         });
-
-    bumpFeed(feedId, flipId);
-
-    res.status(200);
-    res.end();
 });
 
 app.post('/flip/:flipId/info', function (req, res) {
@@ -197,13 +198,18 @@ app.post('/flip/:flipId/info', function (req, res) {
             [flipId, intro, intro],
             function(err, result) {
                 if (err) throw err;
+
+
+                bumpFlipInfo(flipId);
+
+                res.status(200);
+                res.end();
             });
 
-        bumpFlipInfo(flipId);
+    } else {
+        res.status(200);
+        res.end();
     }
-
-    res.status(200);
-    res.end();
 });
 
 // ?creation_time=  set creation time
@@ -214,19 +220,28 @@ app.put('/flip/:flipId/frame/:frameId', function (req, res) {
 
     var creationTime = req.query.creation_time || 0;
 
+    var imageUrl = 'http://flip.nextop.io/flip/' + flipId + '/frame/' + frameId;
+
+
+    // save the data
     // FIXME error handling here
-    req.pipe(fs.createWriteStream('./tmp/' + flipId + '_' + frameId + '.jpeg'));
-    var imageUrl = 'http://demo-flip.nextop.io/flip/' + flipId + '/frame/' + frameId;
+    //req.pipe(fs.createWriteStream('./tmp/' + flipId + '_' + frameId + '.jpeg'));
+
 
     // update creation_time, image_url in DB
-    mysqlClient.query('INSERT INTO FlipFrame VALUES (flip_id, frame_id, creation_time, image_url) VALUES (?, ?, ?, ?)' +
+    mysqlClient.query('INSERT INTO FlipFrame (flip_id, frame_id, creation_time, image_url) VALUES (?, ?, ?, ?)' +
         ' ON DUPLICATE KEY UPDATE creation_time = ?, image_url = ?',
+        [flipId, frameId, creationTime, imageUrl, creationTime, imageUrl],
         function (err, result) {
             if (err) throw err;
+
+            bumpFlipFrame(flipId, frameId);
 
             res.status(200);
             res.end();
         });
+
+
 
 });
 

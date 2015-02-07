@@ -11,6 +11,7 @@ import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func2;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -48,17 +49,19 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
 
 
     private void add(Id flipId, final Message results) {
-        update(flipId, new Func2<FlipViewModel, RxState, FlipViewModel>() {
-            @Override
-            public FlipViewModel call(FlipViewModel flipVm, RxState rxState) {
-                for (WireValue value : results.getContent().asList()) {
+        final List<WireValue> values = results.getContent().asList();
+        if (!values.isEmpty()) {
+            update(flipId, new Func2<FlipViewModel, RxState, FlipViewModel>() {
+                @Override
+                public FlipViewModel call(FlipViewModel flipVm, RxState rxState) {
+                for (WireValue value : values) {
                     Map<WireValue, WireValue> m = value.asMap();
 
                     // FIXME asId
-                    Id frameId = Id.valueOf(m.get("frame_id").asString());
-                    long creationTime = m.get("creation_time").asLong();
-                    String imageUrl = m.get("image_url").asString();
-                    long updateIndex = m.get("most_recent_update_index").asLong();
+                    Id frameId = Id.valueOf(m.get(WireValue.of("frame_id")).asString());
+                    long creationTime = m.get(WireValue.of("creation_time")).asLong();
+                    String imageUrl = m.get(WireValue.of("image_url")).asString();
+                    long updateIndex = m.get(WireValue.of("most_recent_update_index")).asLong();
 
                     FrameViewModel frameVm = new FrameViewModel(frameId);
                     frameVm.creationTime = creationTime;
@@ -68,9 +71,9 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
                     flipVm.add(new FlipViewModel.FrameState(frameVm, updateIndex));
                 }
                 return flipVm;
-            }
-        });
-
+                    }
+            });
+        }
     }
 
     
@@ -86,12 +89,12 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
                 .setRoute("GET http://" + Flip.REMOTE + "/flip/$flip-id/frame")
                 .set("flip-id", flipVm.id)
                 .build();
-        state.add(nextop.send(sync)
+        state.bind(nextop.send(sync))
                 .doOnNext(new Action1<Message>() {
                     @Override
                     public void call(Message message) {
                         add(flipVm.id, message);
-                        setSyncd(flipVm.id);
+                        state.sync();
                     }
                 }).doOnCompleted(new Action0() {
                     @Override
@@ -105,21 +108,21 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
                                         .set("flip-id", flipVm.id)
                                         .set("after", flipVm.getMaxUpdateIndex())
                                         .build();
-                                state.add(nextop.send(poll)
+                                state.bind(nextop.send(poll))
                                         .doOnNext(new Action1<Message>() {
                                             @Override
                                             public void call(final Message message) {
-                                            add(flipVm.id, message);
+                                                add(flipVm.id, message);
                                             }
-                                        })).subscribe();
+                                        }).subscribe();
                             }
                         };
 
-                        state.add(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(poller,
+                        state.bind(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(poller,
                                 pollTimeoutMs, pollTimeoutMs, TimeUnit.MILLISECONDS));
 
                     }
-                })).subscribe();
+                }).subscribe();
     }
 
     @Override

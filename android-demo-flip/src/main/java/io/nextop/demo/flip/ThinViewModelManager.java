@@ -7,7 +7,7 @@ import io.nextop.rx.RxManager;
 public abstract class ThinViewModelManager<M extends RxManaged> extends RxManager<M> {
 
     final Nextop nextop;
-    final int pollTimeoutMs = 1000;
+    final int pollTimeoutMs = 15000;
 
     ThinViewModelManager(Nextop nextop) {
         this.nextop = nextop;

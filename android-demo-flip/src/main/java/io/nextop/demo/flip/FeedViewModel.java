@@ -93,7 +93,13 @@ public class FeedViewModel extends RxManaged {
             } else if (bn) {
                 return 1;
             } else {
-                return Long.compare(a.updateIndex, b.updateIndex);
+                if (a.updateIndex < b.updateIndex) {
+                    return 1;
+                }
+                if (b.updateIndex < a.updateIndex) {
+                    return -1;
+                }
+                return 0;
             }
         }
     };

@@ -102,8 +102,9 @@ public final class Authority {
         }
     }
 
+    @Nullable
     public String getHost() {
-        return host.toString();
+        return null != host ? host.toString() : null;
     }
 
 

@@ -1,5 +1,6 @@
 package io.nextop.demo.flip;
 
+import android.renderscript.Sampler;
 import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Nextop;
@@ -10,6 +11,7 @@ import rx.functions.Action1;
 import rx.functions.Func2;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -48,21 +50,24 @@ public class FlipInfoViewModelManager extends ThinViewModelManager<FlipInfoViewM
 
 
 
-    private void add(final Id flipId, final Message results) {
-        update(flipId, new Func2<FlipInfoViewModel, RxState, FlipInfoViewModel>() {
-            @Override
-            public FlipInfoViewModel call(FlipInfoViewModel flipInfoVm, RxState rxState) {
-                for (WireValue value : results.getContent().asList()) {
-                    Map<WireValue, WireValue> m = value.asMap();
+    private void add(final Id flipId, Message message) {
+        final List<WireValue> values = message.getContent().asList();
+        if (!values.isEmpty()) {
+            update(flipId, new Func2<FlipInfoViewModel, RxState, FlipInfoViewModel>() {
+                @Override
+                public FlipInfoViewModel call(FlipInfoViewModel flipInfoVm, RxState rxState) {
+                    for (WireValue value : values) {
+                        Map<WireValue, WireValue> m = value.asMap();
 
-                    String intro = m.get("intro").asString();
-                    long updateIndex = m.get("most_recent_update_index").asLong();
+                        String intro = m.get(WireValue.of("intro")).asString();
+                        long updateIndex = m.get(WireValue.of("most_recent_update_index")).asLong();
 
-                    flipInfoVm.set(intro, updateIndex);
-                }
-                return flipInfoVm;
-            }
-        });
+                        flipInfoVm.set(intro, updateIndex);
+                    }
+                    return flipInfoVm;
+                    }
+            });
+        }
     }
 
 
@@ -79,12 +84,12 @@ public class FlipInfoViewModelManager extends ThinViewModelManager<FlipInfoViewM
                 .setRoute("GET http://" + Flip.REMOTE + "/flip/$flip-id/info")
                 .set("flip-id", flipInfoVm.id)
                 .build();
-        state.add(nextop.send(sync)
+        state.bind(nextop.send(sync))
                 .doOnNext(new Action1<Message>() {
                     @Override
                     public void call(Message message) {
                         add(flipInfoVm.id, message);
-                        setSyncd(flipInfoVm.id);
+                        state.sync();
                     }
                 }).doOnCompleted(new Action0() {
                     @Override
@@ -98,19 +103,19 @@ public class FlipInfoViewModelManager extends ThinViewModelManager<FlipInfoViewM
                                         .set("flip-id", flipInfoVm.id)
                                         .set("after", flipInfoVm.getUpdateIndex())
                                         .build();
-                                state.add(nextop.send(poll)
+                                state.bind(nextop.send(poll))
                                         .doOnNext(new Action1<Message>() {
                                             @Override
                                             public void call(final Message message) {
                                                 add(flipInfoVm.id, message);
                                             }
-                                        })).subscribe();
+                                        }).subscribe();
                             }
                         };
-                        state.add(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(poller,
+                        state.bind(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(poller,
                                 pollTimeoutMs, pollTimeoutMs, TimeUnit.MILLISECONDS));
                     }
-                })).subscribe();
+                }).subscribe();
     }
 
 

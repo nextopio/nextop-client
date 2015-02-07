@@ -6,6 +6,7 @@ import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func2;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -46,7 +47,7 @@ public class FeedViewModelManager extends ThinViewModelManager<FeedViewModel> {
                         .set("before", feedVm.getMinUpdateIndex())
                         .build();
 
-                state.add(nextop.send(message)
+                state.bind(nextop.send(message)
                         .doOnNext(new Action1<Message>() {
                             @Override
                             public void call(final Message message) {
@@ -65,22 +66,24 @@ public class FeedViewModelManager extends ThinViewModelManager<FeedViewModel> {
 
 
     private void add(final Id feedId, final Message results) {
-        update(feedId, new Func2<FeedViewModel, RxState, FeedViewModel>() {
-            @Override
-            public FeedViewModel call(FeedViewModel feedVm, RxState state) {
-                for (WireValue value : results.getContent().asList()) {
-                    Map<WireValue, WireValue> m = value.asMap();
+        final List<WireValue> values = results.getContent().asList();
+        if (!values.isEmpty()) {
+            update(feedId, new Func2<FeedViewModel, RxState, FeedViewModel>() {
+                @Override
+                public FeedViewModel call(FeedViewModel feedVm, RxState state) {
+                    for (WireValue value : values) {
+                        Map<WireValue, WireValue> m = value.asMap();
 
-                    // FIXME asId
-                    Id flipId = Id.valueOf(m.get("flip_id").asString());
-                    long updateIndex = m.get("most_recent_update_index").asLong();
+                        // FIXME asId
+                        Id flipId = Id.valueOf(m.get(WireValue.of("flip_id")).asString());
+                        long updateIndex = m.get(WireValue.of("most_recent_update_index")).asLong();
 
-                    feedVm.add(new FeedViewModel.FlipState(flipId, updateIndex));
-                }
-                return feedVm;
-            }
-        });
-
+                        feedVm.add(new FeedViewModel.FlipState(flipId, updateIndex));
+                    }
+                    return feedVm;
+                    }
+            });
+        }
     }
 
 
@@ -98,13 +101,12 @@ public class FeedViewModelManager extends ThinViewModelManager<FeedViewModel> {
         Message sync = Message.newBuilder()
                 .setRoute("GET http://" + Flip.REMOTE + "/feed")
                 .build();
-        state.add(nextop.send(sync)
+        state.bind(nextop.send(sync))
                 .doOnNext(new Action1<Message>() {
                     @Override
                     public void call(Message message) {
-
                         add(feedVm.id, message);
-                        setSyncd(feedVm.id);
+                        state.sync();
                     }
                 }).doOnCompleted(new Action0() {
                     @Override
@@ -117,19 +119,19 @@ public class FeedViewModelManager extends ThinViewModelManager<FeedViewModel> {
                                         .setRoute("GET http://" + Flip.REMOTE + "/feed")
                                         .set("after", feedVm.getMaxUpdateIndex())
                                         .build();
-                                state.add(nextop.send(poll)
+                                state.bind(nextop.send(poll))
                                         .doOnNext(new Action1<Message>() {
                                             @Override
                                             public void call(final Message message) {
                                                 add(feedVm.id, message);
                                             }
-                                        })).subscribe();
+                                        }).subscribe();
                             }
                         };
-                        state.add(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(poller,
+                        state.bind(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(poller,
                                 pollTimeoutMs, pollTimeoutMs, TimeUnit.MILLISECONDS));
                     }
-                })).subscribe();
+                }).subscribe();
     }
 
 

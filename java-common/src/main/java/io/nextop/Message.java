@@ -100,6 +100,22 @@ public class Message {
     Message(Id id, Id groupId, int groupPriority, Route route,
                     Map<WireValue, WireValue> headers,
                     Map<WireValue, WireValue> parameters) {
+        if (null == id) {
+            throw new IllegalArgumentException();
+        }
+        if (null == groupId) {
+            throw new IllegalArgumentException();
+        }
+        if (null == route) {
+            throw new IllegalArgumentException();
+        }
+        if (null == headers) {
+            throw new IllegalArgumentException();
+        }
+        if (null == parameters) {
+            throw new IllegalArgumentException();
+        }
+
         this.id = id;
         this.groupId = groupId;
         this.groupPriority = groupPriority;
@@ -379,17 +395,19 @@ public class Message {
         }
 
         URIBuilder builder = new URIBuilder();
-        builder.setScheme(message.route.via.scheme.toString());
-        builder.setHost(message.route.via.authority.getHost());
-        if (0 < message.route.via.authority.port) {
-            builder.setPort(message.route.via.authority.port);
+        builder.setScheme(message.route.via.scheme.toString().toLowerCase());
+        if (null != message.route.via.authority.getHost()) {
+            builder.setHost(message.route.via.authority.getHost());
+            if (0 < message.route.via.authority.port) {
+                builder.setPort(message.route.via.authority.port);
+            }
         }
         builder.setPath(fixedPath.toString());
 
         for (Map.Entry<WireValue, WireValue> e : message.parameters.entrySet()) {
             WireValue key = e.getKey();
             WireValue value = e.getValue();
-            if (!P_CONTENT.equals(key)) {
+            if (!P_CONTENT.equals(key) && !pathVariableNames.contains(key.toText())) {
                 builder.addParameter(key.toText(), value.toText());
             }
         }
