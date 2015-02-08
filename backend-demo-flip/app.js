@@ -2,6 +2,9 @@ var fs = require('fs');
 var express = require('express');
 var bodyParser = require('body-parser');
 var mysql = require('mysql');
+var async = require('async');
+var aws = require('aws-sdk');
+var concat = require('concat-stream');
 
 
 var configObj;
@@ -11,6 +14,15 @@ try {
 }
 catch (err) {
     console.log(err);
+}
+
+if ('s3' == configObj.storage) {
+    // copy config
+    aws.config.update({
+        accessKeyId:configObj.s3.accessKeyId,
+        secretAccessKey: configObj.s3.secretAccessKey,
+        region: configObj.s3.region
+    });
 }
 
 
@@ -220,38 +232,85 @@ app.put('/flip/:flipId/frame/:frameId', function (req, res) {
 
     var creationTime = req.query.creation_time || 0;
 
-    var imageUrl = 'http://flip.nextop.io/flip/' + flipId + '/frame/' + frameId;
+    var ext;
+    var contentType;
+    if (req.get('Content-Type')) {
+        contentType = req.get('Content-Type');
+        if (0 <= contentType.indexOf('jpeg')) {
+            ext = '.jpeg';
+        } else if (0 <= contentType.indexOf('webp')) {
+            ext = '.webp';
+        } else if (0 <= contentType.indexOf('png')) {
+            ext = '.png';
+        } else {
+            ext = '';
+        }
+    } else {
+        contentType = 'application/binary';
+        ext = '';
+    }
+
+    var imageUrl;
+    var saveCallback;
+    if ('s3' == configObj.storage) {
+        var key = flipId + '-' + frameId + ext;
+        imageUrl = 'http://' + configObj.s3.bucket + '.s3.amazonaws.com/' + key;
+
+        // TODO investigate streaming versus reading all into memory
+        // TODO https://www.npmjs.com/package/s3-upload-stream
+        saveCallback = function(next) {
+            req.pipe(concat(function(data) {
+                var s3 = new aws.S3();
+                s3.putObject({
+                    Bucket: configObj.s3.bucket,
+                    Key: key,
+                    StorageClass: "REDUCED_REDUNDANCY",
+                    ContentType: contentType,
+                    Body: data
+                }, next);
+            }));
+        };
+    } else {
+        imageUrl = 'http://' + configObj.http.host + '/flip/' + flipId + '/frame/' + frameId;
+
+        saveCallback = function(next) {
+            // FIXME the metadata gets lost here
+            // could save with the correct extension, then use the extension to determine the content type for get
+            var file = configObj.local.dir + '/' +  + flipId + '-' + frameId;
+            req.pipe(fs.createWriteStream(file));
+        }
+    }
 
 
-    // save the data
-    // FIXME error handling here
-    //req.pipe(fs.createWriteStream('./tmp/' + flipId + '_' + frameId + '.jpeg'));
-
-
-    // update creation_time, image_url in DB
-    mysqlClient.query('INSERT INTO FlipFrame (flip_id, frame_id, creation_time, image_url) VALUES (?, ?, ?, ?)' +
-        ' ON DUPLICATE KEY UPDATE creation_time = ?, image_url = ?',
-        [flipId, frameId, creationTime, imageUrl, creationTime, imageUrl],
-        function (err, result) {
-            if (err) throw err;
-
-            bumpFlipFrame(flipId, frameId);
-
+    async.series([saveCallback,
+            function(next) {
+                // update creation_time, image_url in DB
+                mysqlClient.query('INSERT INTO FlipFrame (flip_id, frame_id, creation_time, image_url) VALUES (?, ?, ?, ?)' +
+                    ' ON DUPLICATE KEY UPDATE creation_time = ?, image_url = ?',
+                    [flipId, frameId, creationTime, imageUrl, creationTime, imageUrl],
+                    next);
+            },
+            function(next) {
+                bumpFlipFrame(flipId, frameId);
+                next(null, null);
+            }],
+        function(err, results) {
             res.status(200);
             res.end();
         });
-
-
-
 });
 
 app.get('/flip/:flipId/frame/:frameId', function (req, res) {
+    // FIXME
     var flipId = req.params.flipId;
     var frameId = req.params.frameId;
+    var file = configObj.local.dir + '/' +  + flipId + '-' + frameId;
+
     res.status(200);
+    // FIXME see note in put on metadate getting lost
+    // FIXME the file might not be jpeg
     res.set('Content-Type', 'image/jpeg');
-    fileSystem.createReadStream('./tmp/' + flipId + '_' + frameId + '.jpeg').pipe(res);
-    res.end();
+    fs.createReadStream(file).pipe(res);
 });
 
 

@@ -1,5 +1,6 @@
 {
   "http": {
+    "host": "localhost",
     "port": 3777
   },
   "mysql": {
@@ -14,6 +15,8 @@
     "dir": "./tmp"
   },
   "s3": {
+    "region": "",
+    "bucket": "",
     "accessKeyId": "",
     "secretAccessKey": ""
   }
