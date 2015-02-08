@@ -322,6 +322,9 @@ public class Nextop {
     /////// TRANSFER STATUS ///////
 
     public Observable<TransferStatus> transferStatus(Id id) {
+        if (null == id) {
+            throw new IllegalArgumentException();
+        }
         Message statusMessage = Message.newBuilder().setRoute(Message.statusRoute(id)).build();
         return send(statusMessage).map(new Func1<Message, TransferStatus>() {
             @Override

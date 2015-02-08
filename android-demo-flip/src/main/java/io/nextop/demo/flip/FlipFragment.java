@@ -1,6 +1,11 @@
 package io.nextop.demo.flip;
 
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.os.Bundle;
+import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -435,6 +440,37 @@ public class FlipFragment extends RxFragment {
         @Override
         public int getViewTypeCount() {
             return 1;
+        }
+    }
+
+
+    public static final class ProgressHero extends View {
+
+        public ProgressHero(Context context) {
+            super(context);
+        }
+        public ProgressHero(Context context, AttributeSet attrs) {
+            super(context, attrs);
+        }
+        public ProgressHero(Context context, AttributeSet attrs, int defStyleAttr) {
+            super(context, attrs, defStyleAttr);
+        }
+        public ProgressHero(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+            super(context, attrs, defStyleAttr, defStyleRes);
+        }
+
+        // FIXME accept frameIndex, progressf [0, 1) for frame index
+        // FIXME draw a hero marker for the point
+
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+
+            // FIXME animation sequence
+//            Paint paint = new Paint();
+//            paint.setColor(Color.argb(92, 0, 0, 0));
+//            canvas.drawRect(100, 100, 200, 200, paint);
         }
     }
 }

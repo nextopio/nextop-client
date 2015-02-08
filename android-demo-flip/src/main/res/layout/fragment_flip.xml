@@ -26,5 +26,11 @@
           android:layout_gravity="center_horizontal|center_vertical"
             android:background="@color/white" />
 
+    <view class="io.nextop.demo.flip.FlipFragment$ProgressHero"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+
+            />
+
 
 </FrameLayout>
