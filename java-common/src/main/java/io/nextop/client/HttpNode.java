@@ -1,5 +1,6 @@
 package io.nextop.client;
 
+import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Route;
 import io.nextop.client.retry.SendStrategy;
@@ -21,8 +22,8 @@ public class HttpNode extends AbstractMessageControlNode {
     private SendStrategy sendStrategy = SendStrategy.INDEFINITE;
 
 
-    // FIXME 0.1.1
-//    Map<Route, TransferProgress> progresses;
+    // FIXME Map<Id, TransferState> states = new ConcurrentHashMap<>();
+    // FIXME TransferState does progress, cancellation, holds onto original message for load from local
 
 
 
@@ -83,10 +84,41 @@ public class HttpNode extends AbstractMessageControlNode {
 
 
 
-    private void onSend(Message message) {
+    private void onSend(final Message message) {
         if (message.route.via.isLocal()) {
             // FIXME 0.1.1 a control message
-            // leave it hanging for now
+
+            Id id = message.route.getLocalId();
+
+            if (Message.statusRoute(id).equals(message.route)) {
+                // FIXME TEMP REMOVE
+                // FIXME HOOK INTO THE TRANSFER STATE MAP
+                class StatusUpdater implements Runnable {
+                    int c = 0;
+                    int m = 100;
+
+                    @Override
+                    public void run() {
+                        float p = ++c / (float) m;
+
+                        Message statusMessage = Message.newBuilder()
+                                .setRoute(message.inboxRoute())
+                                .set(Message.P_PROGRESS, p)
+                                .build();
+                        upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE, statusMessage));
+
+                        if (c < m) {
+                            postDelayed(this, 100);
+                        } else {
+                            upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_COMPLETE, statusMessage.toSpec()));
+                        }
+                    }
+                }
+                new StatusUpdater().run();
+            } else {
+                // FIXME more
+                onSendError(message);
+            }
         } else {
             executor.execute(new RequestWorker(message));
         }

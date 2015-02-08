@@ -16,6 +16,7 @@ import io.nextop.vm.ImageViewModel;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
+import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
@@ -26,6 +27,7 @@ import rx.subscriptions.CompositeSubscription;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends RxActivity {
 
@@ -174,9 +176,10 @@ public class MainActivity extends RxActivity {
 
             imageView.reset();
 
-            Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view), flipVmSource).out
+            Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view), 3000, flipVmSource).out
             .distinctUntilChanged();
-            imageVmSource.subscribe(new ImageView.Updater(imageView));
+            imageVmSource.subscribe(new ImageView.Updater(imageView,
+                    null, ImageView.Transition.instantHold()));
 
             Observable<String> shortIntroSource = flipInfoVmSource.map(new Func1<FlipInfoViewModel, String>() {
                 @Override
@@ -209,29 +212,19 @@ public class MainActivity extends RxActivity {
     }
 
 
-    // FIXME bug where tile grid is waffling on scroll
-
-    // TODO
-    static final class LoadingImageVmSource {
-        // flipVmSource subscribe X
-        // X onNext (
-        //    create observable for imagevm for frames
-        //    unsubscribe subject from old observable
-        //    subscribe subject to new observable
-        // )
-
-
-        Nextop nextop;
-        PublishSubject<ImageViewModel> subject;
+    private static final class LoadingImageVmSource {
+        final Nextop nextop;
+        final int loopIntervalMs;
+        final PublishSubject<ImageViewModel> subject;
+        final Observable<ImageViewModel> out;
 
         Subscription flipVmSubscription = null;
-        final Observable<ImageViewModel> out;
         Subscription emitSubscription;
 
 
-
-        LoadingImageVmSource(Nextop nextop, final Observable<FlipViewModel> flipVmSource) {
+        LoadingImageVmSource(Nextop nextop, int loopIntervalMs, final Observable<FlipViewModel> flipVmSource) {
             this.nextop = nextop;
+            this.loopIntervalMs = loopIntervalMs;
 
             subject = PublishSubject.create();
 
@@ -241,7 +234,6 @@ public class MainActivity extends RxActivity {
                     flipVmSubscription = flipVmSource.doOnNext(new Action1<FlipViewModel>() {
                         @Override
                         public void call(FlipViewModel flipVm) {
-
                             if (null != emitSubscription) {
                                 emitSubscription.unsubscribe();
                                 emitSubscription = null;
@@ -254,15 +246,21 @@ public class MainActivity extends RxActivity {
                             }
 
 
-                            CompositeSubscription s = new CompositeSubscription();
-                            emitSubscription = s;
+                            if (0 < frameVms.length) {
+                                subject.onNext(frameVms[0].imageVm);
 
-                            emit(frameVms, 0, s);
-
-
-
-
-
+                                CompositeSubscription s = new CompositeSubscription();
+                                emitSubscription = s;
+                                emit(frameVms, 0, s);
+                            }
+                        }
+                    }).doOnCompleted(new Action0() {
+                        @Override
+                        public void call() {
+                            if (null != emitSubscription) {
+                                emitSubscription.unsubscribe();
+                                emitSubscription = null;
+                            }
                         }
                     }).subscribe();
                 }
@@ -279,45 +277,58 @@ public class MainActivity extends RxActivity {
 
         }
 
-        void emit(final FrameViewModel[] frameVms, final int i, final CompositeSubscription s) {
+        void emit(final FrameViewModel[] frameVms, int i, final CompositeSubscription s) {
             if (s.isUnsubscribed()) {
                 return;
             }
+
+            // find the next frame vm with a local source
+            while (i < frameVms.length && null == frameVms[i].imageVm.localId) {
+                ++i;
+            }
+
             if (i < frameVms.length) {
-                final FrameViewModel frameVm = frameVms[i];
-                if (null != frameVm.imageVm.localId) {
-                    s.clear();
-                    s.add(nextop.transferStatus(frameVm.id).subscribe(new Observer<Nextop.TransferStatus>() {
-                        int count = 0;
+                final int locali = i;
+                s.clear();
+                s.add(nextop.transferStatus(frameVms[locali].imageVm.localId).subscribe(new Observer<Nextop.TransferStatus>() {
+                    int count = 0;
 
-                        @Override
-                        public void onNext(Nextop.TransferStatus transferStatus) {
-                            if (1 == ++count) {
-                                if (transferStatus.progress < 1.f) {
-                                    subject.onNext(frameVm.imageVm);
-                                }
-                            }
+                    @Override
+                    public void onNext(Nextop.TransferStatus transferStatus) {
+                        if (1 == ++count && transferStatus.progress < 1.f) {
+                            subject.onNext(frameVms[locali].imageVm);
                         }
+                    }
 
 
-                        @Override
-                        public void onCompleted() {
-                            emit(frameVms, i + 1, s);
-                        }
+                    @Override
+                    public void onCompleted() {
+                        emit(frameVms, locali + 1, s);
+                    }
 
-                        @Override
-                        public void onError(Throwable e) {
+                    @Override
+                    public void onError(Throwable e) {
+                        emit(frameVms, locali + 1, s);
+                    }
 
-                        }
 
-
-                    }));
-
+                }));
+            } else {
+                // now all the frames are loaded
+                s.clear();
+                if (loopIntervalMs <= 0) {
+                    subject.onNext(frameVms[0].imageVm);
                 } else {
-                    emit(frameVms, i + 1, s);
+                    // loop through all the frames
+                    s.add(AndroidSchedulers.mainThread().createWorker().schedulePeriodically(new Action0() {
+                        int frameCount = 0;
+                        @Override
+                        public void call() {
+                            int index = frameCount++;
+                            subject.onNext(frameVms[index % frameVms.length].imageVm);
+                        }
+                    }, 0, loopIntervalMs, TimeUnit.MILLISECONDS));
                 }
-            } else if (0 < frameVms.length) {
-                subject.onNext(frameVms[0].imageVm);
             }
         }
 

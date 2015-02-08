@@ -19,6 +19,7 @@ import io.nextop.org.apache.http.HttpResponse;
 import io.nextop.org.apache.http.client.methods.HttpUriRequest;
 import rx.Observable;
 import rx.Subscriber;
+import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.subjects.BehaviorSubject;
 
@@ -157,7 +158,7 @@ public class Nextop {
 
     public Receiver<HttpResponse> send(HttpUriRequest request) {
         Message message = Message.fromHttpRequest(request);
-        return new Receiver<HttpResponse>(message.inboxRoute(),
+        return Receiver.create(this, message.inboxRoute(),
                 send(message).map(new Func1<Message, HttpResponse>() {
                     @Override
                     public HttpResponse call(Message message) {
@@ -417,16 +418,52 @@ public class Nextop {
 
 
     public static final class Receiver<T> extends Observable<T> {
-        public final Route route;
+        static <T> Receiver<T> create(final Nextop nextop, Route route, Observable<T> in) {
+            Map<Source.UnsubscribeBehavior, Observable<T>> ins = new HashMap<Source.UnsubscribeBehavior, Observable<T>>(2);
+            Source.UnsubscribeBehavior defaultUnsubscribeBehavior;
 
-        Receiver(Route route, final Observable<T> in) {
+            final @Nullable Id id = route.getLocalId();
+            if (null != id) {
+                ins.put(Source.UnsubscribeBehavior.DETACH, in.share());
+                ins.put(Source.UnsubscribeBehavior.CANCEL_SEND, in.doOnUnsubscribe(new Action0() {
+                    @Override
+                    public void call() {
+                        nextop.cancelSend(id);
+                    }
+                }).share());
+                defaultUnsubscribeBehavior = Source.UnsubscribeBehavior.CANCEL_SEND;
+            } else {
+                ins.put(Source.UnsubscribeBehavior.DETACH, in.share());
+                defaultUnsubscribeBehavior = Source.UnsubscribeBehavior.DETACH;
+            }
+            Source source = new Source<T>(ins);
+            source.check(defaultUnsubscribeBehavior);
+            return new Receiver(route, source, defaultUnsubscribeBehavior);
+        }
+
+
+        public final Route route;
+        private final Source<T> source;
+
+        private Receiver(Route route, final Source<T> source, final Source.UnsubscribeBehavior unsubscribeBehavior) {
             super(new OnSubscribe<T>() {
                 @Override
                 public void call(Subscriber<? super T> subscriber) {
-                    in.subscribe(subscriber);
+                    source.ins.get(unsubscribeBehavior).subscribe(subscriber);
                 }
             });
             this.route = route;
+            this.source = source;
+        }
+
+        public Receiver<T> cancelSendOnUnsubscribe() {
+            source.check(Source.UnsubscribeBehavior.CANCEL_SEND);
+            return new Receiver<T>(route, source, Source.UnsubscribeBehavior.CANCEL_SEND);
+        }
+
+        public Receiver<T> detachOnUnsubscribe() {
+            source.check(Source.UnsubscribeBehavior.DETACH);
+            return new Receiver<T>(route, source, Source.UnsubscribeBehavior.DETACH);
         }
 
         // return the localId of the outgoing message that this receiver is tied to
@@ -434,6 +471,26 @@ public class Nextop {
         @Nullable
         public Id getId() {
             return route.getLocalId();
+        }
+
+
+        private static class Source<T> {
+            static enum UnsubscribeBehavior {
+                CANCEL_SEND,
+                DETACH
+            }
+
+            final Map<UnsubscribeBehavior, Observable<T>> ins;
+
+            Source(Map<UnsubscribeBehavior, Observable<T>> ins) {
+                this.ins = ins;
+            }
+
+            void check(UnsubscribeBehavior unsubscribeBehavior) {
+                if (!ins.containsKey(unsubscribeBehavior)) {
+                    throw new UnsupportedOperationException();
+                }
+            }
         }
     }
 
@@ -494,7 +551,7 @@ public class Nextop {
 
         @Override
         public Receiver<Message> receive(Route route) {
-            return new Receiver<Message>(route, subjectNode.receive(route));
+            return Receiver.create(this, route, subjectNode.receive(route));
         }
 
         @Override
@@ -529,7 +586,7 @@ public class Nextop {
 
             subjectNode.send(tmessage);
             Route route = tmessage.inboxRoute();
-            return new Receiver(route, subjectNode.receive(route).map(new Func1<Message, Layer>() {
+            return Receiver.create(this, route, subjectNode.receive(route).map(new Func1<Message, Layer>() {
                 @Override
                 public Layer call(Message message) {
                     WireValue content = message.getContent();

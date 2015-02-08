@@ -31,8 +31,9 @@ public class ImageView extends android.widget.ImageView {
 
     @Nullable
     Source source = null;
+    @Nullable
+    Transition transition = null;
 
-    // loading loadSubscriptions FIXME rename to loadSubscriptions
     @Nullable
     SubscriptionList loadSubscriptions = null;
 
@@ -42,9 +43,7 @@ public class ImageView extends android.widget.ImageView {
 
     // CONFIG
 
-    /** align visual transitions on these boundaries */
-    int transitionQMs = 200;
-    int fadeInMs = 200;
+    private final Transition defaultTransition = new Transition(200, 200, false);
 
     int transferQPx = 48;
     float defaultMaxTransferMultiple = 2.f;
@@ -56,7 +55,6 @@ public class ImageView extends android.widget.ImageView {
     // DRAW STATE
 
     Paint tempPaint = new Paint();
-
 
 
     public ImageView(Context context) {
@@ -165,7 +163,7 @@ public class ImageView extends android.widget.ImageView {
     /////// SOURCE ///////
 
     public void reset() {
-        setSource(null);
+        setSource(null, Transition.instant());
     }
 
     @Override
@@ -187,11 +185,18 @@ public class ImageView extends android.widget.ImageView {
         setSource(Source.memory(bitmap));
     }
 
-
-    private void setSource(@Nullable Source source) {
+    public void setSource(@Nullable Source source) {
+        setSource(source, null);
+    }
+    public void setSource(@Nullable Source source, @Nullable Transition transition) {
         if (!Objects.equals(this.source, source)) {
+            Transition useTransition = null != transition ? transition : defaultTransition;
             resetLoad();
+            if (!useTransition.hold) {
+                resetImage();
+            }
             this.source = source;
+            this.transition = useTransition;
             reload();
         }
     }
@@ -204,6 +209,8 @@ public class ImageView extends android.widget.ImageView {
     private void resetLoad() {
         cancelLoadSubscriptions();
         setProgress(null);
+    }
+    private void resetImage() {
         setImageDrawable(null);
     }
     private void reload() {
@@ -330,6 +337,7 @@ public class ImageView extends android.widget.ImageView {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         resetLoad();
+        resetImage();
     }
 
 
@@ -374,7 +382,7 @@ public class ImageView extends android.widget.ImageView {
 
     private final class LayerLoader implements Observer<Nextop.Layer> {
         /** if true, the layer should be immediately set into the view (no transition);
-         * otherwise, do a fade in on a quantized schedule. */
+         * otherwise, (if supported by the transition properties) do a fade in on a quantized schedule. */
         boolean immediate = false;
         int count = 0;
 
@@ -386,12 +394,14 @@ public class ImageView extends android.widget.ImageView {
         private void set(Bitmap bitmap) {
             ++count;
             Drawable d;
-            if (!immediate && 1 == count) {
+            if (!immediate && 1 == count &&
+                    null != transition && 0 < transition.fadeInMs) {
+                // FIXME use transitionQMs
                 TransitionDrawable td = new TransitionDrawable(new Drawable[]{
                         new ColorDrawable(Color.argb(0, 0, 0, 0)),
                         new BitmapDrawable(getResources(), bitmap)
                 });
-                td.startTransition(fadeInMs);
+                td.startTransition(transition.fadeInMs);
                 d = td;
             } else {
                 d = new BitmapDrawable(getResources(), bitmap);
@@ -438,28 +448,55 @@ public class ImageView extends android.widget.ImageView {
 
 
 
-    private static final class Source {
+
+    public static final class Transition {
+        public static Transition instant() {
+            return new Transition(0, 0, false);
+        }
+
+        public static Transition instantHold() {
+            return new Transition(0, 0, true);
+        }
+
+
+        public final int fadeInMs;
+        /** align visual transitions on these boundaries */
+        public final int transitionQMs;
+        public final boolean hold;
+
+
+        public Transition(int fadeInMs, int transitionQMs, boolean hold) {
+            this.fadeInMs = fadeInMs;
+            this.transitionQMs = transitionQMs;
+            this.hold = hold;
+        }
+    }
+
+    public static final class Source {
         static enum Type {
             URI,
             LOCAL,
             MEMORY
         }
 
-        static Source uri(@Nullable Uri uri) {
+        @Nullable
+        public static Source uri(@Nullable Uri uri) {
             if (null != uri) {
                 return new Source(Type.URI, uri, null, null);
             } else {
                 return null;
             }
         }
-        static Source local(@Nullable Id id) {
+        @Nullable
+        public static Source local(@Nullable Id id) {
             if (null != id) {
                 return new Source(Type.LOCAL, null, id, null);
             } else {
                 return null;
             }
         }
-        static Source memory(@Nullable Bitmap bitmap) {
+        @Nullable
+        public static Source memory(@Nullable Bitmap bitmap) {
             if (null != bitmap) {
                 return new Source(Type.MEMORY, null, null, bitmap);
             } else {
@@ -563,21 +600,36 @@ public class ImageView extends android.widget.ImageView {
 
     public static final class Updater implements Observer<ImageViewModel> {
         private final ImageView imageView;
+        /** the last transition is held */
+        private final Transition[] transitions;
+        private int frameCount = 0;
 
 
-        public Updater(ImageView imageView) {
+        public Updater(ImageView imageView, Transition ... transitions) {
             this.imageView = imageView;
+            this.transitions = transitions;
         }
 
 
         @Override
         public void onNext(final ImageViewModel imageVm) {
+            int index = frameCount++;
+
+            @Nullable Transition transition;
+            if (transitions.length <= 0) {
+                transition = null;
+            } else if (index < transitions.length) {
+                transition = transitions[index];
+            } else {
+                transition = transitions[transitions.length - 1];
+            }
+
             if (null != imageVm.bitmap) {
-                imageView.setImageBitmap(imageVm.bitmap);
+                imageView.setSource(Source.memory(imageVm.bitmap), transition);
             } else if (null != imageVm.localId) {
-                imageView.setLocalImage(imageVm.localId);
+                imageView.setSource(Source.local(imageVm.localId), transition);
             } else if (null != imageVm.uri) {
-                imageView.setImageUri(imageVm.uri);
+                imageView.setSource(Source.uri(imageVm.uri), transition);
             } else {
                 imageView.reset();
             }

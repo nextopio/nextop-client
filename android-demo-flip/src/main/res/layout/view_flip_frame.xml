@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<io.nextop.view.ImageView xmlns:android="http://schemas.android.com/apk/res/android"
-                          android:id="@+id/image"
+<io.nextop.rx.RxViewGroup xmlns:android="http://schemas.android.com/apk/res/android"
                           android:layout_width="match_parent"
                           android:layout_height="92dp"
+        >
+<io.nextop.view.ImageView
+                          android:id="@+id/image"
+                          android:layout_width="match_parent"
+                          android:layout_height="match_parent"
                           android:layout_gravity="center_horizontal|top"
                             android:scaleType="centerCrop"/>
+</io.nextop.rx.RxViewGroup>

@@ -65,6 +65,10 @@ public final class Route {
     }
 
 
+    public boolean isLocal() {
+        return via.isLocal();
+    }
+
     @Nullable
     public Id getLocalId() {
         if (via.isLocal() && target.path.isFixed() && 1 <= target.path.segments.size()) {
@@ -117,7 +121,11 @@ public final class Route {
     public static enum Scheme {
         HTTP,
         HTTPS,
-        NEXTOP
+        NEXTOP,
+
+        /////// ANDROID ///////
+        /* these are supported only on Android, at the Android layer */
+        CONTENT
     }
 
 

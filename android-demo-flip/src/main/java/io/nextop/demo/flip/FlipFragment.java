@@ -79,7 +79,7 @@ public class FlipFragment extends RxFragment {
 
 
         final PublishSubject<ImageViewModel> largeSource = PublishSubject.create();
-        bind(largeSource).distinctUntilChanged().subscribe(new ImageView.Updater(largeView));
+        bind(largeSource).distinctUntilChanged().subscribe(new ImageView.Updater(largeView, ImageView.Transition.instantHold()));
 
 
 
@@ -358,7 +358,6 @@ public class FlipFragment extends RxFragment {
         }
 
 
-
         @Override
         public int getCount() {
             return null != flipVm ? flipVm.size() : 0;
@@ -391,13 +390,14 @@ public class FlipFragment extends RxFragment {
 
             @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
             if (null != rxVg) {
-                rxVg.reset();
-                updateIndefinitely(convertView, rxVg.bind(flip.getFlipVmm().get(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
-                    @Override
-                    public FrameViewModel call(FlipViewModel flipVm) {
-                        return flipVm.getFrameVm(frameId);
-                    }
-                })));
+                if (rxVg.reset(frameId)) {
+                    updateIndefinitely(convertView, rxVg.bind(flip.getFlipVmm().get(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
+                        @Override
+                        public FrameViewModel call(FlipViewModel flipVm) {
+                            return flipVm.getFrameVm(frameId);
+                        }
+                    })));
+                }
             } else {
                 // update immediate snapshot
                 updateIndefinitely(convertView, flip.getFlipVmm().peek(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
@@ -422,7 +422,9 @@ public class FlipFragment extends RxFragment {
 
             ImageView imageView = (ImageView) view.findViewById(R.id.image);
 
-            imageVmSource.subscribe(new ImageView.Updater(imageView));
+            imageView.reset();
+
+            imageVmSource.subscribe(new ImageView.Updater(imageView, ImageView.Transition.instant()));
         }
 
         @Override
