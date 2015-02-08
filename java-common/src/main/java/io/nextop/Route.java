@@ -13,32 +13,36 @@ public final class Route {
         // the string version is a mesh of the via and target
         // mirror the parsing rules in Target, but apply them in a custom way
 
-        int n = s.length();
-        if (n <= 0) {
-            throw new IllegalArgumentException();
-        }
-        int i = s.indexOf(' ');
-        if (i < 0) {
-            throw new IllegalArgumentException();
-        }
-        String d = "://";
-        int j = s.indexOf(d, i + 1);
-        if (i < 0) {
-            throw new IllegalArgumentException();
-        }
-        int k = s.indexOf('/', j + d.length());
+        try {
+            int n = s.length();
+            if (n <= 0) {
+                throw new IllegalArgumentException();
+            }
+            int i = s.indexOf(' ');
+            if (i < 0) {
+                throw new IllegalArgumentException();
+            }
+            String d = "://";
+            int j = s.indexOf(d, i + 1);
+            if (i < 0) {
+                throw new IllegalArgumentException();
+            }
+            int k = s.indexOf('/', j + d.length());
 
-        Method method = Method.valueOf(s.substring(0, i).toUpperCase());
-        Via via;
-        Path path;
-        if (k < 0) {
-            via = Via.valueOf(s.substring(i + 1, n));
-            path = Path.empty();
-        } else {
-            via = Via.valueOf(s.substring(i + 1, k));
-            path = Path.valueOf(s.substring(k + 1, n));
+            Method method = Method.valueOf(s.substring(0, i).toUpperCase());
+            Via via;
+            Path path;
+            if (k < 0) {
+                via = Via.valueOf(s.substring(i + 1, n));
+                path = Path.empty();
+            } else {
+                via = Via.valueOf(s.substring(i + 1, k));
+                path = Path.valueOf(s.substring(k + 1, n));
+            }
+            return new Route(new Target(method, path), via);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(s, e);
         }
-        return new Route(new Target(method, path), via);
     }
 
 

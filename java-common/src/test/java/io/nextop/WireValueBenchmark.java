@@ -3,6 +3,7 @@ package io.nextop;
 import com.google.common.base.Charsets;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -12,7 +13,8 @@ import java.nio.channels.WritableByteChannel;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
-public class WireValueBenchmark {
+
+public class WireValueBenchmark extends TestCase {
 
     @Test
     public void testSize1() throws Exception {

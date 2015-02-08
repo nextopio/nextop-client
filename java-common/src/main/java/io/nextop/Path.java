@@ -187,7 +187,7 @@ public class Path {
 
 
         // FIXME ref spec
-        private static final Pattern M_FIXED = Pattern.compile("[a-z0-9-_;]+");
-        private static final Pattern M_VARIABLE = Pattern.compile("[a-z0-9-]+");
+        private static final Pattern M_FIXED = Pattern.compile("[a-z0-9-_;\\.]+");
+        private static final Pattern M_VARIABLE = Pattern.compile("[a-z0-9-\\.]+");
     }
 }

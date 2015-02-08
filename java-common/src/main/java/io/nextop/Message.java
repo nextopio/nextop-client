@@ -422,6 +422,7 @@ public class Message {
     private static final String H_PRAGMA_ID_PREFIX = "nextop-id";
     // FIXME serialID
     private static final String H_PRAGMA_PREFIX = "nextop-header";
+    // FIXME use something standard - figure out what
     private static final String H_PRAGMA_IMAGE_SIZE_PREFIX = "image-size";
 
 
@@ -669,6 +670,31 @@ public class Message {
             } catch (IOException e) {
                 throw new IllegalArgumentException(e);
             }
+        } else if (contentType.is(MediaType.ANY_IMAGE_TYPE)) {
+            // receive as image if supported (TODO or can be transcoded)
+            // otherwise receive as binary
+            RepetableEntity re = RepetableEntity.create(entity);
+            re.setBytes();
+
+            EncodedImage.Orientation orientation = EncodedImage.Orientation.REAR_FACING;
+            EncodedImage.Format format;
+            if (contentType.is(MediaType.JPEG)) {
+                format = EncodedImage.Format.JPEG;
+            } else if (contentType.is(MediaType.WEBP)) {
+                format = EncodedImage.Format.WEBP;
+            } else if (contentType.is(MediaType.PNG)) {
+                format = EncodedImage.Format.PNG;
+            } else {
+                // the image is not supported
+                // TODO consider doing a transcoding here if possible
+                // TODO for now, just surface as binary
+                return WireValue.of(re.bytes, re.offset, re.length);
+            }
+
+            // FIXME accept image size headers (still need to figure out what's standard)
+            int width = EncodedImage.UNKNOWN_WIDTH;
+            int height = EncodedImage.UNKNOWN_HEIGHT;
+            return WireValue.of(EncodedImage.create(format, orientation, width, height, re.bytes, re.offset, re.length));
         } else {
             // receive as binary
             RepetableEntity re = RepetableEntity.create(entity);

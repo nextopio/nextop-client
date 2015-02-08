@@ -12,6 +12,7 @@ public class EncodedImage {
         PNG
     }
     public static enum Orientation {
+        /** this is the standard orientation. Any image where the orientation is unknown should use this. */
         REAR_FACING,
         /** mirrored */
         FRONT_FACING
