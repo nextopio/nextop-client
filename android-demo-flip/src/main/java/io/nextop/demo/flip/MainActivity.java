@@ -156,8 +156,9 @@ public class MainActivity extends RxActivity {
 
             @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
             if (null != rxVg) {
-                rxVg.reset();
-                updateIndefinitely(convertView, rxVg.bind(flip.getFlipInfoVmm().get(flipId)), rxVg.bind(flip.getFlipVmm().get(flipId)));
+                if (rxVg.reset(flipId)) {
+                    updateIndefinitely(convertView, rxVg.bind(flip.getFlipInfoVmm().get(flipId)), rxVg.bind(flip.getFlipVmm().get(flipId)));
+                }
             } else {
                 // update immediate snapshot
                 updateIndefinitely(convertView, flip.getFlipInfoVmm().peek(flipId), flip.getFlipVmm().peek(flipId));
@@ -170,6 +171,8 @@ public class MainActivity extends RxActivity {
         private void updateIndefinitely(View view, Observable<FlipInfoViewModel> flipInfoVmSource, Observable<FlipViewModel> flipVmSource) {
             ImageView imageView = (ImageView) view.findViewById(R.id.image);
             final TextView shortIntroView = (TextView) view.findViewById(R.id.short_intro);
+
+            imageView.reset();
 
             Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view), flipVmSource).out
             .distinctUntilChanged();
@@ -283,7 +286,7 @@ public class MainActivity extends RxActivity {
             if (i < frameVms.length) {
                 final FrameViewModel frameVm = frameVms[i];
                 if (null != frameVm.imageVm.localId) {
-                    // TODO remove previous - need a "replace subscription"
+                    s.clear();
                     s.add(nextop.transferStatus(frameVm.id).subscribe(new Observer<Nextop.TransferStatus>() {
                         int count = 0;
 

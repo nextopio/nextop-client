@@ -1,5 +1,6 @@
 package io.nextop.rx;
 
+import com.google.common.base.Objects;
 import immutablecollections.ImSet;
 import rx.Observable;
 import rx.Observer;
@@ -15,6 +16,13 @@ import javax.annotation.Nullable;
 public interface RxLifecycleBinder extends Subscription {
 
     void reset();
+
+    /** this version compares the current id to the given id.
+     * This is useful for recycler views where tearing down and
+     * setting up the same id is wasteful/visually jarring.
+     * if different, does a reset and returns true.
+     * if the same, does nothing and returns false. */
+    boolean reset(Object id);
 
     /** Wraps the given observable in an observable bound to the lifecyle of a container.
      * The wrapper allocates on subscribe and cleans up on unsubscribe.
@@ -32,6 +40,8 @@ public interface RxLifecycleBinder extends Subscription {
 
     /** Binds to an internal lifecycle start/stop. */
     final class Lifted implements RxLifecycleBinder {
+        @Nullable
+        private Object currentId = null;
 
         private ImSet<Bind<?>> binds = ImSet.empty();
         private final CompositeSubscription subscriptions = new CompositeSubscription();
@@ -133,7 +143,22 @@ public interface RxLifecycleBinder extends Subscription {
             if (closed) {
                 throw new IllegalStateException();
             }
+            currentId = null;
             clear();
+        }
+
+        @Override
+        public boolean reset(Object id) {
+            if (closed) {
+                throw new IllegalStateException();
+            }
+            if (!Objects.equal(currentId, id)) {
+                currentId = id;
+                clear();
+                return true;
+            } else {
+                return false;
+            }
         }
 
         @Override

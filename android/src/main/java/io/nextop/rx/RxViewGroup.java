@@ -45,6 +45,11 @@ public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder 
     }
 
     @Override
+    public boolean reset(Object id) {
+        return liftedRxLifecycleBinder.reset(id);
+    }
+
+    @Override
     public <T> Observable<T> bind(Observable<T> source) {
         return liftedRxLifecycleBinder.bind(source);
     }

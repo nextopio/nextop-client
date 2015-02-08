@@ -164,7 +164,7 @@ public class ImageView extends android.widget.ImageView {
 
     /////// SOURCE ///////
 
-    public void clearImage() {
+    public void reset() {
         setSource(null);
     }
 
@@ -190,7 +190,7 @@ public class ImageView extends android.widget.ImageView {
 
     private void setSource(@Nullable Source source) {
         if (!Objects.equals(this.source, source)) {
-            reset();
+            resetLoad();
             this.source = source;
             reload();
         }
@@ -201,7 +201,7 @@ public class ImageView extends android.widget.ImageView {
             loadSubscriptions = null;
         }
     }
-    private void reset() {
+    private void resetLoad() {
         cancelLoadSubscriptions();
         setProgress(null);
         setImageDrawable(null);
@@ -329,7 +329,7 @@ public class ImageView extends android.widget.ImageView {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        reset();
+        resetLoad();
     }
 
 
@@ -579,7 +579,7 @@ public class ImageView extends android.widget.ImageView {
             } else if (null != imageVm.uri) {
                 imageView.setImageUri(imageVm.uri);
             } else {
-                imageView.clearImage();
+                imageView.reset();
             }
 
         }
