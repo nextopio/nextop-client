@@ -5,6 +5,7 @@ import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Route;
 import rx.Observable;
+import rx.Scheduler;
 import rx.Subscriber;
 import rx.Subscription;
 import rx.functions.Action0;
@@ -37,7 +38,8 @@ public class SubjectNode extends AbstractMessageControlNode {
 
 
     public void send(Message message) {
-        onMessageControl(new MessageControl(MessageControl.Type.SEND, message));
+        mcs.notifyPending(message.id);
+        onMessageControl(MessageControl.send(message));
     }
 
 
@@ -46,6 +48,7 @@ public class SubjectNode extends AbstractMessageControlNode {
     // this rule makes it easier to reason about ack behavior
     // FIXME use NURL+priority here
     public Observable<Message> receive(final Route route) {
+
         return Observable.create(new Observable.OnSubscribe<Message>() {
             @Override
             public void call(final Subscriber<? super Message> subscriber) {
@@ -57,26 +60,28 @@ public class SubjectNode extends AbstractMessageControlNode {
                         boolean s = receivers.remove(route, subscriber);
                         assert s;
 
-                        downstream.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                onMessageControl(new MessageControl(MessageControl.Type.UNSUBSCRIBE,
-                                        Message.newBuilder().setRoute(route).build()));
-                                // FIXME CHANGE_SUBSCRIPTION with new spec if another instead of unsubscribe (?)
-                            }
-                        });
+                        // FIXME
+//                        downstream.post(new Runnable() {
+//                            @Override
+//                            public void run() {
+//                                onMessageControl(new MessageControl(MessageControl.Type.UNSUBSCRIBE,
+//                                        Message.newBuilder().setRoute(route).build()));
+//                                // FIXME CHANGE_SUBSCRIPTION with new spec if another instead of unsubscribe (?)
+//                            }
+//                        });
                     }
                 });
                 subscriber.add(subscription);
                 assert !subscription.isUnsubscribed();
+                // FIXME
                 // FIXME only send if not already subscribed (?)
-                downstream.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        onMessageControl(new MessageControl(MessageControl.Type.SUBSCRIBE,
-                                Message.newBuilder().setRoute(route).build()));
-                    }
-                });
+//                downstream.post(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        onMessageControl(new MessageControl(MessageControl.Type.SUBSCRIBE,
+//                                Message.newBuilder().setRoute(route).build()));
+//                    }
+//                });
             }
         });
     }
@@ -109,11 +114,11 @@ public class SubjectNode extends AbstractMessageControlNode {
 
 
     public void cancelSend(final Id id) {
+//        mcs.remove(id, MessageControlState.End.CANCELED);
         downstream.post(new Runnable() {
             @Override
             public void run() {
-                onMessageControl(new MessageControl(MessageControl.Type.SEND_NACK,
-                        Message.newBuilder().setRoute(Message.outboxRoute(id)).build()));
+                onMessageControl(MessageControl.send(MessageControl.Type.ERROR, Message.outboxRoute(id)));
             }
         });
     }
@@ -139,52 +144,28 @@ public class SubjectNode extends AbstractMessageControlNode {
             @Override
             public void onMessageControl(MessageControl mc) {
                 switch (mc.type) {
-                    case RECEIVE: {
+                    case MESSAGE: {
                         @Nullable Subscriber firstSubscriber = Iterables.getFirst(
                                 Iterables.concat(receivers.get(mc.message.route), defaultReceivers),
                                 null);
                         if (null != firstSubscriber) {
-                            try {
-                                firstSubscriber.onNext(mc.message);
-                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ACK,
-                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                            } catch (Throwable t) {
-                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_NACK,
-                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                                // FIXME log
-                            }
+                            firstSubscriber.onNext(mc.message);
                         }
                         // else the downstream will resend on subscribe
                         break;
                     }
-                    case RECEIVE_COMPLETE: {
+                    case COMPLETE: {
                         @Nullable Subscriber firstSubscriber = Iterables.getFirst(receivers.get(mc.message.route), null);
                         if (null != firstSubscriber) {
-                            try {
-                                firstSubscriber.onCompleted();
-                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ACK,
-                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                            } catch (Throwable t) {
-                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_NACK,
-                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                                // FIXME log
-                            }
+                            firstSubscriber.onCompleted();
                         }
                         // else the downstream will resend on subscribe
                         break;
                     }
-                    case RECEIVE_ERROR: {
+                    case ERROR: {
                         @Nullable Subscriber firstSubscriber = Iterables.getFirst(receivers.get(mc.message.route), null);
                         if (null != firstSubscriber) {
-                            try {
-                                firstSubscriber.onError(new ReceiveException(mc.message));
-                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ACK,
-                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                            } catch (Throwable t) {
-                                onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_NACK,
-                                        Message.newBuilder().setRoute(Message.outboxRoute(mc.message.id)).build()));
-                                // FIXME log
-                            }
+                            firstSubscriber.onError(new ReceiveException(mc.message));
                         }
                         // else the downstream will resend on subscribe
                         break;
@@ -200,6 +181,11 @@ public class SubjectNode extends AbstractMessageControlNode {
             @Override
             public void postDelayed(Runnable r, int delayMs) {
                 upstream.postDelayed(r, delayMs);
+            }
+
+            @Override
+            public Scheduler getScheduler() {
+                return upstream.getScheduler();
             }
         });
     }
@@ -222,6 +208,8 @@ public class SubjectNode extends AbstractMessageControlNode {
 
     @Override
     public void onTransfer(MessageControlState mcs) {
+        super.onTransfer(mcs);
+
         downstream.onTransfer(mcs);
     }
 

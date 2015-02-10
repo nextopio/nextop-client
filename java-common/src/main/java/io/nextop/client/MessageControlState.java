@@ -9,15 +9,18 @@ import io.nextop.sortedlist.SortedList;
 import io.nextop.sortedlist.SplaySortedList;
 import rx.Observable;
 import rx.Subscriber;
+import rx.functions.Action0;
 import rx.subjects.BehaviorSubject;
 
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-/** Shared state for all {@link MessageControlChannel} objects.
- * This object should be updated from the active channel on message control
- * (the control logic of the active channel should update this object then update itself).
+/** Shared state for all {@link MessageControlChannel} objects
+ * for SEND.MESSAGE.
+ * TODO RECEIVE.* and SEND.{COMPLETED, ERROR} are multicasted
+ * TODO to all upstream/downstream and not persisted in the state.
+ *
  * Each {@link MessageControl} object is controlled by at most one channel object.
  * Nodes take/release control via {@link #take}/{@link #release}.
  *
@@ -28,16 +31,11 @@ public final class MessageControlState {
 
     private final MessageContext context;
 
-    // FIXME remove no longer apply
-    // optional: the channel may create entries with no message (stub(id))
-    // and - setProgess(...) to update the download progress
-    // - call setMessage(...) to set the completed message
-    // these entries show up in a null group (null == indexOf(id))
-
-    private final Object monitor = new Object();
+    private final Object mutex = new Object();
 
     private int headIndex = 0;
     private final Map<Id, Entry> entries;
+    private final Set<Id> pending;
     /** these need to be attached to an entry on {@link #add} */
     private final Multimap<Id, Subscriber<? super Entry>> pendingSubscribers;
 
@@ -56,6 +54,7 @@ public final class MessageControlState {
         entries = new HashMap<Id, Entry>(32);
         groups = new HashMap<Id, Group>(8);
         groupsByPriority = new SplaySortedList<Group>(COMPARATOR_GROUP_AVAILABLE);
+        pending = new HashSet<Id>(4);
         pendingSubscribers = HashMultimap.create(4, 4);
 
         publish = BehaviorSubject.create(this);
@@ -71,12 +70,13 @@ public final class MessageControlState {
 
     /** non-blocking */
     @Nullable
-    public Entry getFirstAvailable() {
-        synchronized (monitor) {
+    public Entry takeFirstAvailable(MessageControlChannel owner) {
+        synchronized (mutex) {
             for (Group group : groupsByPriority) {
                 if (!group.entries.isEmpty()) {
                     Entry first = group.entries.get(0);
-                    if (null != first.owner) {
+                    if (null == first.owner) {
+                        take(first.id, owner);
                         return first;
                     }
                 }
@@ -91,17 +91,18 @@ public final class MessageControlState {
      * @param min the minimum priority to search for the first available.
      *            If none available with greater priority, returns null. */
     @Nullable
-    public Entry getFirstAvailable(Id min) {
+    public Entry takeFirstAvailable(Id min, MessageControlChannel owner) {
         if (null == min) {
             throw new IllegalArgumentException();
         }
-        synchronized (monitor) {
+        synchronized (mutex) {
             for (Group group : groupsByPriority) {
                 if (!group.entries.isEmpty()) {
                     Entry first = group.entries.get(0);
                     if (min.equals(first.id)) {
                         return null;
-                    } else if (null != first.owner) {
+                    } else if (null == first.owner) {
+                        take(first.id, owner);
                         return first;
                     }
                 }
@@ -113,20 +114,15 @@ public final class MessageControlState {
 
     /** blocking */
     @Nullable
-    public Entry getFirstAvailable(long timeout, TimeUnit timeUnit) {
-        synchronized (monitor) {
+    public Entry takeFirstAvailable(MessageControlChannel owner, long timeout, TimeUnit timeUnit) throws InterruptedException {
+        final long nanosPerMillis = TimeUnit.MILLISECONDS.toNanos(1);
+        synchronized (mutex) {
             long timeoutNanos = timeUnit.toNanos(timeout);
             Entry entry;
-            while (null == (entry = getFirstAvailable()) && 0 < timeoutNanos) {
+            while (null == (entry = takeFirstAvailable(owner)) && 0 < timeoutNanos) {
                 long nanos = System.nanoTime();
-                try {
-                    final long nanosPerMillis = TimeUnit.MILLISECONDS.toNanos(1);
-                    monitor.wait(timeoutNanos / nanosPerMillis, (int) (timeoutNanos % nanosPerMillis));
-                    timeoutNanos = 0;
-                } catch (InterruptedException e) {
-                    // continue
-                    timeoutNanos -= (System.nanoTime() - nanos);
-                }
+                mutex.wait(timeoutNanos / nanosPerMillis, (int) (timeoutNanos % nanosPerMillis));
+                timeoutNanos -= (System.nanoTime() - nanos);
             }
             return entry;
         }
@@ -134,20 +130,15 @@ public final class MessageControlState {
 
     /** blocking */
     @Nullable
-    public Entry getFirstAvailable(Id min, long timeout, TimeUnit timeUnit) {
-        synchronized (monitor) {
+    public Entry takeFirstAvailable(Id min, MessageControlChannel owner, long timeout, TimeUnit timeUnit) throws InterruptedException {
+        final long nanosPerMillis = TimeUnit.MILLISECONDS.toNanos(1);
+        synchronized (mutex) {
             long timeoutNanos = timeUnit.toNanos(timeout);
             Entry entry;
-            while (null == (entry = getFirstAvailable(min)) && 0 < timeoutNanos) {
+            while (null == (entry = takeFirstAvailable(min, owner)) && 0 < timeoutNanos) {
                 long nanos = System.nanoTime();
-                try {
-                    final long nanosPerMillis = TimeUnit.MILLISECONDS.toNanos(1);
-                    monitor.wait(timeoutNanos / nanosPerMillis, (int) (timeoutNanos % nanosPerMillis));
-                    timeoutNanos = 0;
-                } catch (InterruptedException e) {
-                    // continue
-                    timeoutNanos -= (System.nanoTime() - nanos);
-                }
+                mutex.wait(timeoutNanos / nanosPerMillis, (int) (timeoutNanos % nanosPerMillis));
+                timeoutNanos -= (System.nanoTime() - nanos);
             }
             return entry;
         }
@@ -159,7 +150,7 @@ public final class MessageControlState {
      * - no owner
      * - first in group */
     public boolean isAvailable(Id id) {
-        synchronized (monitor) {
+        synchronized (mutex) {
             @Nullable Entry entry = entries.get(id);
             if (null == entry) {
                 return false;
@@ -185,7 +176,7 @@ public final class MessageControlState {
 
 
     public void take(Id id, MessageControlChannel owner) {
-        synchronized (monitor) {
+        synchronized (mutex) {
             @Nullable Entry entry = entries.get(id);
 
             if (null == entry) {
@@ -205,12 +196,12 @@ public final class MessageControlState {
                 groupsByPriority.insert(group);
             }
 
-            monitor.notifyAll();
+            mutex.notifyAll();
         }
         publish();
     }
     public void release(Id id, MessageControlChannel owner) {
-        synchronized (monitor) {
+        synchronized (mutex) {
             @Nullable Entry entry = entries.get(id);
 
             if (null == entry) {
@@ -230,25 +221,36 @@ public final class MessageControlState {
                 groupsByPriority.insert(group);
             }
 
-            monitor.notifyAll();
+            mutex.notifyAll();
         }
         publish();
     }
 
 
+    /** this should be called immediately before inserting a message control
+     * into the channel. It helps provide a fast negative for queries
+     * for bad IDs (could be for a number of reasons).
+     * @see #getObservable(io.nextop.Id, long, java.util.concurrent.TimeUnit) */
+    public void notifyPending(Id id) {
+        synchronized (mutex) {
+            pending.add(id);
+        }
+    }
 
+    public boolean add(Message message) {
+        // see notes at top - only SEND.MESSAGE message control
 
-
-
-    public boolean add(MessageControl mc) {
         Entry entry;
         Collection<Subscriber<? super Entry>> subscribers;
-        synchronized (monitor) {
-            if (entries.containsKey(mc.message.id)) {
+        synchronized (mutex) {
+            // check already added
+            if (entries.containsKey(message.id)) {
                 return false;
             }
 
-            entry = new Entry(headIndex++, mc);
+            entry = new Entry(headIndex++, message);
+            entries.put(entry.id, entry);
+            pending.remove(entry.id);
             subscribers = pendingSubscribers.removeAll(entry.id);
 
             @Nullable Group group = groups.get(entry.groupId);
@@ -264,7 +266,7 @@ public final class MessageControlState {
             group.add(entry);
             groupsByPriority.insert(group);
 
-            monitor.notifyAll();
+            mutex.notifyAll();
         }
         // add the subscribers (which publishes to them)
         for (Subscriber subscriber : subscribers) {
@@ -275,9 +277,9 @@ public final class MessageControlState {
     }
 
 
-    public boolean remove(Id id, Entry.End end) {
+    public boolean remove(Id id, End end) {
         Entry entry;
-        synchronized (monitor) {
+        synchronized (mutex) {
             entry = entries.remove(id);
 
             if (null == entry) {
@@ -299,7 +301,7 @@ public final class MessageControlState {
 
             entry.end = end;
 
-            monitor.notifyAll();
+            mutex.notifyAll();
         }
         entry.publish();
         publish();
@@ -309,9 +311,9 @@ public final class MessageControlState {
 
 
 
-    public boolean setTransferProgress(Id id, MessageControl.Direction dir, TransferProgress transferProgress) {
+    public boolean setInboxTransferProgress(Id id, TransferProgress transferProgress) {
         Entry entry;
-        synchronized (monitor) {
+        synchronized (mutex) {
             entry = entries.get(id);
 
             if (null == entry) {
@@ -322,16 +324,27 @@ public final class MessageControlState {
                 return false;
             }
 
-            switch (dir) {
-                case SEND:
-                    entry.sendTransferProgress = transferProgress;
-                    break;
-                case RECEIVE:
-                    entry.receiveTransferProgress = transferProgress;
-                    break;
-                default:
-                    throw new IllegalStateException();
+            entry.inboxTransferProgress = transferProgress;
+        }
+        entry.publish();
+        publish();
+        return true;
+    }
+
+    public boolean setOutboxTransferProgress(Id id, TransferProgress transferProgress) {
+        Entry entry;
+        synchronized (mutex) {
+            entry = entries.get(id);
+
+            if (null == entry) {
+                return false;
             }
+
+            if (null != entry.end) {
+                return false;
+            }
+
+            entry.outboxTransferProgress = transferProgress;
         }
         entry.publish();
         publish();
@@ -349,16 +362,40 @@ public final class MessageControlState {
         return publish;
     }
 
+
     public Observable<Entry> getObservable(final Id id) {
+        return getObservable(id, 0, TimeUnit.MILLISECONDS);
+    }
+
+    public Observable<Entry> getObservable(final Id id, final long timeout, final TimeUnit timeUnit) {
         // on subscribe, if no entry, add subscriber to pending observers for entry
         return Observable.create(new Observable.OnSubscribe<Entry>() {
             @Override
-            public void call(Subscriber<? super Entry> subscriber) {
+            public void call(final Subscriber<? super Entry> subscriber) {
                 @Nullable Entry entry;
-                synchronized (monitor) {
+                synchronized (mutex) {
                     entry = entries.get(id);
                     if (null == entry) {
-                        pendingSubscribers.put(id, subscriber);
+                        if (0 < timeout && /* see notifyPending */ pending.contains(id)) {
+                            pendingSubscribers.put(id, subscriber);
+
+                            // add the timeout
+                            subscriber.add(context.getScheduler().createWorker().schedule(new Action0() {
+                                @Override
+                                public void call() {
+                                    synchronized (mutex) {
+                                        if (pendingSubscribers.containsEntry(id, subscriber)) {
+                                            pendingSubscribers.remove(id, subscriber);
+                                            subscriber.onCompleted();
+                                            subscriber.unsubscribe();
+                                        }
+                                    }
+                                }
+                            }, timeout, timeUnit));
+                        } else {
+                            subscriber.onCompleted();
+                            subscriber.unsubscribe();
+                        }
                     }
                 }
                 if (null != entry) {
@@ -371,7 +408,7 @@ public final class MessageControlState {
 
 
     public int size() {
-        synchronized (monitor) {
+        synchronized (mutex) {
             int c = 0;
             for (Group g : groupsByPriority) {
                 c += g.entries.size();
@@ -381,13 +418,13 @@ public final class MessageControlState {
     }
 
     public int indexOf(Id id) {
-        synchronized (monitor) {
+        synchronized (mutex) {
             @Nullable Entry entry = entries.get(id);
             if (null == entry) {
                 return -1;
             }
 
-            @Nullable Group group = groups.get(entry.mc.message.groupId);
+            @Nullable Group group = groups.get(entry.message.groupId);
             if (null == group) {
                 return -1;
             }
@@ -405,7 +442,7 @@ public final class MessageControlState {
     }
 
     public Entry get(int index) {
-        synchronized (monitor) {
+        synchronized (mutex) {
             if (index < 0) {
                 throw new IndexOutOfBoundsException();
             }
@@ -422,7 +459,7 @@ public final class MessageControlState {
     }
 
     public List<GroupSnapshot> getGroups() {
-        synchronized (monitor) {
+        synchronized (mutex) {
             List<GroupSnapshot> groupSnapshots = new ArrayList<GroupSnapshot>(groupsByPriority.size());
             for (Group g : groupsByPriority) {
                 groupSnapshots.add(new GroupSnapshot(g.groupId, g.entries.size()));
@@ -432,7 +469,7 @@ public final class MessageControlState {
     }
 
     public Entry get(Id groupId, int index) {
-        synchronized (monitor) {
+        synchronized (mutex) {
             @Nullable Group group = groups.get(groupId);
             if (null == group) {
                 throw new IndexOutOfBoundsException();
@@ -463,28 +500,26 @@ public final class MessageControlState {
 
 
     /** standard implementation to respond to internal control messages */
-    public boolean onMessageControl(MessageControl mc, MessageControlChannel upstream) {
+    public boolean onActiveMessageControl(MessageControl mc, MessageControlChannel upstream) {
         Message message = mc.message;
         Route route = message.route;
         if (route.isLocal()) {
-            switch (mc.type) {
-                case MESSAGE:
-                    Id id = route.getLocalId();
+            Id id = route.getLocalId();
 
-                    if (Message.echoRoute(id).equals(route)) {
-                        @Nullable MessageControl rmc = createRedirect(id, message.inboxRoute());
-                        if (null != rmc) {
-                            upstream.onMessageControl(rmc);
-                            return true;
-                        } else {
-                            return false;
-                        }
-                    } // else fall through
-                    break;
-                default:
-                    // fall through
-                    break;
-            }
+            if (MessageControl.Type.ERROR.equals(mc.type) && Message.outboxRoute(id).equals(route)) {
+                // cancel
+                if (remove(id, End.CANCELED)) {
+                    upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, Message.inboxRoute(id)));
+                }
+            } else if (MessageControl.Type.MESSAGE.equals(mc.type) && Message.echoRoute(id).equals(route)) {
+                @Nullable MessageControl rmc = createRedirect(id, message.inboxRoute());
+                if (null != rmc) {
+                    upstream.onMessageControl(rmc);
+                    return true;
+                } else {
+                    return false;
+                }
+            } // else fall through
         }
         return false;
     }
@@ -492,48 +527,31 @@ public final class MessageControlState {
     @Nullable
     private MessageControl createRedirect(Id id, Route newRoute) {
         @Nullable Entry entry;
-        synchronized (monitor) {
+        synchronized (mutex) {
             entry = entries.get(id);
         }
         if (null == entry) {
             return null;
         }
 
-        Message message = entry.mc.message;
+        Message message = entry.message;
 
-        MessageControl.Direction rdir;
-        MessageControl.Type rtype;
-        Message rmessage;
-
-        rtype = entry.mc.type;
-        // flip the direction
-        switch (entry.mc.dir) {
-            case SEND:
-                rdir = MessageControl.Direction.RECEIVE;
-                break;
-            case RECEIVE:
-                rdir = MessageControl.Direction.SEND;
-                break;
-            default:
-                throw new IllegalStateException();
-        }
-        rmessage = message.toBuilder()
-                .setHeader(Message.H_LOCATION, message.route)
+        return MessageControl.receive(MessageControl.Type.MESSAGE, message.toBuilder()
+                // FIXME
+//                .setHeader(Message.H_LOCATION, message.route)
                 .setRoute(newRoute)
-                .build();
-
-        return new MessageControl(rdir, rtype, rmessage);
+                .build());
     }
 
 
-
+    public static enum End {
+        CANCELED,
+        COMPLETED,
+        ERROR
+    }
 
     public static final class Entry {
-        static enum End {
-            CANCELED,
-            COMPLETED,
-            ERROR
-        }
+
 
 
         final int index;
@@ -544,7 +562,7 @@ public final class MessageControlState {
         /** alias from message */
         public final int groupPriority;
 
-        public final MessageControl mc;
+        public final Message message;
 
 
         /////// PROPERTIES ///////
@@ -556,8 +574,8 @@ public final class MessageControlState {
         @Nullable
         public volatile MessageControlChannel owner = null;
 
-        public volatile TransferProgress sendTransferProgress = TransferProgress.none();
-        public volatile TransferProgress receiveTransferProgress = TransferProgress.none();
+        public volatile TransferProgress outboxTransferProgress = TransferProgress.none();
+        public volatile TransferProgress inboxTransferProgress = TransferProgress.none();
         @Nullable
         public volatile End end = null;
 
@@ -572,12 +590,12 @@ public final class MessageControlState {
 
 
 
-        Entry(int index, MessageControl mc) {
+        Entry(int index, Message message) {
             this.index = index;
-            id = mc.message.id;
-            groupId = mc.message.groupId;
-            groupPriority = mc.message.groupPriority;
-            this.mc = mc;
+            groupId = message.groupId;
+            id = message.id;
+            groupPriority = message.groupPriority;
+            this.message = message;
             publish = BehaviorSubject.create(this);
         }
 
@@ -643,7 +661,7 @@ public final class MessageControlState {
         Group(Id groupId) {
             this.groupId = groupId;
 
-            entriesByPriority = new PriorityQueue<Entry>(COMPARATOR_ENTRY_DESCENDING_PRIORITY);
+            entriesByPriority = new PriorityQueue<Entry>(8, COMPARATOR_ENTRY_DESCENDING_PRIORITY);
             entries = new SplaySortedList<Entry>(COMPARATOR_ENTRY_AVAILABLE);
         }
 
@@ -678,7 +696,7 @@ public final class MessageControlState {
             try {
                 entry.owner = owner;
             } finally {
-                entries.add(entry);
+                entries.insert(entry);
             }
         }
         void release(Entry entry, MessageControlChannel owner) {
@@ -692,7 +710,7 @@ public final class MessageControlState {
             try {
                 entry.owner = null;
             } finally {
-                entries.add(entry);
+                entries.insert(entry);
             }
         }
     }

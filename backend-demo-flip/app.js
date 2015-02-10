@@ -156,7 +156,7 @@ app.get('/flip/:flipId/info', function (req, res) {
 // ?after= to go after index
 app.get('/flip/:flipId/frame', function (req, res) {
     var flipId = req.params.flipId;
-    if ('after' in req.params) {
+    if ('after' in req.query) {
         var after = req.query.after;
         mysqlClient.query('SELECT frame_id, creation_time, image_url, most_recent_update_index FROM FlipFrame' +
             ' WHERE flip_id = ? AND deleted = false AND most_recent_update_index > ?' +

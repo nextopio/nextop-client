@@ -1,18 +1,17 @@
 package io.nextop.sortedlist;
 
+import com.google.common.collect.Ordering;
+
+import javax.annotation.Nullable;
 import java.util.AbstractList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 
-import javax.annotation.Nullable;
-
-import com.google.common.collect.Ordering;
-
 
 /** Random-access data structure that maintains
  * elements in sorted order, with some extra sorted lookup functionality. 
- * Inserting by index {@link #add(int, E)} is not supported,
+ * Inserting by index {@link #add(int, Object)} is not supported,
  * since the index is determined by the sort order.
  * add/get/remove operations are logarithmic.
  * 
@@ -25,8 +24,8 @@ import com.google.common.collect.Ordering;
  * or values/indexes near them.
  * 
  * Based on notes:
- * @see CLR
- * @see ftp://ftp.cs.cmu.edu/usr/ftp/usr/sleator/splaying/SplayTree.java
+ * see CLR
+ * see ftp://ftp.cs.cmu.edu/usr/ftp/usr/sleator/splaying/SplayTree.java
  */
 // FIXME inserting in sequential order bad perf
 // FIXME support duplicates

@@ -17,6 +17,9 @@ public interface MessageControlChannel extends MessageContext {
     //
 
 
+    // FIXME kill metrics
+    // FIXME kill onTransfer - pass the state in Node init
+
     // quality is set to 0 into downstream; only the upstream cares about quality
     void onActive(boolean active, MessageControlMetrics metrics);
     void onTransfer(MessageControlState mcs);

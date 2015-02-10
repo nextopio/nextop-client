@@ -176,8 +176,9 @@ public class MainActivity extends RxActivity {
 
             imageView.reset();
 
-            Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view), 3000, flipVmSource).out
-            .distinctUntilChanged();
+            Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view), 3000, flipVmSource)
+                    .out;
+//            .distinctUntilChanged();
             imageVmSource.subscribe(new ImageView.Updater(imageView,
                     null, ImageView.Transition.instantHold()));
 
@@ -295,7 +296,7 @@ public class MainActivity extends RxActivity {
 
                     @Override
                     public void onNext(Nextop.TransferStatus transferStatus) {
-                        if (1 == ++count && transferStatus.progress < 1.f) {
+                        if (1 == ++count && transferStatus.send.asFloat() < 1.f) {
                             subject.onNext(frameVms[locali].imageVm);
                         }
                     }

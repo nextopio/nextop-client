@@ -8,6 +8,7 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.TransitionDrawable;
 import android.net.Uri;
 import android.util.AttributeSet;
+import android.util.Log;
 import com.google.common.annotations.Beta;
 import io.nextop.*;
 import io.nextop.vm.ImageViewModel;
@@ -247,7 +248,7 @@ public class ImageView extends android.widget.ImageView {
                     new Func2<Nextop.TransferStatus, Nextop.ConnectionStatus, Progress>() {
                         @Override
                         public Progress call(Nextop.TransferStatus transferStatus, Nextop.ConnectionStatus connectionStatus) {
-                            return Progress.download(transferStatus.progress, connectionStatus.online);
+                            return Progress.download(transferStatus.receive.asFloat(), connectionStatus.online);
                         }
                     }).delaySubscription(downProgressTimeoutMs, TimeUnit.MILLISECONDS);
             // cancel this subscription on the first emitted layer (below)
@@ -283,7 +284,7 @@ public class ImageView extends android.widget.ImageView {
                     new Func2<Nextop.TransferStatus, Nextop.ConnectionStatus, Progress>() {
                         @Override
                         public Progress call(Nextop.TransferStatus transferStatus, Nextop.ConnectionStatus connectionStatus) {
-                            return Progress.upload(transferStatus.progress, connectionStatus.online);
+                            return Progress.upload(transferStatus.send.asFloat(), connectionStatus.online);
                         }
                     });
             Subscription progressSubscription = upProgressSource.subscribe(new ProgressLoader());

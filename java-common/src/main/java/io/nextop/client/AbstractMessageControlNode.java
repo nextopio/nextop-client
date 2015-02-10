@@ -1,11 +1,16 @@
 package io.nextop.client;
 
+import rx.Scheduler;
+
 import javax.annotation.Nullable;
 
 public abstract class AbstractMessageControlNode implements MessageControlNode {
 
     @Nullable
     protected MessageControlChannel upstream = null;
+
+    @Nullable
+    protected MessageControlState mcs = null;
 
 
 
@@ -72,6 +77,11 @@ public abstract class AbstractMessageControlNode implements MessageControlNode {
 
 
     @Override
+    public void onTransfer(MessageControlState mcs) {
+        this.mcs = mcs;
+    }
+
+    @Override
     public void post(Runnable r) {
         checkUpstream();
         upstream.post(r);
@@ -81,5 +91,11 @@ public abstract class AbstractMessageControlNode implements MessageControlNode {
     public void postDelayed(Runnable r, int delayMs) {
         checkUpstream();
         upstream.postDelayed(r, delayMs);
+    }
+
+    @Override
+    public Scheduler getScheduler() {
+        checkUpstream();
+        return upstream.getScheduler();
     }
 }

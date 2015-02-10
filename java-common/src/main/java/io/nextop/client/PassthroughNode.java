@@ -1,5 +1,7 @@
 package io.nextop.client;
 
+import rx.Scheduler;
+
 public class PassthroughNode extends AbstractMessageControlNode {
 
     MessageControlNode downstream;
@@ -35,6 +37,11 @@ public class PassthroughNode extends AbstractMessageControlNode {
             @Override
             public void postDelayed(Runnable r, int delayMs) {
                 upstream.postDelayed(r, delayMs);
+            }
+
+            @Override
+            public Scheduler getScheduler() {
+                return upstream.getScheduler();
             }
         });
     }

@@ -13,35 +13,23 @@ import io.nextop.org.apache.http.client.HttpClient;
 import io.nextop.org.apache.http.client.methods.HttpUriRequest;
 import io.nextop.org.apache.http.impl.client.DefaultHttpClient;
 
+import javax.annotation.Nullable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-// FIXME ordering and retry
-// FIXME use a package-shifted version of HttpClient
-public class HttpNode extends AbstractMessageControlNode {
+public final class HttpNode extends AbstractMessageControlNode {
 
-    private Executor executor;
-    private HttpClient httpClient;
+    private final HttpClient httpClient;
 
+    // FIXME
     private SendStrategy sendStrategy = SendStrategy.INDEFINITE;
 
     volatile boolean active = true;
 
 
-    // FIXME Map<Id, TransferState> states = new ConcurrentHashMap<>();
-    // FIXME TransferState does progress, cancellation, holds onto original message for load from local
-
-
 
     public HttpNode() {
-        // FIXME 0.2 ordering and expand to multiple threads
-        this(Executors.newSingleThreadExecutor());
-    }
-
-    public HttpNode(Executor executor) {
-
-        this.executor = executor;
-        // FIXME 0.1.1 jarjar httpclient
         httpClient = new DefaultHttpClient();
                 //HttpClients.createDefault();
     }
@@ -49,112 +37,73 @@ public class HttpNode extends AbstractMessageControlNode {
 
     @Override
     public void onActive(boolean active, MessageControlMetrics metrics) {
-        // FIXME on false, upstream.onTransfer(mcs)
+        this.active = active;
+
+        if (!active) {
+            // FIXME on false, upstream.onTransfer(mcs)
+        }
     }
 
     @Override
     public void onTransfer(MessageControlState mcs) {
-        // FIXME
-    }
+        super.onTransfer(mcs);
 
+        if (active) {
+            // FIXME can have multiple loopers here because mcs does the correct ordering
+            // FIXME parameterize
+//            for (int i = 0; i < 8; ++i) {
+                new Thread(new RequestLooper()).start();
+//            }
+        }
+    }
 
     @Override
     public void onMessageControl(MessageControl mc) {
-        switch (mc.type) {
-            case SEND:
-                // FIXME update the mcs?
-                onSend(mc.message);
-                break;
-
-            case SUBSCRIBE:
-                // FIXME put this in the mcs
-                break;
-
-            case UNSUBSCRIBE:
-                // FIXME put this in the mcs
-                break;
-
-            case SEND_NACK:
-                // FIXME update the mcs
-                break;
-
-            case RECEIVE_ACK:
-                // FIXME update the mcs
-                break;
-
-            case RECEIVE_NACK:
-                // FIXME update the mcs
-                break;
-        }
-    }
-
-
-
-    private void onSend(final Message message) {
-        if (message.route.via.isLocal()) {
-            // FIXME 0.1.1 a control message
-
-            Id id = message.route.getLocalId();
-
-            if (Message.statusRoute(id).equals(message.route)) {
-                // FIXME TEMP REMOVE
-                // FIXME HOOK INTO THE TRANSFER STATE MAP
-                class StatusUpdater implements Runnable {
-                    int c = 0;
-                    int m = 100;
-
-                    @Override
-                    public void run() {
-                        float p = ++c / (float) m;
-
-                        Message statusMessage = Message.newBuilder()
-                                .setRoute(message.inboxRoute())
-                                .set(Message.P_PROGRESS, p)
-                                .build();
-                        upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE, statusMessage));
-
-                        if (c < m) {
-                            postDelayed(this, 100);
-                        } else {
-                            upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_COMPLETE, statusMessage.toSpec()));
-                        }
-                    }
-                }
-                new StatusUpdater().run();
-            } else {
-                // FIXME more
-                onSendError(message);
+        assert MessageControl.Direction.SEND.equals(mc.dir);
+        if (active && !mcs.onActiveMessageControl(mc, upstream)) {
+            switch (mc.type) {
+                case MESSAGE:
+                    mcs.add(mc.message);
+                    break;
+                default:
+                    // ignore
+                    break;
             }
-        } else {
-            executor.execute(new RequestWorker(message));
         }
     }
 
-    private void onSendError(Message message) {
-        upstream.onMessageControl(new MessageControl(MessageControl.Type.SEND_ERROR, message));
-    }
-
-
-    private void onReceive(Message message) {
-        upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE, message));
-        upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_COMPLETE, message.toSpec()));
-    }
-
-    private void onReceiveError(Message message) {
-        upstream.onMessageControl(new MessageControl(MessageControl.Type.RECEIVE_ERROR, message));
-    }
 
 
 
-    private final class RequestWorker implements Runnable {
-        final Message requestMessage;
 
-        RequestWorker(Message requestMessage) {
-            this.requestMessage = requestMessage;
-        }
+    private final class RequestLooper implements Runnable {
 
         @Override
         public void run() {
+            while (active) {
+                try {
+                    @Nullable MessageControlState.Entry entry = mcs.takeFirstAvailable(HttpNode.this,
+                            Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
+                    if (null != entry) {
+                        try {
+                            execute(entry.message, entry);
+                        } finally {
+                            // FIXME ERROR, COMPLETED
+                            mcs.remove(entry.id, MessageControlState.End.COMPLETED);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    // continue
+                }
+            }
+
+        }
+
+        private void execute(final Message requestMessage, MessageControlState.Entry entry) {
+            // FIXME do progress updates
+
+
+
             final HttpUriRequest request;
             try {
                 request = Message.toHttpRequest(requestMessage);
@@ -162,7 +111,7 @@ public class HttpNode extends AbstractMessageControlNode {
                 post(new Runnable() {
                     @Override
                     public void run() {
-                        onSendError(requestMessage);
+                        upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, requestMessage));
                     }
                 });
                 return;
@@ -181,7 +130,7 @@ public class HttpNode extends AbstractMessageControlNode {
                 post(new Runnable() {
                     @Override
                     public void run() {
-                        onSendError(requestMessage);
+                        upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, requestMessage));
                     }
                 });
                 return;
@@ -198,7 +147,7 @@ public class HttpNode extends AbstractMessageControlNode {
                 post(new Runnable() {
                     @Override
                     public void run() {
-                        onReceiveError(Message.newBuilder().setRoute(requestMessage.inboxRoute()).build());
+                        upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, requestMessage.inboxRoute()));
                     }
                 });
                 return;
@@ -208,23 +157,15 @@ public class HttpNode extends AbstractMessageControlNode {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    onReceive(responseMessage);
+                    upstream.onMessageControl(MessageControl.receive(responseMessage));
+                    upstream.onMessageControl(MessageControl.receive(MessageControl.Type.COMPLETE, responseMessage.route));
                 }
             });
         }
-    }
-
-
-
-    private static final class TransferProgressState {
-        final Route route;
-        float progress;
-
-        TransferProgressState(Route route, float progress) {
-            this.route = route;
-            this.progress = progress;
-        }
 
     }
+
+
+
 
 }

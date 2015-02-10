@@ -515,10 +515,13 @@ public class Nextop {
 
             this.node = node;
 
+            AndroidMessageContext messageContext = new AndroidMessageContext();
             subjectNode = new SubjectNode(node);
-            mcs = new MessageControlState();
-            subjectNode.init(new AndroidMessageContext(mcs));
+            mcs = new MessageControlState(messageContext);
+            subjectNode.init(messageContext);
             subjectNode.start();
+            subjectNode.onActive(true, null);
+            subjectNode.onTransfer(mcs);
         }
 
 
@@ -557,6 +560,8 @@ public class Nextop {
             subjectNode.cancelSend(id);
         }
 
+        // FIXME
+        // FIXME if these are GETs, do request piggybacking and decoding on multiple threads
         @Override
         public Receiver<Layer> send(Layer layer, @Nullable LayersConfig config) {
             // FIXME 0.1.1
@@ -582,6 +587,9 @@ public class Nextop {
                 tmessage = layer.message;
             }
 
+            // FIXME parallel
+//            tmessage = tmessage.buildOn().setGroupId(Id.create()).build();
+
             subjectNode.send(tmessage);
             Route route = tmessage.inboxRoute();
             return Receiver.create(this, route, subjectNode.receive(route).map(new Func1<Message, Layer>() {
@@ -592,7 +600,12 @@ public class Nextop {
                         case IMAGE:
                             EncodedImage image = content.asImage();
 
-                            Bitmap bitmap = BitmapFactory.decodeByteArray(image.bytes, image.offset, image.length);
+                            // FIXME
+                            // FIXME fit the scale correctly to the layer
+                            BitmapFactory.Options opts = new BitmapFactory.Options();
+                            opts.inSampleSize = 4;
+
+                            Bitmap bitmap = BitmapFactory.decodeByteArray(image.bytes, image.offset, image.length, opts);
                             return Layer.bitmap(message.buildOn().setContent(null).build(),
                                     bitmap);
                         default:
@@ -608,7 +621,12 @@ public class Nextop {
             if (null == id) {
                 throw new IllegalArgumentException();
             }
-            return mcs.getProgress(id);
+            return mcs.getObservable(id).map(new Func1<MessageControlState.Entry, TransferStatus>() {
+                @Override
+                public TransferStatus call(MessageControlState.Entry entry) {
+                    return new TransferStatus(entry.inboxTransferProgress, entry.outboxTransferProgress);
+                }
+            });
         }
 
 
@@ -738,6 +756,20 @@ public class Nextop {
 
         }
     }
+
+
+    /////// TRANSFER STATUS ///////
+
+    public static final class TransferStatus {
+        public final MessageControlState.TransferProgress send;
+        public final MessageControlState.TransferProgress receive;
+
+        TransferStatus(MessageControlState.TransferProgress send, MessageControlState.TransferProgress receive) {
+            this.send = send;
+            this.receive = receive;
+        }
+    }
+
 
 
     /////// AUTH ///////
