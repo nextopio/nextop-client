@@ -11,7 +11,7 @@ import java.util.UUID;
 /** 256-bit UUID.
  * @see <a href="http://www.ietf.org/rfc/rfc4122.txt">RFC4122</a>
  * @see #create */
-public final class Id {
+public final class Id implements Comparable<Id> {
     private static final SecureRandom sr = new SecureRandom();
 
     static final int LENGTH = 32;
@@ -92,5 +92,17 @@ public final class Id {
         }
         Id b = (Id) obj;
         return hashCode == b.hashCode && Arrays.equals(bytes, b.bytes);
+    }
+
+
+    @Override
+    public int compareTo(Id b) {
+        for (int i = 0; i < 32; ++i) {
+            int d = (0xFF & bytes[offset + i]) - (0xFF & b.bytes[b.offset + i]);
+            if (0 != d) {
+                return d;
+            }
+        }
+        return 0;
     }
 }

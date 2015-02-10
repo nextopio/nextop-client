@@ -9,7 +9,7 @@ public final class MoreObservables {
         return Observable.create(new Observable.OnSubscribe<T>() {
             @Override
             public void call(Subscriber<? super T> subscriber) {
-                // hang ...
+                /* hang ... */
             }
         });
     }

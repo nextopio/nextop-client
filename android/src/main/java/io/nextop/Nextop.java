@@ -11,7 +11,7 @@ import android.os.Bundle;
 import com.google.common.annotations.Beta;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import io.nextop.client.HttpNode;
+import io.nextop.client.http.HttpNode;
 import io.nextop.client.MessageControlNode;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.SubjectNode;
@@ -322,25 +322,19 @@ public class Nextop {
     /////// TRANSFER STATUS ///////
 
     public Observable<TransferStatus> transferStatus(Id id) {
-        if (null == id) {
-            throw new IllegalArgumentException();
-        }
-        Message statusMessage = Message.newBuilder().setRoute(Message.statusRoute(id)).build();
-        return send(statusMessage).map(new Func1<Message, TransferStatus>() {
-            @Override
-            public TransferStatus call(Message message) {
-                return new TransferStatus(message.parameters.get(Message.P_PROGRESS).asFloat());
-            }
-        });
+//        if (null == id) {
+//            throw new IllegalArgumentException();
+//        }
+//        Message statusMessage = Message.newBuilder().setRoute(Message.statusRoute(id)).build();
+//        return send(statusMessage).map(new Func1<Message, TransferStatus>() {
+//            @Override
+//            public TransferStatus call(Message message) {
+//                return new TransferStatus(message.parameters.get(Message.P_PROGRESS).asFloat());
+//            }
+//        });
+        throw new IllegalStateException("Call on a started nextop.");
     }
 
-    public static final class TransferStatus {
-        public final float progress;
-
-        TransferStatus(float progress) {
-            this.progress = progress;
-        }
-    }
 
 
     /////// TIME ///////
@@ -511,6 +505,7 @@ public class Nextop {
         private BehaviorSubject<CameraAdapter> cameraSubject = BehaviorSubject.create();
 
         SubjectNode subjectNode;
+        MessageControlState mcs;
         MessageControlNode node;
 
 
@@ -521,7 +516,7 @@ public class Nextop {
             this.node = node;
 
             subjectNode = new SubjectNode(node);
-            MessageControlState mcs = new MessageControlState();
+            mcs = new MessageControlState();
             subjectNode.init(new AndroidMessageContext(mcs));
             subjectNode.start();
         }
@@ -605,6 +600,15 @@ public class Nextop {
                     }
                 }
             }));
+        }
+
+        // FIXME distinct within 1%
+        // FIXME timeout if no first emit after 15s
+        public Observable<TransferStatus> transferStatus(Id id) {
+            if (null == id) {
+                throw new IllegalArgumentException();
+            }
+            return mcs.getProgress(id);
         }
 
 

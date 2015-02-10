@@ -1,8 +1,12 @@
-package io.nextop.client;
+package io.nextop.client.http;
 
 import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Route;
+import io.nextop.client.AbstractMessageControlNode;
+import io.nextop.client.MessageControl;
+import io.nextop.client.MessageControlMetrics;
+import io.nextop.client.MessageControlState;
 import io.nextop.client.retry.SendStrategy;
 import io.nextop.org.apache.http.HttpResponse;
 import io.nextop.org.apache.http.client.HttpClient;
@@ -20,6 +24,8 @@ public class HttpNode extends AbstractMessageControlNode {
     private HttpClient httpClient;
 
     private SendStrategy sendStrategy = SendStrategy.INDEFINITE;
+
+    volatile boolean active = true;
 
 
     // FIXME Map<Id, TransferState> states = new ConcurrentHashMap<>();

@@ -15,6 +15,7 @@ package io.nextop.client;
 
 
 import io.nextop.Message;
+import io.nextop.client.http.HttpNode;
 
 public class ClientDemo {
 
@@ -47,7 +48,7 @@ public class ClientDemo {
 
         MessageControlState mcs = new MessageControlState();
 
-        MessageContext context = new MessageContext(mcs);
+        DemoMessageContext context = new DemoMessageContext(mcs);
         s.init(context);
         s.start();
 

@@ -41,6 +41,9 @@ public class Message {
     public static final WireValue P_CODE = WireValue.of("$code");
     public static final WireValue P_REASON = WireValue.of("$reason");
 
+    public static final WireValue H_LOCATION = WireValue.of("$location");
+
+
     public static final Id DEFAULT_GROUP_ID = Id.create(0L, 0L, 0L, 0L);
     public static final int DEFAULT_GROUP_PRIORITY = 0;
 
@@ -60,13 +63,13 @@ public class Message {
     public static Route echoHeadRoute(Id id) {
         return Route.local(Target.create(Method.HEAD, Path.valueOf("/" + id)));
     }
-    /** @see Route#getLocalId */
-    public static Route statusRoute(Id id) {
-        return Route.local(Target.create(Method.GET, Path.valueOf("/" + id + "/status")));
-    }
+//    /** @see Route#getLocalId */
+//    public static Route statusRoute(Id id) {
+//        return Route.local(Target.create(Method.GET, Path.valueOf("/" + id + "/status")));
+//    }
 
 
-    public static final WireValue P_PROGRESS = WireValue.of("progress");
+//    public static final WireValue P_PROGRESS = WireValue.of("progress");
 
 
 
@@ -141,9 +144,9 @@ public class Message {
     public Route echoHeadRoute() {
         return echoHeadRoute(id);
     }
-    public Route statusRoute() {
-        return statusRoute(id);
-    }
+//    public Route statusRoute() {
+//        return statusRoute(id);
+//    }
 
 
 

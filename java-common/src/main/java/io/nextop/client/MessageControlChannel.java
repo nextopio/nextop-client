@@ -2,7 +2,7 @@ package io.nextop.client;
 
 // proactor (async) pattern where messages in get routed the active controller,
 // and surface messages out in both directions
-public interface MessageControlChannel {
+public interface MessageControlChannel extends MessageContext {
     // rules
     // 1. messages routed to the active node
     // 2. after onActive, onTransfer is always called (either from upstream to self if active-true, or from self to upstream is active=false) with the complete message control state, transferring control of the state
@@ -22,10 +22,5 @@ public interface MessageControlChannel {
     void onTransfer(MessageControlState mcs);
     void onMessageControl(MessageControl mc);
 
-    // TODO
-    // post
-    // postDelayed
-    void post(Runnable r);
-    void postDelayed(Runnable r, int delayMs);
 
 }
