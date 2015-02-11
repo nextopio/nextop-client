@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              >
+<FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="320dp"
+        android:layout_weight="1"
         >
     <GridView android:id="@+id/grid"
           android:layout_width="match_parent"
@@ -21,5 +27,15 @@
             android:background="@drawable/button_round"
             android:elevation="4dp" />
 
-
 </FrameLayout>
+
+
+        <!-- FIXME the lib insert this dynamically -->
+<FrameLayout
+android:id="@+id/debug_container"
+android:layout_width="match_parent"
+android:layout_height="320dp"
+android:layout_weight="0"
+android:visibility="gone" />
+
+    </LinearLayout>

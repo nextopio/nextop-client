@@ -2,13 +2,12 @@ package io.nextop.demo.flip;
 
 
 import android.os.Bundle;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
+import android.view.*;
 import android.widget.*;
 import io.nextop.Id;
 import io.nextop.Nextop;
 import io.nextop.NextopAndroid;
+import io.nextop.fragment.DebugFragment;
 import io.nextop.rx.RxActivity;
 import io.nextop.rx.RxViewGroup;
 import io.nextop.view.ImageView;
@@ -35,8 +34,39 @@ public class MainActivity extends RxActivity {
     FeedAdapter feedAdapter;
 
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        super.onCreateOptionsMenu(menu);
 
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
 
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.debug:
+                // toggle the debug fragment
+                View debugContainer = findViewById(R.id.debug_container);
+                if (View.VISIBLE != debugContainer.getVisibility()) {
+                    if (null == getFragmentManager().findFragmentById(R.id.debug_container)) {
+                        getFragmentManager().beginTransaction()
+                                .add(R.id.debug_container, DebugFragment.newInstance())
+                                .commit();
+                    }
+                    debugContainer.setVisibility(View.VISIBLE);
+                } else {
+                    debugContainer.setVisibility(View.GONE);
+                }
+
+                return true;
+            case R.id.about:
+                // FIXME
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

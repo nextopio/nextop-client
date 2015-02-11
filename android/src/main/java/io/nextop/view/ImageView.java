@@ -8,7 +8,6 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.TransitionDrawable;
 import android.net.Uri;
 import android.util.AttributeSet;
-import android.util.Log;
 import com.google.common.annotations.Beta;
 import io.nextop.*;
 import io.nextop.vm.ImageViewModel;
@@ -143,10 +142,10 @@ public class ImageView extends android.widget.ImageView {
         base.minTransferHeight = defaultMinTransferPx;
 
         Nextop.LayersConfig.Bound a = base.copy();
-        a.quality = 0.3f;
+        a.quality = 30;
 
         Nextop.LayersConfig.Bound b = base.copy();
-        b.quality = 1.f;
+        b.quality = 100;
 
         return Nextop.LayersConfig.receive(a, b);
     }

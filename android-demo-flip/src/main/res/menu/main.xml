@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/debug"
+          android:title="@string/debug"
+          android:titleCondensed="@string/debug_short"
+          android:icon="@drawable/debug"
+          android:showAsAction="always" />
+
+    <item android:id="@+id/about"
+          android:title="@string/about"
+          android:showAsAction="never" />
+
+</menu>

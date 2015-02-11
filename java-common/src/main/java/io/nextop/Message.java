@@ -176,6 +176,14 @@ public class Message {
         return toUri(this);
     }
 
+    public String toUriString() {
+        try {
+            return toUri(this).toString();
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException();
+        }
+    }
+
     public HttpUriRequest toHttpRequest() throws URISyntaxException {
         return toHttpRequest(this);
     }

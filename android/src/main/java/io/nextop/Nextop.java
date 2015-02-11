@@ -9,6 +9,11 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import com.google.common.annotations.Beta;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.Weigher;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.nextop.client.http.HttpNode;
@@ -27,6 +32,7 @@ import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 // calls all receives on the MAIN thread
@@ -222,8 +228,18 @@ public class Nextop {
         }
 
 
+        public static String toCacheKey(String uri, Bound bound) {
+            return String.format("%s:%s:%s:%s",
+                    0 <= bound.maxTransferWidth ? bound.maxTransferWidth : "",
+                    0 <= bound.maxTransferHeight ? bound.maxTransferHeight : "",
+                    bound.quality,
+                    uri);
+        }
+
+
         // once passed off, consider this immutable
         public static final class Bound {
+
             // TRANSFER
 
             // affects url
@@ -237,7 +253,8 @@ public class Nextop {
             public int minTransferHeight = -1;
 
             // affects url
-            public float quality = 1.f;
+            // [0, 100]
+            public int quality = 100;
 
             public Id groupId = Message.DEFAULT_GROUP_ID;
             // affects transmission
@@ -558,40 +575,101 @@ public class Nextop {
         @Override
         public void cancelSend(Id id) {
             subjectNode.cancelSend(id);
+            // FIXME
+            inFlight.inverse().remove(id);
         }
+
+
+
+
 
         // FIXME
         // FIXME if these are GETs, do request piggybacking and decoding on multiple threads
+
+        Cache<String, Bitmap> layerCache = CacheBuilder.newBuilder()
+                .maximumWeight(100)
+                .weigher(new Weigher<String, Bitmap>() {
+                    @Override
+                    public int weigh(String key, Bitmap value) {
+                        // FIXME
+                        return 1;
+                    }
+                }).concurrencyLevel(1
+                ).build();
+
+        // FIXME
+        BiMap<String, Id> inFlight = HashBiMap.create(32);
+
+
         @Override
         public Receiver<Layer> send(Layer layer, @Nullable LayersConfig config) {
             // FIXME 0.1.1
             // FIXME   send layers should manipulate the route here (base route + parameters per layer)
             // FIXME   this has to be coordinated with the receive/decode step
             // FIXME   get threading right and general correctness
-            Message tmessage;
-            if (null != layer.bitmap) {
-                Bitmap bitmap = layer.bitmap;
 
-                ByteArrayOutputStream baos = new ByteArrayOutputStream(1024 * 1024);
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, baos);
-                byte[] bytes = baos.toByteArray();
+            // bounds to use:
+            List<LayersConfig.Bound> sendBounds = config.sendBounds;
+            if (sendBounds.isEmpty()) {
+                sendBounds = Collections.singletonList(new LayersConfig.Bound());
+            }
+            List<LayersConfig.Bound> receiveBounds = config.receiveBounds;
+            if (receiveBounds.isEmpty()) {
+                receiveBounds = Collections.singletonList(new LayersConfig.Bound());
+            }
 
-                EncodedImage image = new EncodedImage(EncodedImage.Format.JPEG, EncodedImage.Orientation.REAR_FACING,
-                        bitmap.getWidth(), bitmap.getHeight(),
-                        bytes, 0, bytes.length);
+            // FIXME only for GETs
+            // FIXME even on cache hit, still send a HEAD to check on the cache headers?
+            final boolean cacheable = true;
 
-                tmessage = layer.message.buildOn()
-                        .setContent(WireValue.of(image))
-                        .build();
+            // FIXME start at the last bounds and go down for a cache hit
+            final String uri = layer.message.toUriString();
+            final String cacheKey = LayersConfig.toCacheKey(uri, sendBounds.get(0));
+            @Nullable Bitmap cachedBitmap = layerCache.getIfPresent(cacheKey);
+            if (cacheable && null != cachedBitmap) {
+                return Receiver.create(this, layer.message.inboxRoute(), Observable.just(Layer.bitmap(
+                        // FIXME set cache headers
+                        Message.newBuilder().setRoute(layer.message.inboxRoute()).build(),
+                        cachedBitmap)));
+            }
+
+
+            // FIXME option to attach
+            Route route;
+            @Nullable final Id inFlightId = inFlight.get(uri);
+            if (null != inFlightId) {
+                route = Message.inboxRoute(inFlightId);
             } else {
-                tmessage = layer.message;
+                Message tmessage;
+                if (null != layer.bitmap) {
+                    Bitmap bitmap = layer.bitmap;
+
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream(1024 * 1024);
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, baos);
+                    byte[] bytes = baos.toByteArray();
+
+                    EncodedImage image = new EncodedImage(EncodedImage.Format.JPEG, EncodedImage.Orientation.REAR_FACING,
+                            bitmap.getWidth(), bitmap.getHeight(),
+                            bytes, 0, bytes.length);
+
+                    tmessage = layer.message.buildOn()
+                            .setContent(WireValue.of(image))
+                            .build();
+                } else {
+                    tmessage = layer.message;
+                }
+
+
+                subjectNode.send(tmessage);
+                route = tmessage.inboxRoute();
+                inFlight.put(uri, tmessage.id);
             }
 
             // FIXME parallel
 //            tmessage = tmessage.buildOn().setGroupId(Id.create()).build();
 
-            subjectNode.send(tmessage);
-            Route route = tmessage.inboxRoute();
+            // FIXME subject node needs to put dispatch on the MAIN thread. get scheduling everywhere fixed
+            // FIXME (otherwise could miss the receive)
             return Receiver.create(this, route, subjectNode.receive(route).map(new Func1<Message, Layer>() {
                 @Override
                 public Layer call(Message message) {
@@ -606,13 +684,22 @@ public class Nextop {
                             opts.inSampleSize = 4;
 
                             Bitmap bitmap = BitmapFactory.decodeByteArray(image.bytes, image.offset, image.length, opts);
+
+                            // FIXME correct cache key
+                            layerCache.put(cacheKey, bitmap);
+                            inFlight.remove(uri);
+
+
                             return Layer.bitmap(message.buildOn().setContent(null).build(),
                                     bitmap);
                         default:
                             return Layer.message(message);
                     }
                 }
-            }));
+            }))
+                    // FIXME this is just to populate the cache
+//                    .detachOnUnsubscribe()
+                    ;
         }
 
         // FIXME distinct within 1%

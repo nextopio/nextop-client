@@ -47,6 +47,9 @@ dependencies {
 
 //    compile fileTree(dir: 'libs', include: ['*.jar'])
 
+    compile group: 'com.android.support', name: 'support-v4', version: '21.0.3'
+    compile group: 'com.android.support', name: 'support-v13', version: '21.0.3'
+
     androidTestCompile 'junit:junit:3.8.2'
     /* (source of warnings) this has a transitive dependency on
     org.apache.httpcomponents:httpclient:4.0.3

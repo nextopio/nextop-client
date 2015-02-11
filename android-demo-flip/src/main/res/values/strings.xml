@@ -4,4 +4,9 @@
     <string name="app_name_short">dılɟ</string>
     <string name="app_name">doʇxǝu ʎq dılɟ</string>
 
+    <string name="debug">Debug</string>
+    <string name="debug_short">D</string>
+
+    <string name="about">About</string>
+
 </resources>
