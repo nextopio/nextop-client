@@ -640,13 +640,13 @@ public final class MessageControlState {
     public static final class GroupSnapshot {
         public final Id groupId;
         public final int size;
+        // FIXME priority
 
         GroupSnapshot(Id groupId, int size) {
             this.groupId = groupId;
             this.size = size;
         }
     }
-
 
 
     // internal

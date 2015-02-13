@@ -2,10 +2,7 @@ package io.nextop.rx;
 
 import com.google.common.base.Objects;
 import immutablecollections.ImSet;
-import rx.Observable;
-import rx.Observer;
-import rx.Subscriber;
-import rx.Subscription;
+import rx.*;
 import rx.functions.Action0;
 import rx.observers.Subscribers;
 import rx.subscriptions.BooleanSubscription;
@@ -52,11 +49,22 @@ public interface RxLifecycleBinder extends Subscription {
         @Nullable
         private Subscription cascadeSubscription = null;
 
+        private boolean debug = false;
 
+
+        // FIXME take in a debug boolean
         public Lifted() {
         }
 
+        // FIXME be able to dynamically turn off debug
 
+
+        // FIXME exposed observable<Lifted>
+        // FIXME properties for isConnected, getSubscriptions, getOnNextCallCount<#calls,#fan out>, getOnCompletedCallCount, getOnErrorCallCount
+        // FIXME getView
+        // FIXME register with central on create; unregister with central on close
+
+        // FIXME take in an optional view
         public void connect() {
             if (closed) {
                 throw new IllegalStateException();
@@ -183,7 +191,7 @@ public interface RxLifecycleBinder extends Subscription {
             }
         }
 
-        private static final class Bind<T> {
+        private final class Bind<T> {
             private final Observable<T> source;
             final Observable<T> adapter;
 
@@ -244,21 +252,33 @@ public interface RxLifecycleBinder extends Subscription {
                         @Override
                         public void onNext(T t) {
                             if (!subscriber.isUnsubscribed()) {
-                                subscriber.onNext(t);
+                                if (debug) {
+                                    Debug.get().deliver(subscriber, Notification.createOnNext(t));
+                                } else {
+                                    subscriber.onNext(t);
+                                }
                             }
                         }
 
                         @Override
                         public void onCompleted() {
                             if (!subscriber.isUnsubscribed()) {
-                                subscriber.onCompleted();
+                                if (debug) {
+                                    Debug.get().deliver(subscriber, Notification.createOnCompleted());
+                                } else {
+                                    subscriber.onCompleted();
+                                }
                             }
                         }
 
                         @Override
                         public void onError(Throwable e) {
                             if (!subscriber.isUnsubscribed()) {
-                                subscriber.onError(e);
+                                if (debug) {
+                                    Debug.get().deliver(subscriber, Notification.createOnError(e));
+                                } else {
+                                    subscriber.onError(e);
+                                }
                             }
                         }
                     });
@@ -334,5 +354,23 @@ public interface RxLifecycleBinder extends Subscription {
                 }
             }
         }
+    }
+
+    final class Debug {
+        static Debug get() {
+            return null;
+        }
+
+        // add(Lifted)
+        // remove(Lifted)
+
+        // FIXME central registry for all Lifted
+        // getStats():Observable<Stats>
+        // stats are: View(optional), all debug stats
+
+        void deliver(Subscriber subscriber, Notification notification) {
+
+        }
+
     }
 }

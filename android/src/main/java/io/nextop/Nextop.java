@@ -100,10 +100,14 @@ public class Nextop {
 
     }
 
-
     @Nullable
     public Auth getAuth() {
         return auth;
+    }
+
+    @Nullable
+    public MessageControlState getMessageControlState() {
+        return null;
     }
 
 
@@ -539,6 +543,12 @@ public class Nextop {
             subjectNode.start();
             subjectNode.onActive(true, null);
             subjectNode.onTransfer(mcs);
+        }
+
+
+        @Nullable
+        public MessageControlState getMessageControlState() {
+            return mcs;
         }
 
 
