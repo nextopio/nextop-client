@@ -1,6 +1,7 @@
 package io.nextop.client;
 
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import io.nextop.Id;
 import io.nextop.Message;
@@ -363,6 +364,12 @@ public final class MessageControlState {
     }
 
 
+    private void publish() {
+        publish.onNext(this);
+    }
+
+
+
     public Observable<Entry> getObservable(final Id id) {
         return getObservable(id, 0, TimeUnit.MILLISECONDS);
     }
@@ -460,11 +467,11 @@ public final class MessageControlState {
 
     public List<GroupSnapshot> getGroups() {
         synchronized (mutex) {
-            List<GroupSnapshot> groupSnapshots = new ArrayList<GroupSnapshot>(groupsByPriority.size());
+            final List<GroupSnapshot> groupSnapshots = new ArrayList<GroupSnapshot>(groupsByPriority.size());
             for (Group g : groupsByPriority) {
-                groupSnapshots.add(new GroupSnapshot(g.groupId, g.entries.size()));
+                groupSnapshots.add(new GroupSnapshot(g.groupId, ImmutableList.copyOf(g.entries)));
             }
-            return groupSnapshots;
+            return Collections.unmodifiableList(groupSnapshots);
         }
     }
 
@@ -484,10 +491,6 @@ public final class MessageControlState {
         }
     }
 
-
-    private void publish() {
-        publish.onNext(this);
-    }
 
 
 
@@ -639,14 +642,15 @@ public final class MessageControlState {
 
     public static final class GroupSnapshot {
         public final Id groupId;
-        public final int size;
+        public final List<Entry> entries;
         // FIXME priority
 
-        GroupSnapshot(Id groupId, int size) {
+        GroupSnapshot(Id groupId, List<Entry> entries) {
             this.groupId = groupId;
-            this.size = size;
+            this.entries = entries;
         }
     }
+
 
 
     // internal

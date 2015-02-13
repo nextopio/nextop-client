@@ -3,6 +3,7 @@ package io.nextop.rx;
 import com.google.common.base.Objects;
 import immutablecollections.ImSet;
 import rx.*;
+import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
 import rx.observers.Subscribers;
 import rx.subscriptions.BooleanSubscription;
@@ -37,6 +38,8 @@ public interface RxLifecycleBinder extends Subscription {
 
     /** Binds to an internal lifecycle start/stop. */
     final class Lifted implements RxLifecycleBinder {
+        private final Scheduler scheduler;
+
         @Nullable
         private Object currentId = null;
 
@@ -52,8 +55,13 @@ public interface RxLifecycleBinder extends Subscription {
         private boolean debug = false;
 
 
-        // FIXME take in a debug boolean
         public Lifted() {
+            this(AndroidSchedulers.mainThread());
+        }
+
+        // FIXME take in a debug boolean
+        public Lifted(Scheduler scheduler) {
+            this.scheduler = scheduler;
         }
 
         // FIXME be able to dynamically turn off debug
@@ -174,7 +182,7 @@ public interface RxLifecycleBinder extends Subscription {
             if (closed) {
                 return Observable.empty();
             }
-            Bind<T> bind = new Bind<T>(source);
+            Bind<T> bind = new Bind<T>(source.subscribeOn(scheduler));
             binds = binds.adding(bind);
             if (connected) {
                 bind.connect();
