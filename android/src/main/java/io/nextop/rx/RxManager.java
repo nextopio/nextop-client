@@ -333,7 +333,7 @@ public abstract class RxManager<M extends RxManaged> {
             id = m.id;
 
             // always connected
-            binder.connect();
+            binder.connect(null);
         }
 
 

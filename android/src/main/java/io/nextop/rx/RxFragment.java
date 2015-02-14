@@ -48,7 +48,7 @@ public class RxFragment extends Fragment implements RxLifecycleBinder {
     @Override
     public void onResume() {
         super.onResume();
-        liftedRxLifecycleBinder.connect();
+        liftedRxLifecycleBinder.connect(getView());
     }
 
     @Override

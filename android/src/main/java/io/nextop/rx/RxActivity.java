@@ -1,6 +1,7 @@
 package io.nextop.rx;
 
 import android.app.Activity;
+import android.view.View;
 import rx.Observable;
 import rx.Subscription;
 
@@ -47,7 +48,9 @@ public class RxActivity extends Activity implements RxLifecycleBinder {
     @Override
     public void onResume() {
         super.onResume();
-        liftedRxLifecycleBinder.connect();
+
+        View contentView = findViewById(android.R.id.content);
+        liftedRxLifecycleBinder.connect(contentView);
     }
 
     @Override

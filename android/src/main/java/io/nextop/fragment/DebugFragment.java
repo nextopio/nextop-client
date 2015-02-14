@@ -3,17 +3,30 @@ package io.nextop.fragment;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.v13.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import io.nextop.R;
+import io.nextop.view.DebugOverlayView;
 
 public class DebugFragment extends Fragment {
 
     public static DebugFragment newInstance() {
         return new DebugFragment();
+    }
+
+
+
+    @Nullable
+    DebugOverlayView debugOverlayView = null;
+
+
+    @Nullable
+    public DebugOverlayView getDebugOverlayView() {
+        return debugOverlayView;
     }
 
 
@@ -26,10 +39,15 @@ public class DebugFragment extends Fragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
+        debugOverlayView = (DebugOverlayView) getActivity().findViewById(android.R.id.content
+            ).findViewWithTag(DebugOverlayView.TAG);
+
+
         View view = getView();
 
         ViewPager viewPager = (ViewPager) view.findViewById(R.id.pager);
         viewPager.setAdapter(new DebugPagerAdapter());
+
 
     }
 
@@ -49,7 +67,7 @@ public class DebugFragment extends Fragment {
         public CharSequence getPageTitle(int i) {
             switch (i) {
                 case 0:
-                    return "Messages";
+                    return "Network";
                 case 1:
                     return "Subscriptions";
                 default:
@@ -59,14 +77,19 @@ public class DebugFragment extends Fragment {
 
         @Override
         public Fragment getItem(int i) {
+            DebugChildFragment f;
             switch (i) {
                 case 0:
-                    return DebugMessagesFragment.newInstance();
+                    f = DebugMessagesFragment.newInstance();
+                    break;
                 case 1:
-                    return DebugSubscriptionsFragment.newInstance();
+                    f = DebugSubscriptionsFragment.newInstance();
+                    break;
                 default:
                     throw new IllegalArgumentException();
             }
+            f.debugFragment = DebugFragment.this;
+            return f;
         }
 
     }

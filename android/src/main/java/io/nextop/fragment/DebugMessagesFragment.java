@@ -19,7 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class DebugMessagesFragment extends RxFragment {
+public class DebugMessagesFragment extends DebugChildFragment {
 
     public static DebugMessagesFragment newInstance() {
         return new DebugMessagesFragment();
@@ -63,7 +63,7 @@ public class DebugMessagesFragment extends RxFragment {
         @Nullable
         MessageControlState mcs = null;
 
-
+        // FIXME linger on remove, merge new state with lingering state
         @Nullable
         List<MessageControlState.GroupSnapshot> groups = null;
         @Nullable
@@ -115,9 +115,9 @@ public class DebugMessagesFragment extends RxFragment {
 
         @Override
         public Object getItem(int position) {
-            if (position < 0 || getCount() <= position) {
-                throw new IndexOutOfBoundsException();
-            }
+//            if (position < 0 || getCount() <= position) {
+//                throw new IndexOutOfBoundsException();
+//            }
             int si = Arrays.binarySearch(groupNetSizes, position);
             if (0 <= si) {
                 // a group
@@ -133,17 +133,25 @@ public class DebugMessagesFragment extends RxFragment {
 
         @Override
         public long getItemId(int position) {
-            if (position < 0 || getCount() <= position) {
-                throw new IndexOutOfBoundsException();
-            }
-            int si = Arrays.binarySearch(groupNetSizes, position);
-            if (0 <= si) {
-                // a group
-                return groups.get(si).groupId.longHashCode();
-            } else if (0 < ~si) {
-                // an entry
-                int i = (~si) - 1;
-                return groups.get(i).entries.get(position - groupNetSizes[i] - 1).id.longHashCode();
+//            if (position < 0 || getCount() <= position) {
+//                throw new IndexOutOfBoundsException();
+//            }
+//            int si = Arrays.binarySearch(groupNetSizes, position);
+//            if (0 <= si) {
+//                // a group
+//                return groups.get(si).groupId.longHashCode();
+//            } else if (0 < ~si) {
+//                // an entry
+//                int i = (~si) - 1;
+//                return groups.get(i).entries.get(position - groupNetSizes[i] - 1).id.longHashCode();
+//            } else {
+//                throw new IllegalArgumentException();
+//            }
+            Object item = getItem(position);
+            if (item instanceof MessageControlState.GroupSnapshot) {
+                return ((MessageControlState.GroupSnapshot) item).groupId.longHashCode();
+            } else if (item instanceof MessageControlState.Entry) {
+                return ((MessageControlState.Entry) item).id.longHashCode();
             } else {
                 throw new IllegalArgumentException();
             }
@@ -156,15 +164,23 @@ public class DebugMessagesFragment extends RxFragment {
 
         @Override
         public int getItemViewType(int position) {
-            if (position < 0 || getCount() <= position) {
-                throw new IndexOutOfBoundsException();
-            }
-            int si = Arrays.binarySearch(groupNetSizes, position);
-            if (0 <= si) {
-                // a group
+//            if (position < 0 || getCount() <= position) {
+//                throw new IndexOutOfBoundsException();
+//            }
+//            int si = Arrays.binarySearch(groupNetSizes, position);
+//            if (0 <= si) {
+//                // a group
+//                return 0;
+//            } else if (0 < ~si) {
+//                // an entry
+//                return 1;
+//            } else {
+//                throw new IllegalArgumentException();
+//            }
+            Object item = getItem(position);
+            if (item instanceof MessageControlState.GroupSnapshot) {
                 return 0;
-            } else if (0 < ~si) {
-                // an entry
+            } else if (item instanceof MessageControlState.Entry) {
                 return 1;
             } else {
                 throw new IllegalArgumentException();
@@ -174,6 +190,8 @@ public class DebugMessagesFragment extends RxFragment {
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             // FIXME
+            // FIXME
+
             if (null == convertView) {
                 convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_debug_messages_entry, parent, false);
             }

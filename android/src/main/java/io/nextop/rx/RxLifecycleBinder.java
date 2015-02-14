@@ -1,10 +1,14 @@
 package io.nextop.rx;
 
+import android.view.View;
 import com.google.common.base.Objects;
 import immutablecollections.ImSet;
 import rx.*;
+import rx.Observable;
+import rx.Observer;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
+import rx.functions.Action2;
 import rx.observers.Subscribers;
 import rx.subscriptions.BooleanSubscription;
 import rx.subscriptions.CompositeSubscription;
@@ -47,38 +51,47 @@ public interface RxLifecycleBinder extends Subscription {
         private final CompositeSubscription subscriptions = new CompositeSubscription();
 
         private boolean connected = false;
+        @Nullable
+        private View connectedView = null;
+
         private boolean closed = false;
 
         @Nullable
         private Subscription cascadeSubscription = null;
 
-        private boolean debug = false;
+        @Nullable
+        private RxDebugger debugger;
 
 
         public Lifted() {
-            this(AndroidSchedulers.mainThread());
+            this(RxDebugger.get());
         }
 
-        // FIXME take in a debug boolean
-        public Lifted(Scheduler scheduler) {
-            this.scheduler = scheduler;
+        public Lifted(@Nullable RxDebugger debugger) {
+            scheduler = AndroidSchedulers.mainThread();
+            this.debugger = debugger;
         }
 
-        // FIXME be able to dynamically turn off debug
 
+        public void setDebugger(@Nullable RxDebugger debugger) {
+            if (null != this.debugger) {
+                // FIXME
+                // FIXME detach
+            }
+            this.debugger = debugger;
+            if (null != debugger) {
+                // FIXME
+                // FIXME attach
+            }
+        }
 
-        // FIXME exposed observable<Lifted>
-        // FIXME properties for isConnected, getSubscriptions, getOnNextCallCount<#calls,#fan out>, getOnCompletedCallCount, getOnErrorCallCount
-        // FIXME getView
-        // FIXME register with central on create; unregister with central on close
-
-        // FIXME take in an optional view
-        public void connect() {
+        public void connect(@Nullable View view) {
             if (closed) {
                 throw new IllegalStateException();
             }
             if (!connected) {
                 connected = true;
+                connectedView = view;
                 for (Bind<?> bind : binds) {
                     bind.connect();
                 }
@@ -90,6 +103,7 @@ public interface RxLifecycleBinder extends Subscription {
             }
             if (connected) {
                 connected = false;
+                connectedView = null;
                 for (Bind<?> bind : binds) {
                     bind.disconnect();
                 }
@@ -225,6 +239,20 @@ public interface RxLifecycleBinder extends Subscription {
                 private @Nullable Subscription subscription = null;
 
 
+                // DEBUG STATISTICS
+
+                private int onNextCount = 0;
+                private int onCompletedCount = 0;
+                private int onErrorCount = 0;
+                @Nullable
+                private Notification mostRecentNotification = null;
+                private int failedNotificationCount = 0;
+                @Nullable
+                private Notification mostRecentFailedNotification = null;
+                @Nullable
+                private Throwable mostRecentFailedNotificationReason = null;
+
+
                 Bridge(Subscriber<? super T> subscriber) {
                     this.subscriber = subscriber;
                 }
@@ -236,6 +264,12 @@ public interface RxLifecycleBinder extends Subscription {
                         subscription.unsubscribe();
                     } else {
                         this.subscription = subscription;
+
+                        if (null != debugger && debugger.isEnabled()) {
+                            debugger.update(new RxDebugger.Stats(RxDebugger.Stats.F_CONNECTED, subscriber, connectedView, false, true,
+                                    onNextCount, onCompletedCount, onErrorCount, mostRecentNotification,
+                                    failedNotificationCount, mostRecentFailedNotification, mostRecentFailedNotificationReason));
+                        }
                     }
                 }
 
@@ -243,6 +277,12 @@ public interface RxLifecycleBinder extends Subscription {
                     if (null != subscription) {
                         subscription.unsubscribe();
                         subscription = null;
+
+                        if (null != debugger && debugger.isEnabled()) {
+                            debugger.update(new RxDebugger.Stats(RxDebugger.Stats.F_DISCONNECTED, subscriber, connectedView, false, false,
+                                    onNextCount, onCompletedCount, onErrorCount, mostRecentNotification,
+                                    failedNotificationCount, mostRecentFailedNotification, mostRecentFailedNotificationReason));
+                        }
                     }
                 }
 
@@ -251,42 +291,88 @@ public interface RxLifecycleBinder extends Subscription {
                     if (!subscriber.isUnsubscribed()) {
                         subscriber.onCompleted();
                         subscriber.unsubscribe();
+
+                        if (null != debugger && debugger.isEnabled()) {
+                            onCompletedCount += 1;
+                            debugger.update(new RxDebugger.Stats(RxDebugger.Stats.F_COMPLETED, subscriber, connectedView, true, false,
+                                    onNextCount, onCompletedCount, onErrorCount, mostRecentNotification,
+                                    failedNotificationCount, mostRecentFailedNotification, mostRecentFailedNotificationReason));
+                        }
                     }
                 }
 
 
                 public Subscriber inSubscriber() {
+                    // if in debug, the notification is routed through the debugger
+                    // which may step/filter notifications
+
+                    final Action2<Subscriber, Notification> debugDelivery = new Action2<Subscriber, Notification>() {
+                        @Override
+                        public void call(Subscriber subscriber, Notification notification) {
+                            if (!subscriber.isUnsubscribed()) {
+                                mostRecentNotification = notification;
+
+                                int flags = 0;
+
+                                try {
+                                    notification.accept(subscriber);
+                                    switch (notification.getKind()) {
+                                        case OnNext:
+                                            onNextCount += 1;
+                                            flags |= RxDebugger.Stats.F_NEXT;
+                                            break;
+                                        case OnError:
+                                            onErrorCount += 1;
+                                            flags |= RxDebugger.Stats.F_ERROR;
+                                            break;
+                                        case OnCompleted:
+                                            onCompletedCount += 1;
+                                            flags |= RxDebugger.Stats.F_COMPLETED;
+                                            break;
+                                        default:
+                                            throw new IllegalArgumentException();
+                                    }
+                                } catch (Throwable t) {
+                                    failedNotificationCount += 1;
+                                    mostRecentFailedNotification = notification;
+                                    mostRecentFailedNotificationReason = t;
+                                    flags |= RxDebugger.Stats.F_FAILED;
+                                }
+
+                                if (null != debugger && debugger.isEnabled()) {
+                                    debugger.update(new RxDebugger.Stats(flags, subscriber, connectedView, false, !subscription.isUnsubscribed(),
+                                            onNextCount, onCompletedCount, onErrorCount, mostRecentNotification,
+                                            failedNotificationCount, mostRecentFailedNotification, mostRecentFailedNotificationReason));
+                                }
+                            }
+                        }
+                    };
+
                     return Subscribers.from(new Observer<T>() {
                         @Override
                         public void onNext(T t) {
-                            if (!subscriber.isUnsubscribed()) {
-                                if (debug) {
-                                    Debug.get().deliver(subscriber, Notification.createOnNext(t));
-                                } else {
-                                    subscriber.onNext(t);
-                                }
+                            if (null != debugger && debugger.isEnabled()) {
+                                debugger.deliver(subscriber, Notification.createOnNext(t), debugDelivery);
+                            } else if (!subscriber.isUnsubscribed()) {
+                                subscriber.onNext(t);
                             }
                         }
 
                         @Override
                         public void onCompleted() {
-                            if (!subscriber.isUnsubscribed()) {
-                                if (debug) {
-                                    Debug.get().deliver(subscriber, Notification.createOnCompleted());
-                                } else {
-                                    subscriber.onCompleted();
-                                }
+                            if (null != debugger && debugger.isEnabled()) {
+                                debugger.deliver(subscriber, Notification.createOnCompleted(), debugDelivery);
+                            } else if (!subscriber.isUnsubscribed()) {
+                                subscriber.onCompleted();
                             }
                         }
 
                         @Override
                         public void onError(Throwable e) {
-                            if (!subscriber.isUnsubscribed()) {
-                                if (debug) {
-                                    Debug.get().deliver(subscriber, Notification.createOnError(e));
-                                } else {
-                                    subscriber.onError(e);
-                                }
+                            if (null != debugger && debugger.isEnabled()) {
+                                debugger.deliver(subscriber, Notification.createOnError(e), debugDelivery);
+                            } else if (!subscriber.isUnsubscribed()) {
+                                subscriber.onError(e);
                             }
                         }
                     });
@@ -301,11 +387,6 @@ public interface RxLifecycleBinder extends Subscription {
                         }
                     });
                 }
-
-
-
-
-
             };
 
 
@@ -362,23 +443,5 @@ public interface RxLifecycleBinder extends Subscription {
                 }
             }
         }
-    }
-
-    final class Debug {
-        static Debug get() {
-            return null;
-        }
-
-        // add(Lifted)
-        // remove(Lifted)
-
-        // FIXME central registry for all Lifted
-        // getStats():Observable<Stats>
-        // stats are: View(optional), all debug stats
-
-        void deliver(Subscriber subscriber, Notification notification) {
-
-        }
-
     }
 }

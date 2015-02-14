@@ -186,21 +186,25 @@ public class MainActivity extends RxActivity {
 
             Id flipId = getItem(position);
 
-            @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
-            if (null != rxVg) {
-                if (rxVg.reset(flipId)) {
-                    updateIndefinitely(convertView, rxVg.bind(flip.getFlipInfoVmm().get(flipId)), rxVg.bind(flip.getFlipVmm().get(flipId)));
-                }
-            } else {
-                // update immediate snapshot
-                updateIndefinitely(convertView, flip.getFlipInfoVmm().peek(flipId), flip.getFlipVmm().peek(flipId));
+            RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
+            if (null == rxVg) {
+                throw new IllegalStateException();
             }
+//            if (null != rxVg) {
+                if (rxVg.reset(flipId)) {
+                    updateIndefinitely(rxVg, convertView, rxVg.bind(flip.getFlipInfoVmm().get(flipId)), rxVg.bind(flip.getFlipVmm().get(flipId)));
+                }
+//            } else {
+//                // update immediate snapshot
+//                updateIndefinitely(null, convertView, flip.getFlipInfoVmm().peek(flipId), flip.getFlipVmm().peek(flipId));
+//            }
 
             return convertView;
         }
         // assume the subscription will be managed via onComplete from a higher level
         // this code just assumes it runs until done
-        private void updateIndefinitely(View view, Observable<FlipInfoViewModel> flipInfoVmSource, Observable<FlipViewModel> flipVmSource) {
+        private void updateIndefinitely(RxViewGroup rxVg,
+                                        View view, Observable<FlipInfoViewModel> flipInfoVmSource, Observable<FlipViewModel> flipVmSource) {
             ImageView imageView = (ImageView) view.findViewById(R.id.image);
             final TextView shortIntroView = (TextView) view.findViewById(R.id.short_intro);
 
@@ -209,7 +213,7 @@ public class MainActivity extends RxActivity {
             Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view), 3000, flipVmSource)
                     .out;
 //            .distinctUntilChanged();
-            imageVmSource.subscribe(new ImageView.Updater(imageView,
+            rxVg.bind(imageVmSource).subscribe(new ImageView.Updater(imageView,
                     null, ImageView.Transition.instantHold()));
 
             Observable<String> shortIntroSource = flipInfoVmSource.map(new Func1<FlipInfoViewModel, String>() {

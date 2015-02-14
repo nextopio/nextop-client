@@ -82,7 +82,7 @@ public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        liftedRxLifecycleBinder.connect();
+        liftedRxLifecycleBinder.connect(this);
     }
 
     @Override
