@@ -16,6 +16,7 @@ import io.nextop.rx.RxFragment;
 import io.nextop.sortedlist.SortedList;
 import io.nextop.sortedlist.SplaySortedList;
 import io.nextop.view.DebugOverlayView;
+import rx.Notification;
 import rx.Observer;
 import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
@@ -174,17 +175,28 @@ public class DebugSubscriptionsFragment extends DebugChildFragment {
                 convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_debug_subscriptions_stats, parent, false);
             }
 
-            TextView statsView = (TextView) convertView.findViewById(R.id.stats);
+            TextView countTextView = (TextView) convertView.findViewById(R.id.count);
+            TextView infoTextView = (TextView) convertView.findViewById(R.id.info);
             RxDebugger.Stats stats = getItem(position);
 
-            String ns;
+            countTextView.setText("" + stats.onNextCount);
             if (null != stats.mostRecentNotification) {
-                @Nullable Object nv = stats.mostRecentNotification.getValue();
-                ns = String.format("%s %s", stats.mostRecentNotification.getKind(), null != nv ? nv.getClass().getSimpleName() : "null");
+                Notification n = stats.mostRecentNotification;
+                switch (n.getKind()) {
+                    case OnNext:
+                        @Nullable Object value = n.getValue();
+                        infoTextView.setText(String.format("NEXT %s", null != value ? value.getClass().getSimpleName() : "null"));
+                        break;
+                    case OnCompleted:
+                        infoTextView.setText("COMPLETED");
+                        break;
+                    case OnError:
+                        infoTextView.setText("ERROR");
+                        break;
+                }
             } else {
-                ns = "";
+                infoTextView.setText("");
             }
-            statsView.setText(String.format("%d %d %d %s", stats.onNextCount, stats.onCompletedCount, stats.onErrorCount, ns));
 
             return convertView;
         }

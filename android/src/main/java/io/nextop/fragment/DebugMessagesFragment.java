@@ -15,6 +15,7 @@ import io.nextop.rx.RxFragment;
 import rx.Observer;
 import rx.android.schedulers.AndroidSchedulers;
 
+import java.security.acl.Group;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -191,22 +192,40 @@ public class DebugMessagesFragment extends DebugChildFragment {
         public View getView(int position, View convertView, ViewGroup parent) {
             // FIXME
             // FIXME
-
-            if (null == convertView) {
-                convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_debug_messages_entry, parent, false);
-            }
-
-            TextView routeView = (TextView) convertView.findViewById(R.id.route);
             Object item = getItem(position);
-            if (item instanceof MessageControlState.Entry) {
-                routeView.setText(((MessageControlState.Entry) item).message.toString());
-            } else if (item instanceof MessageControlState.GroupSnapshot) {
-                routeView.setText(((MessageControlState.GroupSnapshot) item).groupId.toString());
+
+            if (item instanceof MessageControlState.GroupSnapshot) {
+                if (null == convertView) {
+                    convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_debug_messages_group, parent, false);
+                }
+
+                MessageControlState.GroupSnapshot groupSnapshot = (MessageControlState.GroupSnapshot) item;
+
+                TextView doctet1TextView = (TextView) convertView.findViewById(R.id.doctet1);
+                TextView doctet2TextView = (TextView) convertView.findViewById(R.id.doctet2);
+                TextView doctet3TextView = (TextView) convertView.findViewById(R.id.doctet3);
+
+                String idString = groupSnapshot.groupId.toString();
+                doctet1TextView.setText(idString.substring(0, 4));
+                doctet2TextView.setText(idString.substring(4, 8));
+                doctet3TextView.setText(idString.substring(8, 12));
+
+                return convertView;
+            } else if (item instanceof MessageControlState.Entry) {
+                if (null == convertView) {
+                    convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_debug_messages_entry, parent, false);
+                }
+
+                MessageControlState.Entry entry = (MessageControlState.Entry) item;
+
+                TextView routeTextView = (TextView) convertView.findViewById(R.id.route);
+                routeTextView.setText(String.format("%s %s", entry.message.route.target.method, entry.message.toUriString()));
+
+                return convertView;
             } else {
                 throw new IllegalArgumentException();
             }
 
-            return convertView;
         }
     }
 
