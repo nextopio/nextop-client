@@ -2,7 +2,7 @@
 
 Nextop is rethinking a CDN for mobile from the ground up. Mobile devices operate in high latency and
  uncertain networks, and Nextop is able to optimize traffic to get content displayed to
- users >2x faster, and never lose a transaction.
+ users >2x faster than leading CDNs, while never losing a transaction.
 
 The core technology is a client SDK that replaces or plugs into your existing network library,
 and a proxy server that translates between the SDK and your existing HTTP backend.
