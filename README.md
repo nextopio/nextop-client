@@ -12,8 +12,6 @@ blocking API calls before loading everything else for a view. As a developer you
  write network code and server code as you normally would, and Nextop takes care
  of optimizing all requests to get content displayed to the user faster.
 
-Does it work? **Yes.** See the demos.
-
 Nextop is a cross-platform project, with Android, iOS, and webviews as top priorities.
 
 [Talk To Us](https://github.com/nextopio/nextop-client/issues)
