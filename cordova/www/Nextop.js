@@ -242,6 +242,180 @@ Nextop.prototype.nextopVersion = '0.1.3';
 
 
 
+/* use the MutationObserver API to intercept 'src' attributes for <img> and <script>
+ * and channel them through the Nextop XHR.
+  * @see https://hacks.mozilla.org/2012/05/dom-mutationobserver-reacting-to-dom-changes-without-killing-browser-performance */
+
+var rootObserver = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if ('childList' == mutation.type) {
+            mutation.addedNodes.forEach(function(node) {
+                if ('IMG' == node.tagName) {
+                    attachNextopImageLoader(node);
+                } else if ('SCRIPT' == node.tagName) {
+                    attachNextopLoader(node, 'src');
+                }
+            });
+            mutation.removedNodes.forEach(function(node) {
+                if ('IMG' == node.tagName) {
+                    detachNextopLoader(node);
+                } else if ('SCRIPT' == node.tagName) {
+                    detachNextopLoader(node);
+                }
+            });
+        }
+    });
+});
+
+rootObserver.observe(document.body, {
+    subtree: true,
+    childList: true,
+    attributes: false,
+    characterData: false
+});
+
+function attachNextopImageLoader(img) {
+    _attachNextopLoader(node, 'src', loadImage);
+}
+
+function attachNextopLoader(node, attrName) {
+    _attachNextopLoader(node, attrName, load);
+}
+
+function _attachNextopLoader(node, attrName, loader) {
+    var state = attach(node);
+    if (node.getAttribute(attrName)) {
+        var uri = node.getAttribute(attrName);
+        if (uri && !uri.startsWith('data:')) {
+            // clear the network uri so the webview does not load it
+            node.setAttribute(attrName, '');
+            state.cancelAllInFlight();
+            loader(node, attrName, uri, state);
+        }
+    }
+    state.observer = new MutationObserver(function(mutation) {
+        if ('attribute' == mutation.type) {
+            if (attrName == mutation.attributeName) {
+                var uri = node.getAttribute(attrName);
+                if (uri && !uri.startsWith('data:')) {
+                    // clear the network uri so the webview does not load it
+                    node.setAttribute(attrName, '');
+                    state.cancelAllInFlight();
+                    loader(node, attrName, uri, state);
+                }
+            }
+        }
+    });
+    state.observer.observe(document.body, {
+        subtree: false,
+        childList: false,
+        attributes: true,
+        characterData: false
+    });
+}
+
+function detachNextopLoader(node) {
+    var state = detach(node);
+    if (state) {
+        // cancel all when the node is removed from the screen
+        state.cancelAllInFlight();
+        if (state.observer) {
+            state.observer.disconnect();
+        }
+    }
+}
+
+
+/////// LOADERS ///////
+
+function loadImage(target, targetAttrName, uri, state) {
+    // TODO load in layers
+    load(target, targetAttrName, uri, state);
+}
+
+function load(target, targetAttrName, uri, state) {
+    var xhr = new XMLHttpRequest();
+    state.addInFlight(xhr);
+
+    xhr.onreadystatechange = function() {
+        if (4 == xhr.readyState && 200 == xhr.status) {
+            // Nextop translates binary response into base64 automatically
+            target.setAttribute(targetAttrName, xhr.responseText);
+            state.removeInFlight(xhr);
+        }
+    };
+
+    xhr.open('GET', uri, true);
+    xhr.send();
+}
+
+
+/////// STATE ///////
+
+var attachStates = [];
+
+function attach(node) {
+    var i = attachStates_indexOf(node);
+    if (0 <= i) {
+        return attachStates[i];
+    }
+    var attachState = new AttachState(node);
+    attachStates.push(attachState);
+    return attachState;
+}
+
+function detatch(node) {
+    var i = attachStates_indexOf(node);
+    if (0 <= i) {
+        var attachState = attachStates[i];
+        attachStates = attachStates.splice(i);
+        return attachState;
+    }
+    return null;
+}
+
+function attachStates_indexOf(node) {
+    for (var i = 0, n = attachStates.length; i < n; ++i) {
+        var attachState = attachStates[i];
+        if (node === atachState.node) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+
+var AttachState = function(node) {
+    this.node = node;
+    this.observer = null;
+
+    /** XHR objects */
+    var inFlight = [];
+
+    this.addInFlight = function (xhr) {
+        inFlight.push(xhr);
+    }
+
+    this.removeInFlight = function (xhr) {
+        var i = inFlight.indexOf(xhr);
+        if (0 <= i) {
+            inFlight = inFlight.splice(i);
+        }
+    }
+
+    this.cancelAllInFlight = function() {
+        for (var xhr = inFlight.pop(); xhr; xhr = inFlight.pop()) {
+            xhr.abort();
+        }
+    }
+};
+
+
+
+
+
+
+
 
 module.exports = Nextop;
 

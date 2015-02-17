@@ -13,6 +13,9 @@ apply plugin: 'maven'
 apply plugin: 'signing'
 //apply plugin: 'robolectric'
 
+sourceCompatibility = JavaVersion.VERSION_1_6
+targetCompatibility = JavaVersion.VERSION_1_6
+
 repositories {
     mavenCentral()
 }
