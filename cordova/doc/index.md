@@ -54,3 +54,6 @@ Add the access key in your `config.xml` as a preference.
 | SMS            | +1-650-862-1946                                            |
 
 
+## Related
+
+- The folks at SpiderOak developed an XMLHttpRequest-replacement plugin to do SSL pinning: [https://github.com/wymsee/cordova-HTTP](https://github.com/wymsee/cordova-HTTP)
