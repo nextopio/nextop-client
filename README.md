@@ -57,7 +57,7 @@ Maven dependency:
 | Date       | Post                                                                                                                                              |
 |------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | 02.13.15   | [Binding Rx subscriptions to view lifecycles, and using them to optimize your network traffic](docs/02.13.15_SUBSCRIPTIONS_NETWORKING_VIEWS.md)   |
-| 02.16.15   | [Things you can do with a Custom XMLHttpRequest](02.16.2015_CUSTOM_XMLHTTPREQUEST.md)                                                             |
+| 02.16.15   | [![cordova](docs/assets/cordova_24.png) Things you can do with a Custom XMLHttpRequest](docs/02.16.2015_CUSTOM_XMLHTTPREQUEST.md)                 |
 
 
 # About Us
