@@ -2,7 +2,7 @@
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
         id="io.nextop.cordova"
-        version="0.1.1">
+        version="0.1.3">
     <name>Nextop</name>
     <description>Nextop Mobile CDN</description>
     <license>Apache Sotware License 2.0</license>

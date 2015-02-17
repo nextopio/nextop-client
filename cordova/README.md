@@ -1,0 +1,1 @@
+[The documentation is at doc/index.md for plugman](doc/index.md)

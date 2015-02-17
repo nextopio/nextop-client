@@ -1,6 +1,5 @@
 'use strict';
 
-
 var argscheck = require('cordova/argscheck'),
     exec = require('cordova/exec');
 
@@ -31,12 +30,44 @@ var RT_JSON = 'json';
 var RT_TEXT = 'text';
 
 
-// FIXME move properties and methods to prototype
-
 var Nextop = function(objParameters) {
 
-    var self = this;
+    // MDN
 
+    this.onreadystatechange = null;
+    this.readyState = RS_UNSET;
+    this.response = '';
+    this.responseText = '';
+    this.responseType = RT_UNSET;
+
+    this.responseXML = null;
+    this.status = 0;
+    this.statusText = null;
+    this.timeout = 0;
+    this.ontimeout = null;
+    /** FIXME see
+     * oReq.upload.addEventListener("progress", updateProgress, false);
+     * oReq.upload.addEventListener("load", transferComplete, false);
+     * oReq.upload.addEventListener("error", transferFailed, false);
+     * oReq.upload.addEventListener("abort", transferCanceled, false);
+     */
+    this.upload = null;
+
+    this.withCredentials = false;
+
+
+    // NEXTOP EXTENSIONS
+
+    // FIXME behaves like upload, but for the download side
+    //this.download = null;
+
+    // TODO pull this from the build
+    this.nextopVersion = '0.1.3';
+
+
+    // internal
+
+    var self = this;
 
     var opened = false;
     var sent = false;
@@ -76,9 +107,9 @@ var Nextop = function(objParameters) {
     };
 
     this.open = function(method, url, async, user, password) {
-        //argscheck.checkArgs('ssb*', 'XMLHttpRequest.open', arguments);
+        // TODO argscheck.checkArgs('ssb*', 'XMLHttpRequest.open', arguments);
         if (opened) {
-            // FIXME (alredy opened) what is the expected behavior here?
+            throw 'Already opened';
         }
         opened = true;
 
@@ -89,22 +120,31 @@ var Nextop = function(objParameters) {
     };
     this.send = function(data) {
         if (!opened) {
-            // FIXME (not opened) what is the expected behavior here?
+            throw 'Not opened';
         }
         if (sent) {
-            // FIXME (already sent) what is the expected behavior here?
+            throw 'Already sent'
         }
         sent = true;
 
-        // FIXME open the flood gates!
-        if (false && async) {
+        if (async) {
             // use Nextop
 
             var successCallback = function (responseObject) {
-                // FIXME status, statusText, responseHeaders, HERE
+                self.status = responseObject.status;
+                self.statusText = responseObject.statusText;
+                responseHeaders = responseObject.responseHeaders;
+
+                self.responseType = /* FIXME parse the responseType/response properly */ RT_TEXT;
+                self.response = '';
+                self.responseText = responseObject.responseText;
+
+                setReadyState(RS_DONE);
             }
             var errorCallback = function (error) {
-                // FIXME
+                // FIXME handle network error different than other errors
+                // fall back to the legacy
+                legacySend(data);
             }
 
             var id = ++sendCount;
@@ -129,47 +169,49 @@ var Nextop = function(objParameters) {
             exec(successCallback, errorCallback, "Nextop", "send", args);
         } else {
             // use legacy
-
-            var legacy = new XMLHttpRequest(objParameters);
-
-
-            legacy.open(sendMethod, sendUrl, false, sendUser, sendPassword);
-
-
-            legacy.timeout = self.timeout;
-            legacy.ontimeout = function() {
-                if (self.ontimeout) {
-                    self.ontimeout();
-                }
-            }
-
-            legacy.onreadystatechange = function() {
-                if (RS_HEADERS_RECEIVED == legacy.readyState) {
-                    copyStatus(legacy);
-                    copyResponseHeaders(legacy);
-                } else if (RS_DONE == legacy.readyState) {
-                    copyStatus(legacy);
-                    copyResponseHeaders(legacy);
-                    copyResponse(legacy);
-                }
-                setReadyState(legacy.readyState);
-            };
-
-
-            for (var header in requestHeaders) {
-                legacy.setRequestHeader(header, requestHeaders[header]);
-            }
-            if (mimeType) {
-                legacy.overrideMimeType(mimeType);
-            }
-
-            abortf = function() {
-                legacy.abort();
-            }
-            legacy.send(data);
+            legacySend(data);
         }
 
     };
+    function legacySend(data) {
+        var legacy = new XMLHttpRequest(objParameters);
+
+
+        legacy.open(sendMethod, sendUrl, false, sendUser, sendPassword);
+
+
+        legacy.timeout = self.timeout;
+        legacy.ontimeout = function() {
+            if (self.ontimeout) {
+                self.ontimeout();
+            }
+        }
+
+        legacy.onreadystatechange = function() {
+            if (RS_HEADERS_RECEIVED == legacy.readyState) {
+                copyStatus(legacy);
+                copyResponseHeaders(legacy);
+            } else if (RS_DONE == legacy.readyState) {
+                copyStatus(legacy);
+                copyResponseHeaders(legacy);
+                copyResponse(legacy);
+            }
+            setReadyState(legacy.readyState);
+        };
+
+
+        for (var header in requestHeaders) {
+            legacy.setRequestHeader(header, requestHeaders[header]);
+        }
+        if (mimeType) {
+            legacy.overrideMimeType(mimeType);
+        }
+
+        abortf = function() {
+            legacy.abort();
+        }
+        legacy.send(data);
+    }
     this.abort = function() {
         if (abortf) {
             abortf();
@@ -197,50 +239,16 @@ var Nextop = function(objParameters) {
             self.onreadystatechange();
         }
     }
-
 };
-
-
-
 
 /** legacy class */
 Nextop.prototype.XMLHttpRequest = XMLHttpRequest;
 
-Nextop.prototype.onreadystatechange = null;
-Nextop.prototype.readyState = RS_UNSET;
-Nextop.prototype.response = '';
-Nextop.prototype.responseText = '';
-Nextop.prototype.responseType = RT_UNSET;
-
-Nextop.prototype.responseXML = null;
-Nextop.prototype.status = 0;
-Nextop.prototype.statusText = null;
-Nextop.prototype.timeout = 0;
-Nextop.prototype.ontimeout = null;
-/** FIXME see
- * oReq.upload.addEventListener("progress", updateProgress, false);
- * oReq.upload.addEventListener("load", transferComplete, false);
- * oReq.upload.addEventListener("error", transferFailed, false);
- * oReq.upload.addEventListener("abort", transferCanceled, false);
- */
-Nextop.prototype.upload = null;
-
-Nextop.prototype.withCredentials = false;
 
 
-
-// NEXTOP EXTENSIONS
-
-// FIXME behaves like upload, but for the download side
-Nextop.prototype.download = null;
-
-// TODO pull this from the build
-Nextop.prototype.nextopVersion = '0.1.3';
-
-
-
-
-
+// DEEP INTEGRATION
+// <img src="">
+// <script src="">
 
 /* use the MutationObserver API to intercept 'src' attributes for <img> and <script>
  * and channel them through the Nextop XHR.
@@ -412,11 +420,7 @@ var AttachState = function(node) {
 
 
 
-
-
-
-
+// EXPORT
 
 module.exports = Nextop;
-
 

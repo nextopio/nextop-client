@@ -4,11 +4,6 @@ This plugin replaces `window.XMLHttpRequest` with an implementation backed
 by Nextop, the mobile CDN. Nextop mitigates network issues
 and speeds up all requests. Read more about Nextop at http://nextop.io.
 
-## Update (0.1.1)
-
-The Nextop path is disabled while we fix an issue.
-The next update will re-enable the Nextop path.
-
 ## Installation
 
 ```
@@ -46,10 +41,16 @@ Add the access key in your `config.xml` as a preference.
 <preference name="NextopAccessKey" value="$access-key" />
 ```
 
+## GitHub
+
+[nextopio/nextop-client](https://github.com/nextopio/nextop-client)
+
+
 ## Support
 
-| Email          | support@nextop.io                  |
-|----------------|------------------------------------|
-| Live Chat      | [#nextop](https://www.hipchat.com/gebRowlQF)  |
-| SMS            | +1-650-862-1946                    |
+| Issues         | [GitHub](https://github.com/nextopio/nextop-client/issues) |
+|----------------|------------------------------------------------------------|
+| Email          | support@nextop.io                                          |
+| SMS            | +1-650-862-1946                                            |
+
 
