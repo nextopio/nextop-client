@@ -3,5 +3,5 @@ repositories {
 }
 
 dependencies {
-    compile group: 'io.nextop', name: 'android', version: '0.1.2'
+    compile 'io.nextop:android:0.1.3'
 }
