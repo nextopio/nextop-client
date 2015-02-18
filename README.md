@@ -25,21 +25,48 @@ We've rebuilt the Android network stack to focus on image upload and download, a
 improving transfer of all requests in all network conditions.
 
 
-Gradle dependency:
+Current version: **0.1.3**
+
+
+Gradle dependency (AAR):
 
 ```
-compile group: 'io.nextop', name: 'android', version: '0.1.3'
+compile group: 'io.nextop', name: 'android', version: '${CURRENT_VERSION}'
 ```
 
-Maven dependency:
+Maven dependency (AAR). This for android-maven-plugin command-line users (as far as I know, Eclipse does not support AAR).
+[See special instructions for Eclipse users here](docs/eclipse.md).
 
 ```xml
 <dependency>
   <groupId>io.nextop</groupId>
   <artifactId>android</artifactId>
-  <version>0.1.3</version>
+  <version>${CURRENT_VERSION}</version>
+  <type>aar</type>
 </dependency>
 ```
+
+JAR versions of Nextop provide a complete network stack and image views. [However, there is some missing functionality around other views and fragments, due to JAR not being able to include Android resources](docs/eclipse.md).
+
+
+Maven dependency (JARs):
+
+```xml
+<dependency>
+  <groupId>io.nextop</groupId>
+  <artifactId>android</artifactId>
+  <version>${CURRENT_VERSION}</version>
+  <type>jar</type>
+</dependency>
+```
+
+Ant/Eclipse dependency direct downloads (JARs):
+```
+http://search.maven.org/remotecontent?filepath=io/nextop/android/${CURRENT_VERSION}/android-${CURRENT_VERSION}.jar
+http://search.maven.org/remotecontent?filepath=io/nextop/java-common/${CURRENT_VERSION}/java-common-${CURRENT_VERSION}-all.jar
+```
+
+
 
 ### Android Benchmarks
 
