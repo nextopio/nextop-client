@@ -23,7 +23,7 @@ android {
         minSdkVersion 21
         targetSdkVersion 21
         versionName project.version
-        versionCode 2
+        versionCode androidVersionCode()
     }
     signingConfigs {
         release {

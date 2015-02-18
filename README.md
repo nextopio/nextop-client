@@ -28,7 +28,7 @@ improving transfer of all requests in all network conditions.
 Gradle dependency:
 
 ```
-compile group: 'io.nextop', name: 'android', version: '0.1.2'
+compile group: 'io.nextop', name: 'android', version: '0.1.3'
 ```
 
 Maven dependency:
@@ -37,7 +37,7 @@ Maven dependency:
 <dependency>
   <groupId>io.nextop</groupId>
   <artifactId>android</artifactId>
-  <version>0.1.2</version>
+  <version>0.1.3</version>
 </dependency>
 ```
 

@@ -31,6 +31,33 @@ def versionName() {
     }
 }
 
+/** for Android apps, derived from the version name.
+ * For a version name "A.B.C" with each number on [0, 1000), the version code is
+ * <code>C + 1000 * (B + 1000 * A))</code>. */
+def androidVersionCode() {
+    def versionName = versionName();
+    def versionNumbers = versionName.split('-')[0].split('\\.');
+
+    if (3 != versionNumbers.length) {
+        throw new IllegalArgumentException();
+    }
+    def m = 1000;
+    def a = versionNumbers[0].toInteger();
+    def b = versionNumbers[1].toInteger();
+    def c = versionNumbers[2].toInteger();
+    if (a < 0 || m <= a) {
+        throw new IllegalArgumentException();
+    }
+    if (b < 0 || m <= b) {
+        throw new IllegalArgumentException();
+    }
+    if (c < 0 || m <= c) {
+        throw new IllegalArgumentException();
+    }
+
+    return c + m * (b + m * a);
+}
+
 subprojects {
     group 'io.nextop'
     version versionName()

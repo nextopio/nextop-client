@@ -11,18 +11,15 @@ import io.nextop.org.apache.http.Header;
 import io.nextop.org.apache.http.HttpEntity;
 import io.nextop.org.apache.http.HttpRequest;
 import io.nextop.org.apache.http.HttpResponse;
-import io.nextop.org.apache.http.client.NonRepeatableRequestException;
 import io.nextop.org.apache.http.client.methods.*;
 import io.nextop.org.apache.http.client.utils.URIBuilder;
 import io.nextop.org.apache.http.entity.ByteArrayEntity;
 import io.nextop.org.apache.http.entity.StringEntity;
 import io.nextop.util.NoCopyByteArrayOutputStream;
 import rx.functions.Func1;
-import sun.nio.ch.IOUtil;
 
 import javax.annotation.Nullable;
 import java.io.*;
-import java.lang.annotation.Repeatable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.net.URI;
