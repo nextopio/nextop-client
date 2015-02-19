@@ -1,8 +1,20 @@
 # Eclipse Usage
 
-I know a ton of people are still using Eclipse for Android development. I was an avid Eclipse user
-before switching to IntelliJ, and I want to given first-class support to Eclipse users where technically possible.
+To fully use Nextop as an Android Library, include the .project as a dependent
+project in Eclipse. [SEE #2](https://github.com/nextopio/nextop-client/issues/2)
 
-If you're an Eclipse user, it's probably best to get in touch <<support@nextop.io>> to figure out
-what you need to get going with Nextop.
+# JAR Usage Caveats
+
+In cases where you must include Nextop as a JAR dependency (even
+manually downloading the JARs and including them in a libs/ dir),
+the following won't work:
+
+- Nextop custom fragments, such as DebugFragment or RecordFragment
+
+The following will work:
+
+- Core network stack
+- ImageView
+
+[Please submit issues if you hit integration problems](https://github.com/nextopio/nextop-client/issues)
 
