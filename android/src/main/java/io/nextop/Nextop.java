@@ -16,10 +16,11 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import io.nextop.client.http.HttpNode;
 import io.nextop.client.MessageControlNode;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.SubjectNode;
+import io.nextop.client.http.HttpNode;
+import io.nextop.com.crittercism.app.Crittercism;
 import io.nextop.org.apache.http.HttpResponse;
 import io.nextop.org.apache.http.client.methods.HttpUriRequest;
 import rx.Observable;
@@ -32,10 +33,13 @@ import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-// calls all receives on the MAIN thread
+/**
+ * By default, Nextop collects crash metrics via a custom version of Crittercism
+ * that won't interfere with Crittercism used in apps that use Nextop.
+ * To disable Nextop Crittercism, call {@link #disableNextopCrittercism}. */
+// FIXME calls all receives on the MAIN thread
 @Beta
 public class Nextop {
     /** The android:name to use in application meta-data to set the access key
@@ -80,6 +84,7 @@ public class Nextop {
     }
 
     private static Nextop create(Context context, @Nullable Auth auth) {
+        initCrittercism(context);
         return new Nextop(context, auth);
     }
 
@@ -910,6 +915,31 @@ public class Nextop {
         private Auth(Id accessKey, Set<Id> grantKeys) {
             this.accessKey = accessKey;
             this.grantKeys = grantKeys;
+        }
+    }
+
+
+    /////// CRITTERCISM ///////
+
+    public static void enableNextopCrittercism() {
+        Crittercism.setOptOutStatus(false);
+    }
+
+    public static void disableNextopCrittercism() {
+        Crittercism.setOptOutStatus(true);
+    }
+
+    private static boolean crittercismInitialized = false;
+
+    private static void initCrittercism(Context context) {
+        if (!crittercismInitialized) {
+            @Nullable Context applicationContext = context.getApplicationContext();
+            if (null != applicationContext) {
+                // FIXME APP ID
+                String appId = "";
+                Crittercism.initialize(applicationContext, appId);
+                crittercismInitialized = true;
+            }
         }
     }
 }

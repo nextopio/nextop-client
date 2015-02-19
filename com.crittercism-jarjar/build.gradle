@@ -1,0 +1,32 @@
+/* the purpose of jarjar'ing the crittercism lib is so that the nextop-client
+ * can have its own Crittercism link that won't interfere with the app's */
+
+ buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.0'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+repositories {
+    maven {
+        url 'https://repository.apache.org/content/groups/public/'
+    }
+    mavenCentral()
+}
+
+dependencies {
+    compile 'com.crittercism:crittercism-android-agent:+'
+}
+
+task jarjar(type:Exec, dependsOn: shadowJar) {
+    // jarjar the fat jar
+    def fatJar = new File(project.buildDir, 'libs/' + project.name + '-' + project.version + '-all.jar')
+    def jarjarJar = new File(project.buildDir, 'libs/' + project.name + '.jar')
+    commandLine 'java', '-jar', 'jarjar/jarjar-1.4.jar', 'process', 'jarjar/rules.txt', fatJar, jarjarJar
+}

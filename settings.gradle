@@ -8,3 +8,5 @@ include 'android-demo-flip'
 include 'cordova'
 include 'org.apache-jarjar'
 
+include 'com.crittercism-jarjar'
+

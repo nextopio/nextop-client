@@ -1,0 +1,2 @@
+rule com.crittercism.** io.nextop.com.crittercism.@1
+rule crittercism.** io.nextop.crittercism.@1

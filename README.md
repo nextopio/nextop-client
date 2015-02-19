@@ -16,7 +16,7 @@ Nextop is a cross-platform project, with Android, iOS, and webviews as top prior
 
 [Talk To Us](https://github.com/nextopio/nextop-client/issues)
 
-Be a [![star](docs/assets/star-16.png)](https://github.com/nextopio/nextop-client/stargazers)
+[Be a ![star](docs/assets/star-16.png)](https://github.com/nextopio/nextop-client/stargazers)
 
 
 ## Android
@@ -33,7 +33,7 @@ improving transfer of all requests in all network conditions.
 Gradle dependency (AAR):
 
 ```
-compile group: 'io.nextop', name: 'android', version: '${CURRENT_VERSION}'
+compile 'io.nextop:android:+'
 ```
 
 Maven dependency (AAR). This is for [android-maven-plugin](https://code.google.com/p/maven-android-plugin/) users.
@@ -43,7 +43,7 @@ As of this writing, Eclipse does not support AAR. [See special instructions for 
 <dependency>
   <groupId>io.nextop</groupId>
   <artifactId>android</artifactId>
-  <version>${CURRENT_VERSION}</version>
+  <version>LATEST</version>
   <type>aar</type>
 </dependency>
 ```
@@ -54,7 +54,7 @@ Maven dependency ([JARs - see notes](docs/eclipse.md)):
 <dependency>
   <groupId>io.nextop</groupId>
   <artifactId>android</artifactId>
-  <version>${CURRENT_VERSION}</version>
+  <version>LATEST</version>
   <type>jar</type>
 </dependency>
 ```
