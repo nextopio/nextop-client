@@ -25,7 +25,7 @@ public class WireValueBenchmark extends TestCase {
         List<WireValue> list = new ArrayList<WireValue>(16);
         for (int i = 0; i < 16; ++i) {
             Map<WireValue, WireValue> m = new HashMap<WireValue, WireValue>(8);
-            m.put(WireValue.of("test"), WireValue.of(r.nextInt()));
+            m.put(WireValue.of("isSend"), WireValue.of(r.nextInt()));
             m.put(WireValue.of("rest"), WireValue.of(r.nextInt()));
             list.add(WireValue.of(m));
         }
@@ -100,7 +100,7 @@ public class WireValueBenchmark extends TestCase {
         for (int i = 0; i < 16; ++i) {
 
             Map<WireValue, WireValue> m = new HashMap<WireValue, WireValue>(8);
-            m.put(WireValue.of("test"), WireValue.of(r.nextInt()));
+            m.put(WireValue.of("isSend"), WireValue.of(r.nextInt()));
             m.put(WireValue.of("rest"), WireValue.of(r.nextInt()));
             m.put(WireValue.of("dump"), WireValue.of(dump));
             list.add(WireValue.of(m));

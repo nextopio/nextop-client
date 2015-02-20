@@ -26,12 +26,12 @@ targetCompatibility = JavaVersion.VERSION_1_6
 //            srcDir 'src/main/resources'
 //        }
 //    }
-//    test {
+//    isSend {
 //        java {
-//            srcDir 'src/test/java'
+//            srcDir 'src/isSend/java'
 //        }
 //        resources {
-//            srcDir 'src/test/resources'
+//            srcDir 'src/isSend/resources'
 //        }
 //    }
 //}

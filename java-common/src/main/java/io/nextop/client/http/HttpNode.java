@@ -1,43 +1,99 @@
 package io.nextop.client.http;
 
 import io.nextop.Message;
+import io.nextop.Route;
+import io.nextop.WireValue;
 import io.nextop.client.AbstractMessageControlNode;
 import io.nextop.client.MessageControl;
 import io.nextop.client.MessageControlMetrics;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.retry.SendStrategy;
+import io.nextop.org.apache.commons.logging.Log;
+import io.nextop.org.apache.commons.logging.LogFactory;
 import io.nextop.org.apache.http.*;
+import io.nextop.org.apache.http.client.ClientProtocolException;
 import io.nextop.org.apache.http.client.HttpClient;
-import io.nextop.org.apache.http.client.methods.HttpUriRequest;
+import io.nextop.org.apache.http.client.HttpRequestRetryHandler;
+import io.nextop.org.apache.http.client.config.RequestConfig;
+import io.nextop.org.apache.http.client.methods.*;
+import io.nextop.org.apache.http.client.protocol.HttpClientContext;
+import io.nextop.org.apache.http.client.protocol.RequestClientConnControl;
+import io.nextop.org.apache.http.client.utils.URIUtils;
+import io.nextop.org.apache.http.config.ConnectionConfig;
+import io.nextop.org.apache.http.config.MessageConstraints;
+import io.nextop.org.apache.http.conn.*;
+import io.nextop.org.apache.http.conn.HttpConnectionFactory;
+import io.nextop.org.apache.http.conn.routing.HttpRoute;
+import io.nextop.org.apache.http.entity.ContentLengthStrategy;
+import io.nextop.org.apache.http.impl.DefaultConnectionReuseStrategy;
+import io.nextop.org.apache.http.impl.client.DefaultConnectionKeepAliveStrategy;
 import io.nextop.org.apache.http.impl.client.DefaultHttpClient;
+import io.nextop.org.apache.http.impl.conn.ConnectionShutdownException;
+import io.nextop.org.apache.http.impl.conn.DefaultHttpResponseParserFactory;
 import io.nextop.org.apache.http.impl.conn.DefaultManagedHttpClientConnection;
-import io.nextop.org.apache.http.protocol.HttpContext;
-import io.nextop.org.apache.http.protocol.HttpCoreContext;
-import io.nextop.org.apache.http.protocol.HttpRequestExecutor;
+import io.nextop.org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import io.nextop.org.apache.http.impl.entity.LaxContentLengthStrategy;
+import io.nextop.org.apache.http.impl.entity.StrictContentLengthStrategy;
+import io.nextop.org.apache.http.impl.execchain.*;
+import io.nextop.org.apache.http.impl.io.DefaultHttpRequestWriterFactory;
+import io.nextop.org.apache.http.io.HttpMessageParserFactory;
+import io.nextop.org.apache.http.io.HttpMessageWriterFactory;
+import io.nextop.org.apache.http.io.SessionInputBuffer;
+import io.nextop.org.apache.http.io.SessionOutputBuffer;
+import io.nextop.org.apache.http.protocol.*;
 
 import javax.annotation.Nullable;
-import java.io.FilterOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class HttpNode extends AbstractMessageControlNode {
 
-    private final HttpClient httpClient;
 
-    // FIXME
-    private SendStrategy sendStrategy = SendStrategy.INDEFINITE;
+    // FIXME pull version from build
+    private static final String DEFAULT_USER_AGENT = "Nextop/0.1.3";
+
+
+    /** emit progress every 4 KiB by default */
+    private static final int DEFAULT_EMIT_Q_BYTES = 4 * 1024;
+
+
+
+    private final int maxConcurrentConnections = 2;
+
+
+    PoolingHttpClientConnectionManager clientConnectionManager =
+            new PoolingHttpClientConnectionManager(new NextopHttpClientConnectionFactory());
+
+
+
+    // this is the strategy for one entry before possibly yielding
+    // each time the entry is taken, the strategy is run from the beginning
+    // this is a really aggressive strategy that relies on CONNECTIVITY STATUS
+    // to stop retrying on a bad connection
+    private SendStrategy sendStrategy = new SendStrategy.Builder()
+            .init(0, TimeUnit.MILLISECONDS)
+            .withUniformRandom(2000, TimeUnit.MILLISECONDS)
+            .repeat(2)
+            .build();
 
     volatile boolean active = true;
 
-    // FIXME pull version from build
-    private final String userAgent = "Nextop/0.1.3";
+    private List<Thread> looperThreads = Collections.emptyList();
 
 
 
     public HttpNode() {
-        httpClient = new DefaultHttpClient();
-                //HttpClients.createDefault();
     }
 
 
@@ -46,6 +102,10 @@ public final class HttpNode extends AbstractMessageControlNode {
         this.active = active;
 
         if (!active) {
+            for (Thread t : looperThreads) {
+                t.interrupt();
+            }
+
             // FIXME on false, upstream.onTransfer(mcs)
         }
     }
@@ -55,11 +115,16 @@ public final class HttpNode extends AbstractMessageControlNode {
         super.onTransfer(mcs);
 
         if (active) {
-            // FIXME can have multiple loopers here because mcs does the correct ordering
-            // FIXME parameterize
-//            for (int i = 0; i < 8; ++i) {
-                new Thread(new RequestLooper()).start();
-//            }
+            // note that the mcs coordinates between multiple loopers
+            int n = maxConcurrentConnections;
+            Thread[] threads = new Thread[n];
+            for (int i = 0; i < n; ++i) {
+                threads[i] = new Thread(new RequestLooper());
+            }
+            looperThreads = Arrays.asList(threads);
+            for (int i = 0; i < n; ++i) {
+                threads[i].start();
+            }
         }
     }
 
@@ -87,91 +152,231 @@ public final class HttpNode extends AbstractMessageControlNode {
         @Override
         public void run() {
             while (active) {
+                @Nullable MessageControlState.Entry entry;
                 try {
-                    @Nullable MessageControlState.Entry entry = mcs.takeFirstAvailable(HttpNode.this,
+                    entry = mcs.takeFirstAvailable(HttpNode.this,
                             Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
-                    if (null != entry) {
-                        try {
-                            execute(entry.message, entry);
-                        } finally {
-                            // FIXME ERROR, COMPLETED
-                            mcs.remove(entry.id, MessageControlState.End.COMPLETED);
-                        }
-                    }
                 } catch (InterruptedException e) {
-                    // continuex
+                    continue;
+                }
+
+                if (null != entry) {
+                    try {
+                        end(entry, execute(entry));
+                    } catch (IOException e) {
+                        handleTransportException(entry, e);
+                    } catch (HttpException e) {
+                        handleTransportException(entry, e);
+                    } catch (Throwable t) {
+                        // an internal issue
+                        // can never recover from this (assume the system is deterministic)
+                        // FIXME remove
+                        t.printStackTrace();
+                        end(entry, MessageControlState.End.ERROR);
+                    }
                 }
             }
+        }
+        /** factored out exception handling in place of multi-catch */
+        private void handleTransportException(MessageControlState.Entry entry, Exception e) {
+            if (null == entry.end) {
+                // FIXME for HttpException the endpoint not speaking the protocol correctly
+                // FIXME the retry should not be as aggressive in this case
 
+                // at this point the entry was elected to yield
+                // in this case, check whether the message has indicated it can be moved to the end of the line
+                if (Message.canYield(entry.message)) {
+                    mcs.yield(entry.id);
+                }
+                mcs.release(entry.id, HttpNode.this);
+            } // else already removed
+        }
+        private void end(final MessageControlState.Entry entry, MessageControlState.End end) {
+            mcs.remove(entry.id, end);
+
+            final Route route = entry.message.inboxRoute();
+            switch (end) {
+                case COMPLETED:
+                    post(new Runnable() {
+                        @Override
+                        public void run() {
+                            upstream.onMessageControl(MessageControl.receive(MessageControl.Type.COMPLETE, route));
+                        }
+                    });
+                    break;
+                case ERROR:
+                case CANCELED:
+                    post(new Runnable() {
+                        @Override
+                        public void run() {
+                            upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, route));
+                        }
+                    });
+                    break;
+                default:
+                    throw new IllegalStateException();
+            }
         }
 
-        private void execute(final Message requestMessage, MessageControlState.Entry entry) {
-            // FIXME do progress updates
 
-
-
-            final HttpUriRequest request;
+        private MessageControlState.End execute(final MessageControlState.Entry entry) throws IOException, HttpException {
+            final HttpRequest request;
             try {
-                request = Message.toHttpRequest(requestMessage);
-            } catch (Exception e) {
-                post(new Runnable() {
-                    @Override
-                    public void run() {
-                        upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, requestMessage));
-                    }
-                });
-                return;
+                request = Message.toHttpRequest(entry.message);
+            } catch (URISyntaxException e) {
+                // can never send this
+                return MessageControlState.End.ERROR;
             }
 
-            // FIXME 0.1.1
-            // FIXME   surface progress
-            // FIXME   retry on transfer up and down if idempotent (resend)
-            // FIXME   use jarjar on latest httpclient to have a stable version to work with on android
-
-            // FIXME can do retry here while active {  use supplied retry strategy
-            final HttpResponse response;
+            final HttpHost target;
             try {
-                response = httpClient.execute(request);
-            } catch (Exception e) {
-                post(new Runnable() {
-                    @Override
-                    public void run() {
-                        upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, requestMessage));
-                    }
-                });
-                return;
-            }
-            // FIXME }
-
-
-            // FIXME can't do retry here if not idempotent
-            // FIXME *can do* retry here on idempotent (GET, HEAD)
-            final Message responseMessage;
-            try {
-                responseMessage = Message.fromHttpResponse(response).setRoute(requestMessage.inboxRoute()).build();
-            } catch (Exception e) {
-                post(new Runnable() {
-                    @Override
-                    public void run() {
-                        upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, requestMessage.inboxRoute()));
-                    }
-                });
-                return;
+                target = Message.toHttpHost(entry.message);
+            } catch (URISyntaxException e) {
+                // can never send this
+                return MessageControlState.End.ERROR;
             }
 
-            // FIXME parse codes
+            HttpResponse response = doExecute(createExecChain(entry, new ProgressAdapter(entry)),
+                    target, request, null);
+
+            final Message responseMessage = Message.fromHttpResponse(response).setRoute(entry.message.inboxRoute()).build();
+
+
             post(new Runnable() {
                 @Override
                 public void run() {
                     upstream.onMessageControl(MessageControl.receive(responseMessage));
-                    upstream.onMessageControl(MessageControl.receive(MessageControl.Type.COMPLETE, responseMessage.route));
                 }
             });
+            return MessageControlState.End.COMPLETED;
+        }
+
+
+        /** lifted version of {@link io.nextop.org.apache.http.impl.client.CloseableHttpClient#doExecute} */
+        private CloseableHttpResponse doExecute(
+                ClientExecChain execChain,
+                HttpHost target,
+                HttpRequest request,
+                @Nullable HttpContext context) throws IOException, HttpException {
+            HttpExecutionAware execAware = null;
+            if (request instanceof HttpExecutionAware) {
+                execAware = (HttpExecutionAware) request;
+            }
+            final HttpRequestWrapper wrapper = HttpRequestWrapper.wrap(request);
+            final HttpClientContext localcontext = HttpClientContext.adapt(
+                    null != context ? context : new BasicHttpContext());
+            final HttpRoute route = new HttpRoute(target);
+            RequestConfig config = null;
+            if (request instanceof Configurable) {
+                config = ((Configurable) request).getConfig();
+            }
+            if (config != null) {
+                localcontext.setRequestConfig(config);
+            }
+            return execChain.execute(route, wrapper, localcontext, execAware);
+        }
+
+
+        private ClientExecChain createExecChain(MessageControlState.Entry entry, ProgressCallback progressCallback) {
+            NextopClientExec nextopExec = new NextopClientExec(
+                    new NextopHttpRequestExecutor(progressCallback),
+                    clientConnectionManager,
+                    DefaultConnectionReuseStrategy.INSTANCE,
+                    DefaultConnectionKeepAliveStrategy.INSTANCE,
+                    progressCallback
+            );
+            return new RetryExec(nextopExec, new NextopHttpRequestRetryHandler(sendStrategy, entry, mcs));
         }
 
     }
 
 
+
+    final class ProgressAdapter implements ProgressCallback {
+        final MessageControlState.Entry entry;
+
+
+        ProgressAdapter(MessageControlState.Entry entry) {
+            this.entry = entry;
+        }
+
+
+        @Override
+        public void onSendStarted(int tryCount) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    mcs.setOutboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(0L, 0L));
+                }
+            });
+        }
+
+        @Override
+        public void onSendProgress(final long sentBytes, final long sendTotalBytes) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    final long t = 0 <= sendTotalBytes ? sendTotalBytes : 0L;
+                    mcs.setOutboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(sentBytes, t));
+                }
+            });
+        }
+
+        @Override
+        public void onSendCompleted(final long sentBytes, final long sendTotalBytes) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    final long t = 0 <= sendTotalBytes ? sendTotalBytes : 0L;
+                    mcs.setOutboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(sentBytes, t));
+                }
+            });
+        }
+
+        @Override
+        public void onReceiveStarted(int tryCount) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    mcs.setInboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(0L, 0L));
+                }
+            });
+        }
+
+        @Override
+        public void onReceiveProgress(final long receivedBytes, final long receiveTotalBytes) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    final long t = 0 <= receiveTotalBytes ? receiveTotalBytes : 0L;
+                    mcs.setInboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(receivedBytes, t));
+                }
+            });
+        }
+
+        @Override
+        public void onReceiveCompleted(final long receivedBytes, final long receiveTotalBytes) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    final long t = 0 <= receiveTotalBytes ? receiveTotalBytes : 0L;
+                    mcs.setInboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(receivedBytes, t));
+                }
+            });
+        }
+    }
+
+
+    /** can be called from any thread. Expect the IO thread to call. */
+    static interface ProgressCallback {
+        void onSendStarted(int tryCount);
+        void onSendProgress(long sentBytes, long sendTotalBytes);
+        void onSendCompleted(long sentBytes, long sendTotalBytes);
+
+        void onReceiveStarted(int tryCount);
+        void onReceiveProgress(long receivedBytes, long receiveTotalBytes);
+        void onReceiveCompleted(long receivedBytes, long receiveTotalBytes);
+    }
 
 
     // PoolingHttpClientConnectionManager
@@ -185,9 +390,74 @@ public final class HttpNode extends AbstractMessageControlNode {
     // FIXME    use the message property idempotent to influence retry also
     // DefaultHttpRequestRetryHandler
 
+
+
+    // FIXME create Nextop exec chain per request
+    // FIXME
+
+
+
+    // NextopRetryExec:
+    // check that request is still the head before retry (this is sort of the solution to head of line blocking)
+    static final class NextopHttpRequestRetryHandler implements HttpRequestRetryHandler {
+        private SendStrategy sendStrategy;
+
+        private final MessageControlState.Entry entry;
+        private final MessageControlState mcs;
+
+
+        NextopHttpRequestRetryHandler(SendStrategy sendStrategy,
+                                      MessageControlState.Entry entry, MessageControlState mcs) {
+            this.sendStrategy = sendStrategy;
+            this.entry = entry;
+            this.mcs = mcs;
+        }
+
+
+        @Override
+        public boolean retryRequest(final IOException exception,
+                                 final int executionCount,
+                                 final HttpContext context) {
+            sendStrategy = sendStrategy.retry();
+            if (!sendStrategy.isSend()) {
+                return false;
+            }
+
+            // check ended
+            if (null != entry.end) {
+                return false;
+            }
+
+
+            // FIXME check the exception. some exceptions should not be retried (e.g. connected but not an http server)
+
+
+            // FIXME message should have controlParameters that are not transmitted
+            if (HttpClientContext.adapt(context).isRequestSent() && !Message.hasSideEffects(entry.message)) {
+                // Retry if the request has not been sent fully or
+                // if it's OK to retry methods that have been sent
+                return false;
+            }
+
+            // fail if there is a higher priority request
+            int timeoutMs = (int) sendStrategy.getDelay(TimeUnit.MILLISECONDS);
+            try {
+                return !mcs.hasFirstAvailable(entry.id, timeoutMs, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                return false;
+            }
+        }
+
+    }
+
+
+
     // implement a subclass of HttpRequestExector that surfaces SendIOException(final chunk), ReceiveIOException
     // implement a custom RetryHandler that always retries if send failed on not final chunk,
-    final class NextopClientExec implements ClientExecChain {
+    static final class NextopClientExec implements ClientExecChain {
+
+
+        ProgressCallback progressCallback;
 
         private final HttpRequestExecutor requestExecutor;
         private final HttpClientConnectionManager connManager;
@@ -199,21 +469,18 @@ public final class HttpNode extends AbstractMessageControlNode {
                 final HttpRequestExecutor requestExecutor,
                 final HttpClientConnectionManager connManager,
                 final ConnectionReuseStrategy reuseStrategy,
-                final ConnectionKeepAliveStrategy keepAliveStrategy) {
-            Args.notNull(requestExecutor, "HTTP request executor");
-            Args.notNull(connManager, "Client connection manager");
-            Args.notNull(reuseStrategy, "Connection reuse strategy");
-            Args.notNull(keepAliveStrategy, "Connection keep alive strategy");
+                final ConnectionKeepAliveStrategy keepAliveStrategy,
+                ProgressCallback progressCallback) {
             this.httpProcessor = new ImmutableHttpProcessor(
                     new RequestContent(),
                     new RequestTargetHost(),
                     new RequestClientConnControl(),
-                    new RequestUserAgent(VersionInfo.getUserAgent(
-                            "Apache-HttpClient", "org.apache.http.client", getClass())));
+                    new RequestUserAgent(DEFAULT_USER_AGENT));
             this.requestExecutor    = requestExecutor;
             this.connManager        = connManager;
             this.reuseStrategy      = reuseStrategy;
             this.keepAliveStrategy  = keepAliveStrategy;
+            this.progressCallback = progressCallback;
         }
 
         static void rewriteRequestURI(
@@ -241,10 +508,6 @@ public final class HttpNode extends AbstractMessageControlNode {
                 final HttpRequestWrapper request,
                 final HttpClientContext context,
                 final HttpExecutionAware execAware) throws IOException, HttpException {
-            Args.notNull(route, "HTTP route");
-            Args.notNull(request, "HTTP request");
-            Args.notNull(context, "HTTP context");
-
             rewriteRequestURI(request, route);
 
             final ConnectionRequest connRequest = connManager.requestConnection(route, null);
@@ -274,7 +537,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                 throw new RequestAbortedException("Request execution failed", cause);
             }
 
-            final ConnectionHolder releaseTrigger = new ConnectionHolder(log, connManager, managedConn);
+            final NextopConnectionHolder releaseTrigger = new NextopConnectionHolder(connManager, managedConn);
             try {
                 if (execAware != null) {
                     if (execAware.isAborted()) {
@@ -300,9 +563,6 @@ public final class HttpNode extends AbstractMessageControlNode {
                 }
 
 
-                // FIXME managedConn is an instanceof of ProgressHttpClientConnection
-                // FIXME attach the progresscallback if exists
-
                 HttpHost target = null;
                 final HttpRequest original = request.getOriginal();
                 if (original instanceof HttpUriRequest) {
@@ -320,9 +580,20 @@ public final class HttpNode extends AbstractMessageControlNode {
                 context.setAttribute(HttpCoreContext.HTTP_CONNECTION, managedConn);
                 context.setAttribute(HttpClientContext.HTTP_ROUTE, route);
 
-                httpProcessor.process(request, context);
-                final HttpResponse response = requestExecutor.execute(request, managedConn, context);
-                httpProcessor.process(response, context);
+                // FIXME the nextop connection is managedConn.getConnection
+                // FIXME get that out
+
+                final HttpResponse response;
+                // FIXME
+//                managedConn.setProgressCallback(progressCallback);
+                try {
+                    httpProcessor.process(request, context);
+                    response = requestExecutor.execute(request, managedConn, context);
+                    httpProcessor.process(response, context);
+                } finally {
+                    // FIXME
+//                    managedConn.setProgressCallback(null);
+                }
 
                 // The connection is in or can be brought to a re-usable state.
                 if (reuseStrategy.keepAlive(response, context)) {
@@ -339,9 +610,9 @@ public final class HttpNode extends AbstractMessageControlNode {
                 if (entity == null || !entity.isStreaming()) {
                     // connection not needed and (assumed to be) in re-usable state
                     releaseTrigger.releaseConnection();
-                    return new HttpResponseProxy(response, null);
+                    return new NextopHttpResponseProxy(response, null);
                 } else {
-                    return new HttpResponseProxy(response, releaseTrigger);
+                    return new NextopHttpResponseProxy(response, releaseTrigger);
                 }
             } catch (final ConnectionShutdownException ex) {
                 final InterruptedIOException ioex = new InterruptedIOException(
@@ -363,36 +634,256 @@ public final class HttpNode extends AbstractMessageControlNode {
     }
 
 
+    static final class NextopHttpClientConnectionFactory
+            implements HttpConnectionFactory<HttpRoute, ManagedHttpClientConnection> {
+
+        private final HttpMessageWriterFactory<HttpRequest> requestWriterFactory;
+        private final HttpMessageParserFactory<HttpResponse> responseParserFactory;
+        private final ContentLengthStrategy incomingContentStrategy;
+        private final ContentLengthStrategy outgoingContentStrategy;
+
+        private final AtomicInteger connectionCounter = new AtomicInteger(0);
+
+        public NextopHttpClientConnectionFactory(
+                @Nullable HttpMessageWriterFactory<HttpRequest> requestWriterFactory,
+                @Nullable HttpMessageParserFactory<HttpResponse> responseParserFactory,
+                @Nullable ContentLengthStrategy incomingContentStrategy,
+                @Nullable ContentLengthStrategy outgoingContentStrategy) {
+            super();
+            this.requestWriterFactory = requestWriterFactory != null ? requestWriterFactory :
+                    DefaultHttpRequestWriterFactory.INSTANCE;
+            this.responseParserFactory = responseParserFactory != null ? responseParserFactory :
+                    DefaultHttpResponseParserFactory.INSTANCE;
+            this.incomingContentStrategy = incomingContentStrategy != null ? incomingContentStrategy :
+                    LaxContentLengthStrategy.INSTANCE;
+            this.outgoingContentStrategy = outgoingContentStrategy != null ? outgoingContentStrategy :
+                    StrictContentLengthStrategy.INSTANCE;
+        }
+
+        public NextopHttpClientConnectionFactory(
+                @Nullable HttpMessageWriterFactory<HttpRequest> requestWriterFactory,
+                @Nullable HttpMessageParserFactory<HttpResponse> responseParserFactory) {
+            this(requestWriterFactory, responseParserFactory, null, null);
+        }
+
+        public NextopHttpClientConnectionFactory(
+                @Nullable HttpMessageParserFactory<HttpResponse> responseParserFactory) {
+            this(null, responseParserFactory);
+        }
+
+        public NextopHttpClientConnectionFactory() {
+            this(null, null);
+        }
+
+        @Override
+        public NextopHttpClientConnection create(final HttpRoute route, final ConnectionConfig config) {
+            final ConnectionConfig cconfig = config != null ? config : ConnectionConfig.DEFAULT;
+            CharsetDecoder chardecoder = null;
+            CharsetEncoder charencoder = null;
+            final Charset charset = cconfig.getCharset();
+            final CodingErrorAction malformedInputAction = cconfig.getMalformedInputAction() != null ?
+                    cconfig.getMalformedInputAction() : CodingErrorAction.REPORT;
+            final CodingErrorAction unmappableInputAction = cconfig.getUnmappableInputAction() != null ?
+                    cconfig.getUnmappableInputAction() : CodingErrorAction.REPORT;
+            if (charset != null) {
+                chardecoder = charset.newDecoder();
+                chardecoder.onMalformedInput(malformedInputAction);
+                chardecoder.onUnmappableCharacter(unmappableInputAction);
+                charencoder = charset.newEncoder();
+                charencoder.onMalformedInput(malformedInputAction);
+                charencoder.onUnmappableCharacter(unmappableInputAction);
+            }
+            final String id = String.format("nextop-http-%d", connectionCounter.getAndIncrement());
+            return new NextopHttpClientConnection(
+                    id,
+                    cconfig.getBufferSize(),
+                    cconfig.getFragmentSizeHint(),
+                    chardecoder,
+                    charencoder,
+                    cconfig.getMessageConstraints(),
+                    incomingContentStrategy,
+                    outgoingContentStrategy,
+                    requestWriterFactory,
+                    responseParserFactory);
+        }
+
+    }
+
+
+
+
+
+
     // be able to reset progress
     // be able to attach callback that gets called after A bytes of upload, B bytes of download indiviudally
-    static final class ProgressHttpClientConnection extends DefaultManagedHttpClientConnection {
+    static final class NextopHttpClientConnection extends DefaultManagedHttpClientConnection {
+        // emit progress every 4KiB
+        final int emitQBytes = DEFAULT_EMIT_Q_BYTES;
 
-        // OVERRIDE sendRequestEntity
-        // throw a SendIO
+        // progress state
+        @Nullable ProgressCallback progressCallback = null;
+
+
+
+        public NextopHttpClientConnection(
+                final String id,
+                final int buffersize,
+                final int fragmentSizeHint,
+                final CharsetDecoder chardecoder,
+                final CharsetEncoder charencoder,
+                final MessageConstraints constraints,
+                final ContentLengthStrategy incomingContentStrategy,
+                final ContentLengthStrategy outgoingContentStrategy,
+                final HttpMessageWriterFactory<HttpRequest> requestWriterFactory,
+                final HttpMessageParserFactory<HttpResponse> responseParserFactory) {
+            super(id, buffersize, fragmentSizeHint,
+                    chardecoder, charencoder,
+                    constraints,
+                    incomingContentStrategy, outgoingContentStrategy,
+                    requestWriterFactory, responseParserFactory);
+        }
+
+
+        void setProgressCallback(@Nullable ProgressCallback progressCallback) {
+            this.progressCallback = progressCallback;
+        }
+
+
+
 
         // FIXME if TCP error on close, throw SendIOException
         // FIXME this means all packets sent up to the tcp window size,
         // FIXME but failed to ack the end
         // FIXME otherwise, up to the end of the entity was not sent, so the server knows it has a hanging request
         @Override
-        protected OutputStream prepareOutput(HttpMessage message) throws HttpException {
-            return new FilterOutputStream(super.prepareOutput(message)) {
+        protected OutputStream createOutputStream(final long len, SessionOutputBuffer outbuffer) {
+
+
+            return new FilterOutputStream(super.createOutputStream(len, outbuffer)) {
+                long sentBytes = 0L;
+                long lastNotificationIndex = -1L;
+
+
+                private void onSendProgress(long bytes) {
+                    sentBytes += bytes;
+
+                    if (null != progressCallback) {
+                        long notificationIndex = sentBytes / emitQBytes;
+                        if (lastNotificationIndex != notificationIndex) {
+                            lastNotificationIndex = notificationIndex;
+                            progressCallback.onSendProgress(sentBytes, len);
+                        }
+                    }
+                }
+                private void onSendCompleted() {
+                    if (null != progressCallback) {
+                        progressCallback.onSendCompleted(sentBytes, len);
+                    }
+                }
+
+
+                @Override
+                public void write(int b) throws IOException {
+                    super.write(b);
+                    onSendProgress(1);
+                }
+
+                @Override
+                public void write(byte[] b) throws IOException {
+                    super.write(b);
+                    onSendProgress(b.length);
+                }
+
+                @Override
+                public void write(byte[] b, int off, int len) throws IOException {
+                    super.write(b, off, len);
+                    onSendProgress(len);
+                }
+
                 @Override
                 public void close() throws IOException {
-                    // this blocks until the tcp window is drained
-                    // if all acks don't come back, then the server may or may not have received all the data
-                    try {
-                        super.close();
-                    } catch (IOException e) {
-                        throw new SendIOException(e, true);
-                    }
+                    super.close();
+                    onSendCompleted();
                 }
             };
         }
+
+        @Override
+        protected InputStream createInputStream(final long len, SessionInputBuffer inbuffer) {
+            return new FilterInputStream(super.createInputStream(len, inbuffer)) {
+                long receivedBytes = 0L;
+                long lastNotificationIndex = -1L;
+
+
+                private void onReceiveProgress(long bytes) {
+                    receivedBytes += bytes;
+
+                    if (null != progressCallback) {
+                        long notificationIndex = receivedBytes / emitQBytes;
+                        if (lastNotificationIndex != notificationIndex) {
+                            lastNotificationIndex = notificationIndex;
+                            progressCallback.onReceiveProgress(receivedBytes, len);
+                        }
+                    }
+                }
+                private void onReceiveCompleted() {
+                    if (null != progressCallback) {
+                        progressCallback.onReceiveCompleted(receivedBytes, len);
+                    }
+                }
+
+
+                @Override
+                public int read() throws IOException {
+                    int b = super.read();
+                    onReceiveProgress(1);
+                    return b;
+                }
+
+                @Override
+                public int read(byte[] b) throws IOException {
+                    int c = super.read(b);
+                    if (0 < c) {
+                        onReceiveProgress(c);
+                    }
+                    return c;
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len) throws IOException {
+                    int c = super.read(b, off, len);
+                    if (0 < c) {
+                        onReceiveProgress(c);
+                    }
+                    return c;
+                }
+
+                @Override
+                public void close() throws IOException {
+                    super.close();
+                    onReceiveCompleted();
+                }
+            };
+        }
+
+
+        // OVERRIDE sendRequestEntity
+        // throw a SendIO
     }
 
 
+    // not to be shared. one per exec chain/request
     static class NextopHttpRequestExecutor extends HttpRequestExecutor {
+
+
+        ProgressCallback progressCallback;
+        int sendTryCount = 0;
+        int receiveTryCount = 0;
+
+
+        NextopHttpRequestExecutor(ProgressCallback progressCallback) {
+            this.progressCallback = progressCallback;
+        }
 
 
         @Override
@@ -400,20 +891,11 @@ public final class HttpNode extends AbstractMessageControlNode {
                 final HttpRequest request,
                 final HttpClientConnection conn,
                 final HttpContext context) throws IOException, HttpException {
-
-            try {
-                return super.doSendRequest(request, conn, context);
-            } catch (IOException e) {
-                if (e instanceof SendIOException) {
-                    throw e;
-                }
-                throw new SendIOException(e);
-            } catch (HttpException e) {
-                if (e instanceof SendHttpException) {
-                    throw e;
-                }
-                throw new SendHttpException(e);
+            ++sendTryCount;
+            if (null != progressCallback) {
+                progressCallback.onSendStarted(sendTryCount);
             }
+            return super.doSendRequest(request, conn, context);
         }
 
         @Override
@@ -421,22 +903,12 @@ public final class HttpNode extends AbstractMessageControlNode {
                 final HttpRequest request,
                 final HttpClientConnection conn,
                 final HttpContext context) throws HttpException, IOException {
-            try {
-                return super.doReceiveResponse(request, conn, context);
-            } catch (IOException e) {
-                if (e instanceof ReceiveIOException) {
-                    throw e;
-                }
-                throw new ReceiveIOException(e);
-            } catch (HttpException e) {
-                if (e instanceof ReceiveHttpException) {
-                    throw e;
-                }
-                throw new ReceiveHttpException(e);
+            ++receiveTryCount;
+            if (null != progressCallback) {
+                progressCallback.onReceiveStarted(receiveTryCount);
             }
+            return super.doReceiveResponse(request, conn, context);
         }
-
-
     }
 
 

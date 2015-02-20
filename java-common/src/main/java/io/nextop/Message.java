@@ -7,10 +7,7 @@ import com.google.common.io.ByteStreams;
 import com.google.common.io.CharStreams;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
-import io.nextop.org.apache.http.Header;
-import io.nextop.org.apache.http.HttpEntity;
-import io.nextop.org.apache.http.HttpRequest;
-import io.nextop.org.apache.http.HttpResponse;
+import io.nextop.org.apache.http.*;
 import io.nextop.org.apache.http.client.methods.*;
 import io.nextop.org.apache.http.client.utils.URIBuilder;
 import io.nextop.org.apache.http.entity.ByteArrayEntity;
@@ -82,6 +79,35 @@ public class Message {
     public static Message valueOf(Route.Method method, URI uri) {
         // FIXME parse query and fragment into parameters
         return newBuilder().setRoute(Route.valueOf(String.format("%s %s", method, uri))).build();
+    }
+
+
+
+
+    public static boolean hasSideEffects(Message message) {
+        // FIXME
+        // FIXME
+//        @Nullable WireValue idValue = entry.message.controlParameters.get(Message.CP_IDEMPOTENT);
+//        if (null != idValue) {
+//            return idValue.asBoolean();
+//        }
+
+        // not explicitly set; infer
+        switch (message.route.target.method) {
+            case GET:
+            case HEAD:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public static boolean canYield(Message message) {
+        // FIXME
+        // FIXME check control parameter
+
+        // not explicitly set; infer
+        return !hasSideEffects(message);
     }
 
 
@@ -437,6 +463,40 @@ public class Message {
     // IMAGE
     // FIXME maxTransferWidth, maxTransferHeight
 
+
+    public static HttpHost toHttpHost(Message message) throws URISyntaxException {
+        switch (message.route.via.scheme) {
+            case HTTP:
+            case HTTPS:
+                break;
+            default:
+                throw new URISyntaxException(message.route.toString(), "Bad scheme");
+        }
+
+        String host = message.route.via.authority.getHost();
+        if (null == host) {
+            throw new URISyntaxException(message.route.toString(), "Bad host");
+        }
+
+        int port = message.route.via.authority.port;
+        if (port <= 0) {
+            // apply default
+            switch (message.route.via.scheme) {
+                case HTTP:
+                    port = 80;
+                    break;
+                case HTTPS:
+                    port = 443;
+                    break;
+                default:
+                    // should never reach here; see check above
+                    throw new IllegalStateException();
+            }
+        }
+
+        return new HttpHost(host, port,
+                message.route.via.scheme.toString().toLowerCase());
+    }
 
 
     public static HttpUriRequest toHttpRequest(Message message) throws URISyntaxException {

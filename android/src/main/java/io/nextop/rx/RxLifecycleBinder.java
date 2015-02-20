@@ -85,6 +85,10 @@ public interface RxLifecycleBinder extends Subscription {
             }
         }
 
+        public void connect() {
+            connect(null);
+        }
+
         public void connect(@Nullable View view) {
             if (closed) {
                 throw new IllegalStateException();

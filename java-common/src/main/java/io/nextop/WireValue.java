@@ -30,7 +30,7 @@ import java.util.*;
 
 // more efficient codec than text, that allows a lossless (*or nearly, for floats) conversion to text when needed
 // like protobufs/bson but focused on easy conversion to text
-// conversion of text is important when constructing HTTP requests, which are test-based
+// conversion of text is important when constructing HTTP requests, which are isSend-based
 // TODO do compression of values and objects keysets by having a header in the front. up to the 127 that save the most bytes to compress
 // TODO long term the compression table can be stateful, so transferring the same objects repeatedly will have a savings, like a dynamic protobuf
 // TODO wire value even in a simple form will increase speed between cloud and client, because binary will be less data and faster to parse on client

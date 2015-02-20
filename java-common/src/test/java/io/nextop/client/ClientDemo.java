@@ -52,7 +52,7 @@ public class ClientDemo {
         s.init(context);
         s.start();
 
-        // FIXME wifiWireFactory and cellWireFactory are test wrappers
+        // FIXME wifiWireFactory and cellWireFactory are isSend wrappers
         // FIXME set a message and regulate the traffic, then watch the callbacks to see what happens
 
 

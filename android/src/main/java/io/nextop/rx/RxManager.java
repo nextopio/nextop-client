@@ -110,7 +110,7 @@ public abstract class RxManager<M extends RxManaged> {
 
     @Nullable
     private ManagedState state(Id id, boolean create) {
-        // always test the cache first because it counts references - e.g. lru
+        // always isSend the cache first because it counts references - e.g. lru
         @Nullable ManagedState state = cachedStates.getIfPresent(id);
         if (null != state) {
             return state;

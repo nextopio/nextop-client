@@ -109,7 +109,7 @@ public class NextopTest extends InstrumentationTestCase {
 
             assertEquals(responseCode, response.getCode());
             assertTrue(String.format("%s <> %s", responseType, actualResponseType), actualResponseType.is(responseType));
-            // test that the response parsing worked correctly
+            // isSend that the response parsing worked correctly
             assertEquals(String.format("%s <> %s", responseBody.toDebugString(), response.getContent().toDebugString()),
                     responseBody, response.getContent());
         }

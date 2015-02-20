@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class RxManagerTest extends TestCase {
 
 
-    // TODO test peek, test more get/update
-    // TODO test cache ejection
+    // TODO isSend peek, isSend more get/update
+    // TODO isSend cache ejection
 
 
     public void testLifecycle() {
@@ -122,7 +122,7 @@ public class RxManagerTest extends TestCase {
 
 
     public void testSync() {
-        // test that notifications come after sync()
+        // isSend that notifications come after sync()
 
         final BehaviorSubject<Boolean> syncGate = BehaviorSubject.create();
         final int[] callCount = {0};
@@ -173,7 +173,7 @@ public class RxManagerTest extends TestCase {
 
 
     public void testUpdateClobber() {
-        // test notifications on updates
+        // isSend notifications on updates
         // when updates are dispatched inside of updates
 
         final BehaviorSubject<Boolean> syncGate = BehaviorSubject.create();

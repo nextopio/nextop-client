@@ -68,7 +68,6 @@ public final class MessageControlState {
     /////// QUEUE MANAGEMENT ///////
 
 
-
     /** non-blocking */
     @Nullable
     public Entry takeFirstAvailable(MessageControlChannel owner) {
@@ -142,6 +141,78 @@ public final class MessageControlState {
                 timeoutNanos -= (System.nanoTime() - nanos);
             }
             return entry;
+        }
+    }
+
+
+
+
+    /** non-blocking */
+    @Nullable
+    public boolean hasFirstAvailable() {
+        synchronized (mutex) {
+            for (Group group : groupsByPriority) {
+                if (!group.entries.isEmpty()) {
+                    Entry first = group.entries.get(0);
+                    if (null == first.owner) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
+
+
+    /** non-blocking. */
+    public boolean hasFirstAvailable(Id min) {
+        if (null == min) {
+            throw new IllegalArgumentException();
+        }
+        synchronized (mutex) {
+            for (Group group : groupsByPriority) {
+                if (!group.entries.isEmpty()) {
+                    Entry first = group.entries.get(0);
+                    if (min.equals(first.id)) {
+                        return false;
+                    } else if (null == first.owner) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
+
+    /** blocking */
+    public boolean hasFirstAvailable(long timeout, TimeUnit timeUnit) throws InterruptedException {
+        final long nanosPerMillis = TimeUnit.MILLISECONDS.toNanos(1);
+        synchronized (mutex) {
+            long timeoutNanos = timeUnit.toNanos(timeout);
+            boolean a;
+            while (!(a = hasFirstAvailable()) && 0 < timeoutNanos) {
+                long nanos = System.nanoTime();
+                mutex.wait(timeoutNanos / nanosPerMillis, (int) (timeoutNanos % nanosPerMillis));
+                timeoutNanos -= (System.nanoTime() - nanos);
+            }
+            return a;
+        }
+    }
+
+    /** blocking */
+    public boolean hasFirstAvailable(Id min, long timeout, TimeUnit timeUnit) throws InterruptedException {
+        final long nanosPerMillis = TimeUnit.MILLISECONDS.toNanos(1);
+        synchronized (mutex) {
+            long timeoutNanos = timeUnit.toNanos(timeout);
+            boolean a;
+            while (!(a = hasFirstAvailable(min)) && 0 < timeoutNanos) {
+                long nanos = System.nanoTime();
+                mutex.wait(timeoutNanos / nanosPerMillis, (int) (timeoutNanos % nanosPerMillis));
+                timeoutNanos -= (System.nanoTime() - nanos);
+            }
+            return a;
         }
     }
 
@@ -292,15 +363,36 @@ public final class MessageControlState {
             assert null != group;
 
             groupsByPriority.remove(group);
-            try {
-                group.remove(entry);
-            } finally {
-                if (!group.entries.isEmpty()) {
-                    groupsByPriority.insert(group);
-                }
+            group.remove(entry);
+            if (!group.entries.isEmpty()) {
+                groupsByPriority.insert(group);
             }
 
             entry.end = end;
+
+            mutex.notifyAll();
+        }
+        entry.publish();
+        publish();
+        return true;
+    }
+
+    public boolean yield(Id id) {
+        Entry entry;
+        synchronized (mutex) {
+            entry = entries.get(id);
+
+            if (null == entry) {
+                return false;
+            }
+            assert null == entry.end;
+
+            Group group = entry.group;
+            assert null != group;
+
+            groupsByPriority.remove(group);
+            group.yield(entry);
+            groupsByPriority.insert(group);
 
             mutex.notifyAll();
         }
@@ -557,7 +649,7 @@ public final class MessageControlState {
 
 
 
-        final int index;
+        int index;
         /** alias from message */
         public final Id id;
         /** alias from message */
@@ -613,7 +705,7 @@ public final class MessageControlState {
             return create(0, 0);
         }
 
-        public static TransferProgress create(int completedBytes, int totalBytes) {
+        public static TransferProgress create(long completedBytes, long totalBytes) {
             if (totalBytes < 0) {
                 throw new IllegalArgumentException();
             }
@@ -624,18 +716,19 @@ public final class MessageControlState {
         }
 
 
-        public final int completedBytes;
-        public final int totalBytes;
+        public final long completedBytes;
+        public final long totalBytes;
 
 
-        TransferProgress(int completedBytes, int totalBytes) {
+        TransferProgress(long completedBytes, long totalBytes) {
             this.completedBytes = completedBytes;
             this.totalBytes = totalBytes;
         }
 
 
         public float asFloat() {
-            return 0 < totalBytes ? (completedBytes / (float) totalBytes) : 0.f;
+            final int q = 1000;
+            return 0 < totalBytes ? (q * completedBytes / totalBytes) / (float) q : 0.f;
         }
     }
 
@@ -655,7 +748,7 @@ public final class MessageControlState {
 
     // internal
 
-    private static final class Group {
+    private final class Group {
         final Id groupId;
 
         final PriorityQueue<Entry> entriesByPriority;
@@ -687,6 +780,18 @@ public final class MessageControlState {
             entries.remove(entry);
             entriesByPriority.remove(entry);
             entry.group = null;
+        }
+
+        void yield(Entry entry) {
+            if (this != entry.group) {
+                throw new IllegalArgumentException();
+            }
+
+            entries.remove(entry);
+            entriesByPriority.remove(entry);
+            entry.index = headIndex++;
+            entriesByPriority.add(entry);
+            entries.insert(entry);
         }
 
         void take(Entry entry, MessageControlChannel owner) {

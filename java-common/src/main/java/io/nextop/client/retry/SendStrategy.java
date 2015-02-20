@@ -11,8 +11,8 @@ import java.util.concurrent.TimeUnit;
  * Strategies are immutable and can be shared, used across multiple threads. */
 public interface SendStrategy {
 
-    boolean test();
-    long delay(TimeUnit timeUnit);
+    boolean isSend();
+    long getDelay(TimeUnit timeUnit);
     SendStrategy retry();
 
 
@@ -169,7 +169,7 @@ public interface SendStrategy {
             }
 
             @Override
-            public boolean test() {
+            public boolean isSend() {
                 return 0 < countDown;
             }
         }
@@ -180,7 +180,7 @@ public interface SendStrategy {
             }
 
             @Override
-            public long delay(TimeUnit timeUnit) {
+            public long getDelay(TimeUnit timeUnit) {
                 return Math.min(TimeUnit.MILLISECONDS.convert(initMs, timeUnit),
                         TimeUnit.MILLISECONDS.convert(maxMs, timeUnit));
             }
@@ -206,7 +206,7 @@ public interface SendStrategy {
             }
 
             @Override
-            public long delay(TimeUnit timeUnit) {
+            public long getDelay(TimeUnit timeUnit) {
                 return Math.min(TimeUnit.MILLISECONDS.convert(initMs + Math.round(r.floatValue() * delayMs), timeUnit),
                         TimeUnit.MILLISECONDS.convert(maxMs, timeUnit));
             }
@@ -233,7 +233,7 @@ public interface SendStrategy {
             }
 
             @Override
-            public long delay(TimeUnit timeUnit) {
+            public long getDelay(TimeUnit timeUnit) {
                 return Math.min(TimeUnit.MILLISECONDS.convert(initMs + Math.round(r.floatValue() * delayMs), timeUnit),
                         TimeUnit.MILLISECONDS.convert(maxMs, timeUnit));
             }
@@ -260,7 +260,7 @@ public interface SendStrategy {
             }
 
             @Override
-            public long delay(TimeUnit timeUnit) {
+            public long getDelay(TimeUnit timeUnit) {
                 return Math.min(TimeUnit.MILLISECONDS.convert(Math.round(r.floatValue() * initMs * factor), timeUnit),
                         TimeUnit.MILLISECONDS.convert(maxMs, timeUnit));
             }
