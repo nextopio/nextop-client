@@ -2,17 +2,12 @@ package io.nextop.client.http;
 
 import io.nextop.Message;
 import io.nextop.Route;
-import io.nextop.WireValue;
 import io.nextop.client.AbstractMessageControlNode;
 import io.nextop.client.MessageControl;
 import io.nextop.client.MessageControlMetrics;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.retry.SendStrategy;
-import io.nextop.org.apache.commons.logging.Log;
-import io.nextop.org.apache.commons.logging.LogFactory;
 import io.nextop.org.apache.http.*;
-import io.nextop.org.apache.http.client.ClientProtocolException;
-import io.nextop.org.apache.http.client.HttpClient;
 import io.nextop.org.apache.http.client.HttpRequestRetryHandler;
 import io.nextop.org.apache.http.client.config.RequestConfig;
 import io.nextop.org.apache.http.client.methods.*;
@@ -27,7 +22,6 @@ import io.nextop.org.apache.http.conn.routing.HttpRoute;
 import io.nextop.org.apache.http.entity.ContentLengthStrategy;
 import io.nextop.org.apache.http.impl.DefaultConnectionReuseStrategy;
 import io.nextop.org.apache.http.impl.client.DefaultConnectionKeepAliveStrategy;
-import io.nextop.org.apache.http.impl.client.DefaultHttpClient;
 import io.nextop.org.apache.http.impl.conn.ConnectionShutdownException;
 import io.nextop.org.apache.http.impl.conn.DefaultHttpResponseParserFactory;
 import io.nextop.org.apache.http.impl.conn.DefaultManagedHttpClientConnection;
@@ -119,7 +113,7 @@ public final class HttpNode extends AbstractMessageControlNode {
             int n = maxConcurrentConnections;
             Thread[] threads = new Thread[n];
             for (int i = 0; i < n; ++i) {
-                threads[i] = new Thread(new RequestLooper());
+                threads[i] = new RequestLooper();
             }
             looperThreads = Arrays.asList(threads);
             for (int i = 0; i < n; ++i) {
@@ -147,7 +141,8 @@ public final class HttpNode extends AbstractMessageControlNode {
 
 
 
-    private final class RequestLooper implements Runnable {
+    private final class RequestLooper extends Thread {
+        @Nullable ProgressCallback progressCallback = null;
 
         @Override
         public void run() {
@@ -236,11 +231,16 @@ public final class HttpNode extends AbstractMessageControlNode {
                 return MessageControlState.End.ERROR;
             }
 
-            HttpResponse response = doExecute(createExecChain(entry, new ProgressAdapter(entry)),
-                    target, request, null);
+            final Message responseMessage;
+            progressCallback = new ProgressAdapter(entry);
+            try {
+                HttpResponse response = doExecute(createExecChain(entry),
+                        target, request, null);
 
-            final Message responseMessage = Message.fromHttpResponse(response).setRoute(entry.message.inboxRoute()).build();
-
+                responseMessage = Message.fromHttpResponse(response).setRoute(entry.message.inboxRoute()).build();
+            } finally {
+                progressCallback = null;
+            }
 
             post(new Runnable() {
                 @Override
@@ -277,7 +277,7 @@ public final class HttpNode extends AbstractMessageControlNode {
         }
 
 
-        private ClientExecChain createExecChain(MessageControlState.Entry entry, ProgressCallback progressCallback) {
+        private ClientExecChain createExecChain(MessageControlState.Entry entry) {
             NextopClientExec nextopExec = new NextopClientExec(
                     new NextopHttpRequestExecutor(progressCallback),
                     clientConnectionManager,
@@ -580,20 +580,13 @@ public final class HttpNode extends AbstractMessageControlNode {
                 context.setAttribute(HttpCoreContext.HTTP_CONNECTION, managedConn);
                 context.setAttribute(HttpClientContext.HTTP_ROUTE, route);
 
-                // FIXME the nextop connection is managedConn.getConnection
-                // FIXME get that out
 
-                final HttpResponse response;
-                // FIXME
-//                managedConn.setProgressCallback(progressCallback);
-                try {
-                    httpProcessor.process(request, context);
-                    response = requestExecutor.execute(request, managedConn, context);
-                    httpProcessor.process(response, context);
-                } finally {
-                    // FIXME
-//                    managedConn.setProgressCallback(null);
-                }
+                // TODO managedConn is an intance of CPoolProxy
+                // TODO an easy way to call getConnection or get the connection out of it without reflection?
+
+                httpProcessor.process(request, context);
+                final HttpResponse response = requestExecutor.execute(request, managedConn, context);
+                httpProcessor.process(response, context);
 
                 // The connection is in or can be brought to a re-usable state.
                 if (reuseStrategy.keepAlive(response, context)) {
@@ -720,10 +713,6 @@ public final class HttpNode extends AbstractMessageControlNode {
         // emit progress every 4KiB
         final int emitQBytes = DEFAULT_EMIT_Q_BYTES;
 
-        // progress state
-        @Nullable ProgressCallback progressCallback = null;
-
-
 
         public NextopHttpClientConnection(
                 final String id,
@@ -744,12 +733,13 @@ public final class HttpNode extends AbstractMessageControlNode {
         }
 
 
-        void setProgressCallback(@Nullable ProgressCallback progressCallback) {
-            this.progressCallback = progressCallback;
+        @Nullable
+        private ProgressCallback getProgressCallback() {
+            // TODO passing this via the thread is nasty, but is there a good way for the ExecChain to inject into this
+            // TODO (through the pool adapter)
+            RequestLooper t = (RequestLooper) Thread.currentThread();
+            return t.progressCallback;
         }
-
-
-
 
         // FIXME if TCP error on close, throw SendIOException
         // FIXME this means all packets sent up to the tcp window size,
@@ -757,7 +747,10 @@ public final class HttpNode extends AbstractMessageControlNode {
         // FIXME otherwise, up to the end of the entity was not sent, so the server knows it has a hanging request
         @Override
         protected OutputStream createOutputStream(final long len, SessionOutputBuffer outbuffer) {
+            @Nullable final ProgressCallback progressCallback = getProgressCallback();
 
+            // FIXME calculate this - len is off
+            final long sendTotalBytes = 0L;
 
             return new FilterOutputStream(super.createOutputStream(len, outbuffer)) {
                 long sentBytes = 0L;
@@ -771,13 +764,13 @@ public final class HttpNode extends AbstractMessageControlNode {
                         long notificationIndex = sentBytes / emitQBytes;
                         if (lastNotificationIndex != notificationIndex) {
                             lastNotificationIndex = notificationIndex;
-                            progressCallback.onSendProgress(sentBytes, len);
+                            progressCallback.onSendProgress(sentBytes, sendTotalBytes);
                         }
                     }
                 }
                 private void onSendCompleted() {
                     if (null != progressCallback) {
-                        progressCallback.onSendCompleted(sentBytes, len);
+                        progressCallback.onSendCompleted(sentBytes, sendTotalBytes);
                     }
                 }
 
@@ -810,6 +803,11 @@ public final class HttpNode extends AbstractMessageControlNode {
 
         @Override
         protected InputStream createInputStream(final long len, SessionInputBuffer inbuffer) {
+            @Nullable final ProgressCallback progressCallback = getProgressCallback();
+
+            // FIXME calculate this - len is off
+            final long receiveTotalBytes = 0L;
+
             return new FilterInputStream(super.createInputStream(len, inbuffer)) {
                 long receivedBytes = 0L;
                 long lastNotificationIndex = -1L;
@@ -822,13 +820,13 @@ public final class HttpNode extends AbstractMessageControlNode {
                         long notificationIndex = receivedBytes / emitQBytes;
                         if (lastNotificationIndex != notificationIndex) {
                             lastNotificationIndex = notificationIndex;
-                            progressCallback.onReceiveProgress(receivedBytes, len);
+                            progressCallback.onReceiveProgress(receivedBytes, receiveTotalBytes);
                         }
                     }
                 }
                 private void onReceiveCompleted() {
                     if (null != progressCallback) {
-                        progressCallback.onReceiveCompleted(receivedBytes, len);
+                        progressCallback.onReceiveCompleted(receivedBytes, receiveTotalBytes);
                     }
                 }
 

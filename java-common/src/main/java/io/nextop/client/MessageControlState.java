@@ -707,10 +707,10 @@ public final class MessageControlState {
 
         public static TransferProgress create(long completedBytes, long totalBytes) {
             if (totalBytes < 0) {
-                throw new IllegalArgumentException();
+                throw new IllegalArgumentException(String.format("%d", totalBytes));
             }
-            if (completedBytes < 0 || totalBytes < completedBytes) {
-                throw new IllegalArgumentException();
+            if (completedBytes < 0 || 0 < totalBytes && totalBytes < completedBytes) {
+                throw new IllegalArgumentException(String.format("%d %d", completedBytes, totalBytes));
             }
             return new TransferProgress(completedBytes, totalBytes);
         }
