@@ -14,7 +14,9 @@ import io.nextop.vm.ImageViewModel;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
+import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.functions.Func1;
 import rx.functions.Func2;
 import rx.internal.util.SubscriptionList;
 
@@ -208,6 +210,11 @@ public class ImageView extends android.widget.ImageView {
     }
     private void resetLoad() {
         cancelLoadSubscriptions();
+
+
+        // FIXME
+//        System.out.printf("  image progress reset load\n");
+
         setProgress(null);
     }
     private void resetImage() {
@@ -215,6 +222,10 @@ public class ImageView extends android.widget.ImageView {
     }
     private void reload() {
         cancelLoadSubscriptions();
+
+        // FIXME
+//        System.out.printf("  image progress reload\n");
+
         setProgress(null);
 
         if (null != source) {
@@ -269,26 +280,47 @@ public class ImageView extends android.widget.ImageView {
 
         }
     }
-    private void loadLocal(Id id) {
+    private void loadLocal(final Id id) {
         assert null == loadSubscriptions;
 
         @Nullable Nextop nextop = NextopAndroid.getActive(this);
         if (null != nextop) {
             loadSubscriptions = new SubscriptionList();
 
-            Message message = Message.newBuilder().setRoute(Message.echoRoute(id)).build();
 
-
-            Observable<Progress> upProgressSource = Observable.combineLatest(nextop.transferStatus(message.id), nextop.connectionStatus(),
+            // FIXME
+            Observable<Progress> upProgressSource = Observable.combineLatest(nextop.transferStatus(id), nextop.connectionStatus(),
                     new Func2<Nextop.TransferStatus, Nextop.ConnectionStatus, Progress>() {
                         @Override
                         public Progress call(Nextop.TransferStatus transferStatus, Nextop.ConnectionStatus connectionStatus) {
                             return Progress.upload(transferStatus.send.asFloat(), connectionStatus.online);
                         }
                     });
+//                    .doOnSubscribe(new Action0() {
+//                        @Override
+//                        public void call() {
+//                            System.out.printf("  SUBSCRIBE to progress %s\n", id);
+//                        }
+//                    })
+//                    .doOnUnsubscribe(new Action0() {
+//                        @Override
+//                        public void call() {
+//                            System.out.printf("  UNSUBSCRIBE from progress %s\n", id);
+//                        }
+//                    });
+//            Observable<Progress> upProgressSource = nextop.transferStatus(id).map(
+//                    new Func1<Nextop.TransferStatus, Progress>() {
+//                        @Override
+//                        public Progress call(Nextop.TransferStatus transferStatus) {
+////                            return Progress.upload(transferStatus.send.asFloat(), true);
+//                            return Progress.upload(0.5f, true);
+//                        }
+//                    });
             Subscription progressSubscription = upProgressSource.subscribe(new ProgressLoader());
             loadSubscriptions.add(progressSubscription);
 
+
+            Message message = Message.newBuilder().setRoute(Message.echoRoute(id)).build();
 
             LayerLoader loader = new LayerLoader();
             loader.immediate = true;
@@ -305,6 +337,10 @@ public class ImageView extends android.widget.ImageView {
     /////// PROGRESS ///////
 
     private void setProgress(@Nullable Progress progress) {
+        // FIXME
+//        System.out.printf("  image progress %s\n", progress);
+
+
         if (!Objects.equals(this.progress, progress)) {
             this.progress = progress;
             invalidate();
@@ -431,17 +467,28 @@ public class ImageView extends android.widget.ImageView {
     private final class ProgressLoader implements Observer<Progress> {
         @Override
         public void onNext(Progress progress) {
+            // FIXME
+//            System.out.printf("  image progress loader next %s\n", progress);
+
             setProgress(progress);
         }
 
         @Override
         public void onCompleted() {
+            // FIXME
+//            System.out.printf("  image progress loader completed\n");
+
             setProgress(null);
         }
 
         @Override
         public void onError(Throwable e) {
-            // TODO
+            // FIXME
+//            System.out.printf("  image progress loader error %s\n", e);
+//            if (null != e) {
+//                e.printStackTrace();
+//            }
+
             setProgress(null);
         }
     }
@@ -571,6 +618,11 @@ public class ImageView extends android.widget.ImageView {
             this.type = type;
             this.progress = progress;
             this.active = active;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s %.2f %s", type, progress, active ? "active" : "-");
         }
 
         @Override

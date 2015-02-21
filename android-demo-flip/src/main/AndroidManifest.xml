@@ -36,7 +36,8 @@
         </activity>
 
         <activity
-                android:name=".FlipActivity" >
+                android:name=".FlipActivity"
+                android:theme="@style/FlipTheme">
 
 
         </activity>

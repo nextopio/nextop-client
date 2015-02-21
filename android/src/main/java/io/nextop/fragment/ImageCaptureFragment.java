@@ -36,7 +36,7 @@ public class ImageCaptureFragment extends RxFragment {
 
     // CONFIG
 
-    int frameIntervalMs = 200;
+    int frameIntervalMs = 50;
     int frameMaxWidthPx = 320;
     int frameMaxHeightPx = 480;
 

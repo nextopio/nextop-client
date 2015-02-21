@@ -2,4 +2,15 @@
 <resources>
     <style name="AppTheme" parent="android:Theme.Material.Light">
     </style>
+
+
+    <style name="FlipTheme" parent="@style/AppTheme">
+        <item name="android:windowActionBarOverlay">true</item>
+        <item name="android:actionBarStyle">@style/FlipActionBar</item>
+    </style>
+
+    <style name="FlipActionBar"
+           parent="android:Widget.Material.Light.ActionBar.Solid">
+        <item name="android:background">@color/white_semi</item>
+    </style>
 </resources>

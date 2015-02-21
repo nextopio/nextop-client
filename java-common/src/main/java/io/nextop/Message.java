@@ -84,7 +84,18 @@ public class Message {
 
 
 
-    public static boolean hasSideEffects(Message message) {
+    public static boolean isIdempotent(Message message) {
+        // FIXME check the controlParameters here
+
+        if (isNullipotent(message)) {
+            return true;
+        }
+
+        // not explicitly set; infer
+        return false;
+    }
+
+    public static boolean isNullipotent(Message message) {
         // FIXME
         // FIXME
 //        @Nullable WireValue idValue = entry.message.controlParameters.get(Message.CP_IDEMPOTENT);
@@ -107,7 +118,7 @@ public class Message {
         // FIXME check control parameter
 
         // not explicitly set; infer
-        return !hasSideEffects(message);
+        return isNullipotent(message);
     }
 
 
@@ -207,9 +218,6 @@ public class Message {
         }
     }
 
-    public HttpUriRequest toHttpRequest() throws URISyntaxException {
-        return toHttpRequest(this);
-    }
 
 
     public Builder buildOn() {
@@ -626,6 +634,9 @@ public class Message {
                 bb.get(bytes);
                 entity = new ByteArrayEntity(bytes);
             }
+
+            // do not set the Content-Length header - the http exec chain does that
+//            request.setHeader(HttpHeaders.CONTENT_LENGTH, "" + entity.getContentLength());
 
             request.setEntity(entity);
 

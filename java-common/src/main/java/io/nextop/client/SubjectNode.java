@@ -37,9 +37,14 @@ public class SubjectNode extends AbstractMessageControlNode {
     //
 
 
-    public void send(Message message) {
+    public void send(final Message message) {
         mcs.notifyPending(message.id);
-        onMessageControl(MessageControl.send(message));
+        post(new Runnable() {
+            @Override
+            public void run() {
+                onMessageControl(MessageControl.send(message));
+            }
+        });
     }
 
 
@@ -52,11 +57,19 @@ public class SubjectNode extends AbstractMessageControlNode {
         return Observable.create(new Observable.OnSubscribe<Message>() {
             @Override
             public void call(final Subscriber<? super Message> subscriber) {
+                // FIXME
+//                System.out.printf(" RECEIVE ADD %s\n", route);
+
+
                 boolean s = receivers.put(route, subscriber);
                 assert s;
                 Subscription subscription = BooleanSubscription.create(new Action0() {
                     @Override
                     public void call() {
+                        // FIXME
+//                        System.out.printf(" RECEIVE REMOVE %s\n", route);
+
+
                         boolean s = receivers.remove(route, subscriber);
                         assert s;
 
@@ -115,7 +128,7 @@ public class SubjectNode extends AbstractMessageControlNode {
 
     public void cancelSend(final Id id) {
 //        mcs.remove(id, MessageControlState.End.CANCELED);
-        downstream.post(new Runnable() {
+        post(new Runnable() {
             @Override
             public void run() {
                 onMessageControl(MessageControl.send(MessageControl.Type.ERROR, Message.outboxRoute(id)));
@@ -150,8 +163,10 @@ public class SubjectNode extends AbstractMessageControlNode {
                                 null);
                         if (null != firstSubscriber) {
                             firstSubscriber.onNext(mc.message);
+                        } else {
+                            // the downstream will resend on subscribe
+//                            System.out.printf(" MC missed onNext %s\n", mc);
                         }
-                        // else the downstream will resend on subscribe
                         break;
                     }
                     case COMPLETE: {

@@ -88,6 +88,7 @@ public class DebugOverlayView extends View {
             }
         }
     }
+    // FIXME saw a SO here
     private void drawViewSummary(Canvas canvas, ViewSummary viewSummary) {
         // FIXME
         View rview = viewSummary.view;

@@ -51,6 +51,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+
+// FIXME figure out how to use a wire factory here instead of a socket
 public final class HttpNode extends AbstractMessageControlNode {
 
 
@@ -58,8 +60,8 @@ public final class HttpNode extends AbstractMessageControlNode {
     private static final String DEFAULT_USER_AGENT = "Nextop/0.1.3";
 
 
-    /** emit progress every 4 KiB by default */
-    private static final int DEFAULT_EMIT_Q_BYTES = 4 * 1024;
+    /** emit progress every 1KiB by default */
+    private static final int DEFAULT_EMIT_Q_BYTES = 1024;
 
 
 
@@ -108,6 +110,7 @@ public final class HttpNode extends AbstractMessageControlNode {
     public void onTransfer(MessageControlState mcs) {
         super.onTransfer(mcs);
 
+        // FIXME bind mcs to the loopers - ultimately remove the onTransfer callback and just pass the mcs in init
         if (active) {
             // note that the mcs coordinates between multiple loopers
             int n = maxConcurrentConnections;
@@ -156,6 +159,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                 }
 
                 if (null != entry) {
+                    assert null == entry.end;
                     try {
                         end(entry, execute(entry));
                     } catch (IOException e) {
@@ -163,10 +167,11 @@ public final class HttpNode extends AbstractMessageControlNode {
                     } catch (HttpException e) {
                         handleTransportException(entry, e);
                     } catch (Throwable t) {
+                        // FIXME remove
+//                        t.printStackTrace();
+
                         // an internal issue
                         // can never recover from this (assume the system is deterministic)
-                        // FIXME remove
-                        t.printStackTrace();
                         end(entry, MessageControlState.End.ERROR);
                     }
                 }
@@ -174,6 +179,9 @@ public final class HttpNode extends AbstractMessageControlNode {
         }
         /** factored out exception handling in place of multi-catch */
         private void handleTransportException(MessageControlState.Entry entry, Exception e) {
+            // FIXME remove
+//            e.printStackTrace();
+
             if (null == entry.end) {
                 // FIXME for HttpException the endpoint not speaking the protocol correctly
                 // FIXME the retry should not be as aggressive in this case
@@ -282,8 +290,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                     new NextopHttpRequestExecutor(progressCallback),
                     clientConnectionManager,
                     DefaultConnectionReuseStrategy.INSTANCE,
-                    DefaultConnectionKeepAliveStrategy.INSTANCE,
-                    progressCallback
+                    DefaultConnectionKeepAliveStrategy.INSTANCE
             );
             return new RetryExec(nextopExec, new NextopHttpRequestRetryHandler(sendStrategy, entry, mcs));
         }
@@ -306,7 +313,8 @@ public final class HttpNode extends AbstractMessageControlNode {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    mcs.setOutboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(0L, 0L));
+                    mcs.setOutboxTransferProgress(entry.id,
+                            MessageControlState.TransferProgress.none(entry.id));
                 }
             });
         }
@@ -316,8 +324,8 @@ public final class HttpNode extends AbstractMessageControlNode {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    final long t = 0 <= sendTotalBytes ? sendTotalBytes : 0L;
-                    mcs.setOutboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(sentBytes, t));
+                    mcs.setOutboxTransferProgress(entry.id,
+                            MessageControlState.TransferProgress.create(entry.id, sentBytes, sendTotalBytes));
                 }
             });
         }
@@ -327,8 +335,8 @@ public final class HttpNode extends AbstractMessageControlNode {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    final long t = 0 <= sendTotalBytes ? sendTotalBytes : 0L;
-                    mcs.setOutboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(sentBytes, t));
+                    mcs.setOutboxTransferProgress(entry.id,
+                            MessageControlState.TransferProgress.create(entry.id, sentBytes, sendTotalBytes));
                 }
             });
         }
@@ -338,7 +346,8 @@ public final class HttpNode extends AbstractMessageControlNode {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    mcs.setInboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(0L, 0L));
+                    mcs.setInboxTransferProgress(entry.id,
+                            MessageControlState.TransferProgress.none(entry.id));
                 }
             });
         }
@@ -348,8 +357,8 @@ public final class HttpNode extends AbstractMessageControlNode {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    final long t = 0 <= receiveTotalBytes ? receiveTotalBytes : 0L;
-                    mcs.setInboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(receivedBytes, t));
+                    mcs.setInboxTransferProgress(entry.id,
+                            MessageControlState.TransferProgress.create(entry.id, receivedBytes, receiveTotalBytes));
                 }
             });
         }
@@ -359,8 +368,8 @@ public final class HttpNode extends AbstractMessageControlNode {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    final long t = 0 <= receiveTotalBytes ? receiveTotalBytes : 0L;
-                    mcs.setInboxTransferProgress(entry.id, MessageControlState.TransferProgress.create(receivedBytes, t));
+                    mcs.setInboxTransferProgress(entry.id,
+                            MessageControlState.TransferProgress.create(entry.id, receivedBytes, receiveTotalBytes));
                 }
             });
         }
@@ -423,19 +432,14 @@ public final class HttpNode extends AbstractMessageControlNode {
                 return false;
             }
 
-            // check ended
+            // check ended - don't retry an ended entry
             if (null != entry.end) {
                 return false;
             }
 
-
-            // FIXME check the exception. some exceptions should not be retried (e.g. connected but not an http server)
-
-
-            // FIXME message should have controlParameters that are not transmitted
-            if (HttpClientContext.adapt(context).isRequestSent() && !Message.hasSideEffects(entry.message)) {
-                // Retry if the request has not been sent fully or
-                // if it's OK to retry methods that have been sent
+            // retry if not fully sent (server starts processing on fully received message)
+            // or if the request is idempotent (either because it is nullipotent or marked as idempotent)
+            if (HttpClientContext.adapt(context).isRequestSent() && Message.isIdempotent(entry.message)) {
                 return false;
             }
 
@@ -454,10 +458,11 @@ public final class HttpNode extends AbstractMessageControlNode {
 
     // implement a subclass of HttpRequestExector that surfaces SendIOException(final chunk), ReceiveIOException
     // implement a custom RetryHandler that always retries if send failed on not final chunk,
+    /** based on <code>org.apache.http.impl.execchain.MinimalClientExec</code> */
     static final class NextopClientExec implements ClientExecChain {
 
 
-        ProgressCallback progressCallback;
+//        ProgressCallback progressCallback;
 
         private final HttpRequestExecutor requestExecutor;
         private final HttpClientConnectionManager connManager;
@@ -469,8 +474,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                 final HttpRequestExecutor requestExecutor,
                 final HttpClientConnectionManager connManager,
                 final ConnectionReuseStrategy reuseStrategy,
-                final ConnectionKeepAliveStrategy keepAliveStrategy,
-                ProgressCallback progressCallback) {
+                final ConnectionKeepAliveStrategy keepAliveStrategy) {
             this.httpProcessor = new ImmutableHttpProcessor(
                     new RequestContent(),
                     new RequestTargetHost(),
@@ -480,7 +484,7 @@ public final class HttpNode extends AbstractMessageControlNode {
             this.connManager        = connManager;
             this.reuseStrategy      = reuseStrategy;
             this.keepAliveStrategy  = keepAliveStrategy;
-            this.progressCallback = progressCallback;
+//            this.progressCallback = progressCallback;
         }
 
         static void rewriteRequestURI(
@@ -749,12 +753,27 @@ public final class HttpNode extends AbstractMessageControlNode {
         protected OutputStream createOutputStream(final long len, SessionOutputBuffer outbuffer) {
             @Nullable final ProgressCallback progressCallback = getProgressCallback();
 
-            // FIXME calculate this - len is off
-            final long sendTotalBytes = 0L;
+            final long sendTotalBytes = 0 < len ? len : 0;
 
-            return new FilterOutputStream(super.createOutputStream(len, outbuffer)) {
+            final OutputStream os = super.createOutputStream(len, outbuffer);
+            return new OutputStream() {
                 long sentBytes = 0L;
                 long lastNotificationIndex = -1L;
+
+
+                /** scales the total in the case the actual transfer is exceeding the total (bug in the size calc) */
+                private long scaledSendTotalBytes(long b) {
+                    long t = sendTotalBytes;
+                    while (0 < t && t <= b) {
+                        long u = 161 * t / 100;
+                        if (t < u) {
+                            t = u;
+                        } else {
+                            t *= 2;
+                        }
+                    }
+                    return t;
+                }
 
 
                 private void onSendProgress(long bytes) {
@@ -764,53 +783,88 @@ public final class HttpNode extends AbstractMessageControlNode {
                         long notificationIndex = sentBytes / emitQBytes;
                         if (lastNotificationIndex != notificationIndex) {
                             lastNotificationIndex = notificationIndex;
-                            progressCallback.onSendProgress(sentBytes, sendTotalBytes);
+                            progressCallback.onSendProgress(sentBytes, scaledSendTotalBytes(sentBytes));
                         }
                     }
                 }
                 private void onSendCompleted() {
                     if (null != progressCallback) {
-                        progressCallback.onSendCompleted(sentBytes, sendTotalBytes);
+                        progressCallback.onSendCompleted(sentBytes, sentBytes);
                     }
                 }
 
 
                 @Override
                 public void write(int b) throws IOException {
-                    super.write(b);
+                    os.write(b);
                     onSendProgress(1);
                 }
 
                 @Override
                 public void write(byte[] b) throws IOException {
-                    super.write(b);
-                    onSendProgress(b.length);
+                    write(b, 0, b.length);
                 }
 
                 @Override
                 public void write(byte[] b, int off, int len) throws IOException {
-                    super.write(b, off, len);
-                    onSendProgress(len);
+                    for (int i = 0; i < len; i += emitQBytes) {
+                        int c = Math.min(emitQBytes, len - i);
+                        os.write(b, off + i, c);
+                        onSendProgress(c);
+
+                        // FIXME
+//                        try {
+//                            Thread.sleep(200);
+//                        } catch (InterruptedException e) {
+//                            // ignore
+//                        }
+                    }
+                }
+
+                @Override
+                public void flush() throws IOException {
+                    os.flush();
                 }
 
                 @Override
                 public void close() throws IOException {
-                    super.close();
+                    os.close();
                     onSendCompleted();
                 }
             };
+        }
+
+
+        @Override
+        public void sendRequestEntity(HttpEntityEnclosingRequest request) throws HttpException, IOException {
+            super.sendRequestEntity(request);
         }
 
         @Override
         protected InputStream createInputStream(final long len, SessionInputBuffer inbuffer) {
             @Nullable final ProgressCallback progressCallback = getProgressCallback();
 
-            // FIXME calculate this - len is off
-            final long receiveTotalBytes = 0L;
+            final long receiveTotalBytes = 0 < len ? len : 0;
 
-            return new FilterInputStream(super.createInputStream(len, inbuffer)) {
+            final InputStream is = super.createInputStream(len, inbuffer);
+            return new InputStream() {
                 long receivedBytes = 0L;
                 long lastNotificationIndex = -1L;
+
+
+                /** scales the total in the case the actual transfer is exceeding the total (bug in the size calc) */
+                private long scaledReceiveTotalBytes(long b) {
+                    long t = receiveTotalBytes;
+                    while (0 < t && t <= b) {
+                        long u = 161 * t / 100;
+                        if (t < u) {
+                            t = u;
+                        } else {
+                            t *= 2;
+                        }
+                    }
+                    return t;
+                }
 
 
                 private void onReceiveProgress(long bytes) {
@@ -820,46 +874,77 @@ public final class HttpNode extends AbstractMessageControlNode {
                         long notificationIndex = receivedBytes / emitQBytes;
                         if (lastNotificationIndex != notificationIndex) {
                             lastNotificationIndex = notificationIndex;
-                            progressCallback.onReceiveProgress(receivedBytes, receiveTotalBytes);
+                            progressCallback.onReceiveProgress(receivedBytes, scaledReceiveTotalBytes(receivedBytes));
                         }
                     }
                 }
                 private void onReceiveCompleted() {
                     if (null != progressCallback) {
-                        progressCallback.onReceiveCompleted(receivedBytes, receiveTotalBytes);
+                        progressCallback.onReceiveCompleted(receivedBytes, receivedBytes);
                     }
                 }
 
 
+
+
                 @Override
                 public int read() throws IOException {
-                    int b = super.read();
+                    int b = is.read();
                     onReceiveProgress(1);
                     return b;
                 }
 
                 @Override
                 public int read(byte[] b) throws IOException {
-                    int c = super.read(b);
-                    if (0 < c) {
-                        onReceiveProgress(c);
-                    }
-                    return c;
+                    return read(b, 0, b.length);
                 }
 
                 @Override
                 public int read(byte[] b, int off, int len) throws IOException {
-                    int c = super.read(b, off, len);
-                    if (0 < c) {
-                        onReceiveProgress(c);
+                    for (int i = 0; i < len; i += emitQBytes) {
+                        int c = Math.min(emitQBytes, len - i);
+                        int r = is.read(b, off + i, c);
+                        if (0 < r) {
+                            onReceiveProgress(r);
+                        }
+                        if (r < c) {
+                            return i + r;
+                        }
                     }
-                    return c;
+                    return len;
                 }
 
                 @Override
                 public void close() throws IOException {
                     super.close();
                     onReceiveCompleted();
+                }
+
+
+
+                @Override
+                public long skip(long n) throws IOException {
+                    return is.skip(n);
+                }
+
+                @Override
+                public int available() throws IOException {
+                    return is.available();
+                }
+
+                @Override
+                public boolean markSupported() {
+                    return is.markSupported();
+                }
+
+                @Override
+                public void mark(int readlimit) {
+                    is.mark(readlimit);
+                }
+
+                @Override
+                public void reset() throws IOException {
+                    is.reset();
                 }
             };
         }

@@ -1437,13 +1437,13 @@ public abstract class WireValue {
 
             int bytes = bb.position() - i;
             bb.putInt(i - 4, bytes);
-            System.out.printf("header %d bytes\n", bytes);
+//            System.out.printf("header %d bytes\n", bytes);
         }
 
         int i = bb.position();
         toBytes(this, lb, bb);
         int bytes = bb.position() - i;
-        System.out.printf("body %d bytes\n", bytes);
+//        System.out.printf("body %d bytes\n", bytes);
 
     }
     private static void toBytes(WireValue value, Lb lb, ByteBuffer bb) {

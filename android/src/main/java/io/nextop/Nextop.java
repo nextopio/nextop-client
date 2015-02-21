@@ -25,6 +25,7 @@ import io.nextop.org.apache.http.HttpResponse;
 import io.nextop.org.apache.http.client.methods.HttpUriRequest;
 import rx.Observable;
 import rx.Subscriber;
+import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.subjects.BehaviorSubject;
@@ -179,7 +180,8 @@ public class Nextop {
                     public HttpResponse call(Message message) {
                         return Message.toHttpResponse(message);
                     }
-                }));
+                }),
+                defaultUnsubscribeBehavior(message));
     }
 
     public Receiver<Layer> send(HttpUriRequest request, @Nullable LayersConfig config) {
@@ -332,7 +334,8 @@ public class Nextop {
     /////// CONNECTION STATUS ///////
 
     public Observable<ConnectionStatus> connectionStatus() {
-        return Observable.just(new ConnectionStatus(false));
+        BehaviorSubject<ConnectionStatus> subject = BehaviorSubject.create(new ConnectionStatus(true));
+        return subject;
     }
 
 
@@ -437,27 +440,34 @@ public class Nextop {
 
 
 
+    static Receiver.UnsubscribeBehavior defaultUnsubscribeBehavior(Message message) {
+        // if the message has no side-effects, it can be canceled when there is no subscriber
+        if (Message.isNullipotent(message)) {
+            return Receiver.UnsubscribeBehavior.CANCEL_SEND;
+        }
+        return Receiver.UnsubscribeBehavior.DETACH;
+    }
 
 
 
+    // FIXME
+    // FIXME the CANCEL_SEND unsubscribe behavior as-is is broken
+    // FIXME the receiver should re-send the message when re-subscribed, if canceled
     public static final class Receiver<T> extends Observable<T> {
-        static <T> Receiver<T> create(final Nextop nextop, Route route, Observable<T> in) {
-            Map<Source.UnsubscribeBehavior, Observable<T>> ins = new HashMap<Source.UnsubscribeBehavior, Observable<T>>(2);
-            Source.UnsubscribeBehavior defaultUnsubscribeBehavior;
+        static <T> Receiver<T> create(final Nextop nextop, Route route, Observable<T> in, UnsubscribeBehavior defaultUnsubscribeBehavior) {
+            Map<UnsubscribeBehavior, Observable<T>> ins = new HashMap<UnsubscribeBehavior, Observable<T>>(2);
 
             final @Nullable Id id = route.getLocalId();
             if (null != id) {
-                ins.put(Source.UnsubscribeBehavior.DETACH, in.share());
-                ins.put(Source.UnsubscribeBehavior.CANCEL_SEND, in.doOnUnsubscribe(new Action0() {
+                ins.put(UnsubscribeBehavior.DETACH, in.share());
+                ins.put(UnsubscribeBehavior.CANCEL_SEND, in.doOnUnsubscribe(new Action0() {
                     @Override
                     public void call() {
                         nextop.cancelSend(id);
                     }
                 }).share());
-                defaultUnsubscribeBehavior = Source.UnsubscribeBehavior.CANCEL_SEND;
             } else {
-                ins.put(Source.UnsubscribeBehavior.DETACH, in.share());
-                defaultUnsubscribeBehavior = Source.UnsubscribeBehavior.DETACH;
+                ins.put(UnsubscribeBehavior.DETACH, in.share());
             }
             Source source = new Source<T>(ins);
             source.check(defaultUnsubscribeBehavior);
@@ -468,7 +478,7 @@ public class Nextop {
         public final Route route;
         private final Source<T> source;
 
-        private Receiver(Route route, final Source<T> source, final Source.UnsubscribeBehavior unsubscribeBehavior) {
+        private Receiver(Route route, final Source<T> source, final UnsubscribeBehavior unsubscribeBehavior) {
             super(new OnSubscribe<T>() {
                 @Override
                 public void call(Subscriber<? super T> subscriber) {
@@ -479,14 +489,9 @@ public class Nextop {
             this.source = source;
         }
 
-        public Receiver<T> cancelSendOnUnsubscribe() {
-            source.check(Source.UnsubscribeBehavior.CANCEL_SEND);
-            return new Receiver<T>(route, source, Source.UnsubscribeBehavior.CANCEL_SEND);
-        }
-
-        public Receiver<T> detachOnUnsubscribe() {
-            source.check(Source.UnsubscribeBehavior.DETACH);
-            return new Receiver<T>(route, source, Source.UnsubscribeBehavior.DETACH);
+        public Receiver<T> doOnUnsubscribe(UnsubscribeBehavior behavior) {
+            source.check(behavior);
+            return new Receiver<T>(route, source, behavior);
         }
 
         // return the localId of the outgoing message that this receiver is tied to
@@ -497,11 +502,13 @@ public class Nextop {
         }
 
 
+        public static enum UnsubscribeBehavior {
+            CANCEL_SEND,
+            DETACH
+        }
+
         private static class Source<T> {
-            static enum UnsubscribeBehavior {
-                CANCEL_SEND,
-                DETACH
-            }
+
 
             final Map<UnsubscribeBehavior, Observable<T>> ins;
 
@@ -584,7 +591,7 @@ public class Nextop {
 
         @Override
         public Receiver<Message> receive(Route route) {
-            return Receiver.create(this, route, subjectNode.receive(route));
+            return Receiver.create(this, route, subjectNode.receive(route), Receiver.UnsubscribeBehavior.DETACH);
         }
 
         @Override
@@ -624,11 +631,22 @@ public class Nextop {
             // FIXME   get threading right and general correctness
 
             // bounds to use:
-            List<LayersConfig.Bound> sendBounds = config.sendBounds;
+            List<LayersConfig.Bound> sendBounds;
+            if (null != config) {
+                sendBounds = config.sendBounds;
+            } else {
+                sendBounds = Collections.emptyList();
+            }
             if (sendBounds.isEmpty()) {
                 sendBounds = Collections.singletonList(new LayersConfig.Bound());
             }
-            List<LayersConfig.Bound> receiveBounds = config.receiveBounds;
+
+            List<LayersConfig.Bound> receiveBounds;
+            if (null != config) {
+                receiveBounds = config.receiveBounds;
+            } else {
+                receiveBounds = Collections.emptyList();
+            }
             if (receiveBounds.isEmpty()) {
                 receiveBounds = Collections.singletonList(new LayersConfig.Bound());
             }
@@ -645,15 +663,19 @@ public class Nextop {
                 return Receiver.create(this, layer.message.inboxRoute(), Observable.just(Layer.bitmap(
                         // FIXME set cache headers
                         Message.newBuilder().setRoute(layer.message.inboxRoute()).build(),
-                        cachedBitmap)));
+                        cachedBitmap)),
+                        defaultUnsubscribeBehavior(layer.message));
             }
 
 
             // FIXME option to attach
             Route route;
+            Receiver.UnsubscribeBehavior defaultUnsubscribeBehavior;
             @Nullable final Id inFlightId = inFlight.get(uri);
             if (null != inFlightId) {
                 route = Message.inboxRoute(inFlightId);
+                // FIXME attach flow and receiver flow needs to be reworked
+                defaultUnsubscribeBehavior = Receiver.UnsubscribeBehavior.DETACH;
             } else {
                 Message tmessage;
                 if (null != layer.bitmap) {
@@ -678,6 +700,8 @@ public class Nextop {
                 subjectNode.send(tmessage);
                 route = tmessage.inboxRoute();
                 inFlight.put(uri, tmessage.id);
+
+                defaultUnsubscribeBehavior = defaultUnsubscribeBehavior(tmessage);
             }
 
             // FIXME parallel
@@ -711,22 +735,30 @@ public class Nextop {
                             return Layer.message(message);
                     }
                 }
-            }))
-                    // FIXME this is just to populate the cache
-//                    .detachOnUnsubscribe()
-                    ;
+            }),
+
+                    // FIXME can't cancel send on an in-flight attach
+                    // FIXME this whole flow needs to be reworked
+                    defaultUnsubscribeBehavior
+            );
         }
 
         // FIXME distinct within 1%
         // FIXME timeout if no first emit after 15s
-        public Observable<TransferStatus> transferStatus(Id id) {
+        public Observable<TransferStatus> transferStatus(final Id id) {
             if (null == id) {
                 throw new IllegalArgumentException();
             }
-            return mcs.getObservable(id).map(new Func1<MessageControlState.Entry, TransferStatus>() {
+            // FIXME scheduler issues
+            return mcs.getObservable(id, 30, TimeUnit.SECONDS).subscribeOn(AndroidSchedulers.mainThread()).map(new Func1<MessageControlState.Entry, TransferStatus>() {
                 @Override
                 public TransferStatus call(MessageControlState.Entry entry) {
-                    return new TransferStatus(entry.inboxTransferProgress, entry.outboxTransferProgress);
+                    TransferStatus s = new TransferStatus(entry.outboxTransferProgress, entry.inboxTransferProgress);
+
+                    // FIXME remove
+//                    System.out.printf("  transfer status %s %s\n", id, s);
+
+                    return s;
                 }
             });
         }
@@ -870,6 +902,12 @@ public class Nextop {
             this.send = send;
             this.receive = receive;
         }
+
+        @Override
+        public String toString() {
+            return String.format("out %s, in %s",
+                    send, receive);
+        }
     }
 
 
@@ -921,6 +959,9 @@ public class Nextop {
 
     /////// CRITTERCISM ///////
 
+    /* the Nextop library contains a package-translated version of Crittercism. */
+    // TODO inject the appId at build time
+
     public static void enableNextopCrittercism() {
         Crittercism.setOptOutStatus(false);
     }
@@ -935,8 +976,7 @@ public class Nextop {
         if (!crittercismInitialized) {
             @Nullable Context applicationContext = context.getApplicationContext();
             if (null != applicationContext) {
-                // FIXME APP ID
-                String appId = "";
+                String appId = /* nextop-client#android */ "54e7b5883cf56b9e0457e38e";
                 Crittercism.initialize(applicationContext, appId);
                 crittercismInitialized = true;
             }

@@ -210,7 +210,11 @@ public class MainActivity extends RxActivity {
 
             imageView.reset();
 
-            Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view), 3000, flipVmSource)
+            int animateIntervalMs = (int) TimeUnit.SECONDS.toMillis(3);
+
+            Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view),
+                    animateIntervalMs,
+                    flipVmSource)
                     .out;
 //            .distinctUntilChanged();
             rxVg.bind(imageVmSource).subscribe(new ImageView.Updater(imageView,

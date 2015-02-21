@@ -357,6 +357,8 @@ public final class MessageControlState {
             if (null == entry) {
                 return false;
             }
+
+
             assert null == entry.end;
 
             Group group = entry.group;
@@ -373,6 +375,7 @@ public final class MessageControlState {
             mutex.notifyAll();
         }
         entry.publish();
+        entry.publishComplete();
         publish();
         return true;
     }
@@ -438,6 +441,9 @@ public final class MessageControlState {
             }
 
             entry.outboxTransferProgress = transferProgress;
+
+            // FIXME remove
+//            System.out.printf("  outbox transfer progress %s\n", transferProgress);
         }
         entry.publish();
         publish();
@@ -475,9 +481,10 @@ public final class MessageControlState {
                 synchronized (mutex) {
                     entry = entries.get(id);
                     if (null == entry) {
-                        if (0 < timeout && /* see notifyPending */ pending.contains(id)) {
+                        if (0 < timeout && /* see #notifyPending */ pending.contains(id)) {
                             pendingSubscribers.put(id, subscriber);
 
+                            // TODO manually clean up the timeout when the subscriber is taken
                             // add the timeout
                             subscriber.add(context.getScheduler().createWorker().schedule(new Action0() {
                                 @Override
@@ -600,21 +607,22 @@ public final class MessageControlState {
         Route route = message.route;
         if (route.isLocal()) {
             Id id = route.getLocalId();
-
-            if (MessageControl.Type.ERROR.equals(mc.type) && Message.outboxRoute(id).equals(route)) {
-                // cancel
-                if (remove(id, End.CANCELED)) {
-                    upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, Message.inboxRoute(id)));
-                }
-            } else if (MessageControl.Type.MESSAGE.equals(mc.type) && Message.echoRoute(id).equals(route)) {
-                @Nullable MessageControl rmc = createRedirect(id, message.inboxRoute());
-                if (null != rmc) {
-                    upstream.onMessageControl(rmc);
-                    return true;
-                } else {
-                    return false;
-                }
-            } // else fall through
+            if (null != id) {
+                if (MessageControl.Type.ERROR.equals(mc.type) && Message.outboxRoute(id).equals(route)) {
+                    // cancel
+                    if (remove(id, End.CANCELED)) {
+                        upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, Message.inboxRoute(id)));
+                    }
+                } else if (MessageControl.Type.MESSAGE.equals(mc.type) && Message.echoRoute(id).equals(route)) {
+                    @Nullable MessageControl rmc = createRedirect(id, message.inboxRoute());
+                    if (null != rmc) {
+                        upstream.onMessageControl(rmc);
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } // else fall through
+            } // else no entry for message; fall through
         }
         return false;
     }
@@ -669,8 +677,9 @@ public final class MessageControlState {
         @Nullable
         public volatile MessageControlChannel owner = null;
 
-        public volatile TransferProgress outboxTransferProgress = TransferProgress.none();
-        public volatile TransferProgress inboxTransferProgress = TransferProgress.none();
+        public volatile TransferProgress outboxTransferProgress;
+        public volatile TransferProgress inboxTransferProgress;
+
         @Nullable
         public volatile End end = null;
 
@@ -692,43 +701,85 @@ public final class MessageControlState {
             groupPriority = message.groupPriority;
             this.message = message;
             publish = BehaviorSubject.create(this);
+
+            outboxTransferProgress = TransferProgress.none(id);
+            inboxTransferProgress = TransferProgress.none(id);
         }
 
 
         private void publish() {
             publish.onNext(this);
         }
+        private void publishComplete() {
+            publish.onCompleted();
+        }
     }
 
     public static final class TransferProgress {
-        public static TransferProgress none() {
-            return create(0, 0);
+        public static TransferProgress none(Id id) {
+            return create(id, 0, 0);
         }
 
-        public static TransferProgress create(long completedBytes, long totalBytes) {
+        public static TransferProgress create(Id id, long completedBytes, long totalBytes) {
             if (totalBytes < 0) {
                 throw new IllegalArgumentException(String.format("%d", totalBytes));
             }
             if (completedBytes < 0 || 0 < totalBytes && totalBytes < completedBytes) {
                 throw new IllegalArgumentException(String.format("%d %d", completedBytes, totalBytes));
             }
-            return new TransferProgress(completedBytes, totalBytes);
+            return new TransferProgress(id, completedBytes, totalBytes);
         }
 
 
+        public final Id id;
         public final long completedBytes;
         public final long totalBytes;
 
 
-        TransferProgress(long completedBytes, long totalBytes) {
+        TransferProgress(Id id, long completedBytes, long totalBytes) {
+            this.id = id;
             this.completedBytes = completedBytes;
             this.totalBytes = totalBytes;
+        }
+
+
+        public boolean isNone() {
+            return 0 == completedBytes && 0 == totalBytes;
         }
 
 
         public float asFloat() {
             final int q = 1000;
             return 0 < totalBytes ? (q * completedBytes / totalBytes) / (float) q : 0.f;
+        }
+
+        @Override
+        public String toString() {
+            if (isNone()) {
+                return "-";
+            } else {
+                return String.format("%s %d/%d (%.2f%%)", id, completedBytes, totalBytes, asFloat());
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            int c = id.hashCode();
+            c = 31 * c + (int)(completedBytes ^ (completedBytes >>> 32));
+            c = 31 * c + (int)(totalBytes ^ (totalBytes >>> 32));
+            return c;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof TransferProgress)) {
+                return false;
+            }
+
+            TransferProgress p = (TransferProgress) obj;
+            return completedBytes == p.completedBytes
+                    && totalBytes == p.totalBytes
+                    && id.equals(p.id);
         }
     }
 

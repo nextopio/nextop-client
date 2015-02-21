@@ -103,12 +103,15 @@ public class FlipFragment extends RxFragment {
             public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
 
                 targetHeight = bottom - top;
+
+                float headerf = 0.25f;
+                float footerf = 0.15f;
                 if (targetHeight != header.getLayoutParams().height) {
-                    header.getLayoutParams().height = targetHeight;
+                    header.getLayoutParams().height = Math.round(headerf * targetHeight);
                     header.invalidate();
                 }
                 if (targetHeight != footer.getLayoutParams().height) {
-                    footer.getLayoutParams().height = targetHeight;
+                    footer.getLayoutParams().height = Math.round(footerf * targetHeight);
                     footer.invalidate();
                 }
 
@@ -394,7 +397,10 @@ public class FlipFragment extends RxFragment {
             final Id frameId = getItem(position);
 
             @Nullable RxViewGroup rxVg = (RxViewGroup) convertView.findViewWithTag(RxViewGroup.TAG);
-            if (null != rxVg) {
+            if (null == rxVg) {
+                throw new IllegalStateException();
+            }
+//            if (null != rxVg) {
                 if (rxVg.reset(frameId)) {
                     updateIndefinitely(convertView, rxVg.bind(flip.getFlipVmm().get(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
                         @Override
@@ -403,15 +409,15 @@ public class FlipFragment extends RxFragment {
                         }
                     })));
                 }
-            } else {
-                // update immediate snapshot
-                updateIndefinitely(convertView, flip.getFlipVmm().peek(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
-                    @Override
-                    public FrameViewModel call(FlipViewModel flipVm) {
-                        return flipVm.getFrameVm(frameId);
-                    }
-                }));
-            }
+//            } else {
+//                // update immediate snapshot
+//                updateIndefinitely(convertView, flip.getFlipVmm().peek(flipId).map(new Func1<FlipViewModel, FrameViewModel>() {
+//                    @Override
+//                    public FrameViewModel call(FlipViewModel flipVm) {
+//                        return flipVm.getFrameVm(frameId);
+//                    }
+//                }));
+//            }
 
             return convertView;
         }
@@ -428,7 +434,6 @@ public class FlipFragment extends RxFragment {
             ImageView imageView = (ImageView) view.findViewById(R.id.image);
 
             imageView.reset();
-
             imageVmSource.subscribe(new ImageView.Updater(imageView, ImageView.Transition.instant()));
         }
 

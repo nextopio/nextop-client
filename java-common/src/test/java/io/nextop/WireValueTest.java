@@ -3,15 +3,15 @@ package io.nextop;
 import com.google.gson.*;
 import io.nextop.util.HexBytes;
 import junit.framework.TestCase;
-import org.junit.Test;
 
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 
 public class WireValueTest extends TestCase {
 
 
-    @Test
     public void testStableKeys() {
 
         int n = 8;
@@ -57,7 +57,6 @@ public class WireValueTest extends TestCase {
 
     }
 
-    @Test
     public void testToString() {
         // create random values and call #toString, #toText, #toDebugString
         // check that nothing crashes on those calls
@@ -80,7 +79,6 @@ public class WireValueTest extends TestCase {
 
 
 
-    @Test
     public void testRandomCodec() {
 
         // 1. generate random json
