@@ -66,11 +66,6 @@ http://search.maven.org/remotecontent?filepath=io/nextop/java-common/${CURRENT_V
 ```
 
 
-
-### Android Benchmarks
-
-(coming soon)
-
 ### Android Demos
 
 | Demo       | Install                                                                                                                                | Objective                                         | Code                                                                                                                                                        |
