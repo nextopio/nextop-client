@@ -15,6 +15,7 @@
             <option value="$PROJECT_DIR$/com.crittercism-jarjar" />
             <option value="$PROJECT_DIR$/cordova" />
             <option value="$PROJECT_DIR$/java-common" />
+            <option value="$PROJECT_DIR$/org.apache-android-jarjar" />
             <option value="$PROJECT_DIR$/org.apache-jarjar" />
           </set>
         </option>

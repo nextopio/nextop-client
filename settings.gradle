@@ -11,3 +11,5 @@ include 'org.apache-jarjar'
 
 include 'com.crittercism-jarjar'
 
+include 'org.apache-android-jarjar'
+

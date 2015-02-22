@@ -1,0 +1,41 @@
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.0'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+repositories {
+    maven {
+        url 'https://repository.apache.org/content/groups/public/'
+    }
+    mavenCentral()
+}
+
+dependencies {
+    compile('org.apache.httpcomponents:httpclient-android:4.3.5.1') {
+        // not compatible with android; android has its own version baked in
+        exclude module: 'commons-logging'
+    }
+    // this is a transitive dependency of httpclient that is used elsewhere in the project
+    // package it into the jarjar to have control over the version used
+    compile('commons-codec:commons-codec:1.10') {
+        // not compatible with android; android has its own version baked in
+        exclude module: 'commons-logging'
+    }
+}
+
+task jarjar(type:Exec, dependsOn: shadowJar) {
+    // jarjar the fat jar
+    def fatJar = new File(project.buildDir, 'libs/' + project.name + '-' + project.version + '-all.jar')
+    def jarjarJar = new File(project.buildDir, 'libs/' + project.name + '.jar')
+//    workingDir project.buildDir.getParentFile()
+    commandLine 'java', '-jar', 'jarjar/jarjar-1.4.jar', 'process', 'jarjar/rules.txt', fatJar, jarjarJar
+//    commandLine 'pwd'
+}

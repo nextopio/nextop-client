@@ -45,7 +45,7 @@ dependencies {
     }
 
     // FIXME why is this not included as a transitive dependency of :java-common?
-    compile fileTree(dir: '../java-common/libs', include: ['*.jar'])
+    compile fileTree(dir: '../java-common/libs', include: ['*.jar'], exclude: ['org.apache-jarjar.jar'])
 
     compile fileTree(dir: 'libs', include: ['*.jar'])
 
