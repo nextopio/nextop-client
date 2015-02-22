@@ -1,7 +1,6 @@
-package io.nextop.fragment;
+package io.nextop.v15.fragment;
 
 import android.app.Fragment;
-import android.app.FragmentManager;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v13.app.FragmentPagerAdapter;
@@ -9,7 +8,7 @@ import android.support.v4.view.ViewPager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import io.nextop.R;
+import io.nextop.v15.R;
 import io.nextop.view.DebugOverlayView;
 
 public class DebugFragment extends Fragment {

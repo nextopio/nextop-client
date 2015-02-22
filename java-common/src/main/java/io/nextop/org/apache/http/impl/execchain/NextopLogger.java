@@ -1,7 +1,9 @@
 package io.nextop.org.apache.http.impl.execchain;
 
-import io.nextop.org.apache.commons.logging.Log;
 
+import org.apache.commons.logging.Log;
+
+// FIXME is this still needed when the caller can just create an Android logger or logger?
 public class NextopLogger {
 
     static final Log EMPTY = new Log() {

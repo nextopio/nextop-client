@@ -1,6 +1,5 @@
 package io.nextop.org.apache.http.impl.execchain;
 
-import io.nextop.org.apache.commons.logging.Log;
 import io.nextop.org.apache.http.HttpClientConnection;
 import io.nextop.org.apache.http.conn.HttpClientConnectionManager;
 

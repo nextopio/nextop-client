@@ -7,7 +7,7 @@ import android.widget.*;
 import io.nextop.Id;
 import io.nextop.Nextop;
 import io.nextop.NextopAndroid;
-import io.nextop.fragment.DebugFragment;
+import io.nextop.v15.fragment.DebugFragment;
 import io.nextop.rx.RxActivity;
 import io.nextop.rx.RxViewGroup;
 import io.nextop.view.ImageView;
@@ -19,13 +19,10 @@ import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
-import rx.internal.util.SubscriptionList;
 import rx.subjects.PublishSubject;
-import rx.subscriptions.BooleanSubscription;
 import rx.subscriptions.CompositeSubscription;
 
 import javax.annotation.Nullable;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends RxActivity {

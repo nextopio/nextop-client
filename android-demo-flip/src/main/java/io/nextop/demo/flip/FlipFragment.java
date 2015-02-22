@@ -2,8 +2,6 @@ package io.nextop.demo.flip;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.os.Bundle;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -11,7 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 import io.nextop.Id;
-import io.nextop.rx.RxFragment;
+import io.nextop.v15.rx.RxFragment;
 import io.nextop.rx.RxViewGroup;
 import io.nextop.view.ImageView;
 import io.nextop.vm.ImageViewModel;

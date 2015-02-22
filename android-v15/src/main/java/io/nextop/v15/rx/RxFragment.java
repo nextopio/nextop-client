@@ -1,6 +1,7 @@
-package io.nextop.rx;
+package io.nextop.v15.rx;
 
 import android.app.Fragment;
+import io.nextop.rx.RxLifecycleBinder;
 import rx.Observable;
 import rx.Subscription;
 

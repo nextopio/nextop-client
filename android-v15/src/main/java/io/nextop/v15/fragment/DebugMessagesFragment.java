@@ -1,4 +1,4 @@
-package io.nextop.fragment;
+package io.nextop.v15.fragment;
 
 import android.os.Bundle;
 import android.support.annotation.Nullable;
@@ -9,13 +9,11 @@ import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 import io.nextop.NextopAndroid;
-import io.nextop.R;
+import io.nextop.v15.R;
 import io.nextop.client.MessageControlState;
-import io.nextop.rx.RxFragment;
 import rx.Observer;
 import rx.android.schedulers.AndroidSchedulers;
 
-import java.security.acl.Group;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

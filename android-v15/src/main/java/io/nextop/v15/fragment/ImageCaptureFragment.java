@@ -1,5 +1,4 @@
-package io.nextop.fragment;
-
+package io.nextop.v15.fragment;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
@@ -9,8 +8,8 @@ import android.os.Bundle;
 import android.view.*;
 import io.nextop.Nextop;
 import io.nextop.NextopAndroid;
-import io.nextop.R;
-import io.nextop.rx.RxFragment;
+import io.nextop.v15.R;
+import io.nextop.v15.rx.RxFragment;
 import rx.Observer;
 import rx.Subscription;
 
@@ -240,9 +239,9 @@ public class ImageCaptureFragment extends RxFragment {
     /** from the Android docs */
     public static void setCameraDisplayOrientation(Activity activity,
                                                    int cameraId, Camera camera) {
-        android.hardware.Camera.CameraInfo info =
-                new android.hardware.Camera.CameraInfo();
-        android.hardware.Camera.getCameraInfo(cameraId, info);
+        Camera.CameraInfo info =
+                new Camera.CameraInfo();
+        Camera.getCameraInfo(cameraId, info);
         int rotation = activity.getWindowManager().getDefaultDisplay()
                 .getRotation();
         int degrees = 0;

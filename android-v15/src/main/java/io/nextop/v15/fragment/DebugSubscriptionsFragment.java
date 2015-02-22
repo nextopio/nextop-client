@@ -1,6 +1,5 @@
-package io.nextop.fragment;
+package io.nextop.v15.fragment;
 
-import android.app.Fragment;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -8,21 +7,19 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
-import io.nextop.NextopAndroid;
-import io.nextop.R;
-import io.nextop.client.MessageControlState;
 import io.nextop.rx.RxDebugger;
-import io.nextop.rx.RxFragment;
 import io.nextop.sortedlist.SortedList;
 import io.nextop.sortedlist.SplaySortedList;
+import io.nextop.v15.R;
 import io.nextop.view.DebugOverlayView;
 import rx.Notification;
 import rx.Observer;
-import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class DebugSubscriptionsFragment extends DebugChildFragment {

@@ -1,6 +1,6 @@
-package io.nextop.fragment;
+package io.nextop.v15.fragment;
 
-import io.nextop.rx.RxFragment;
+import io.nextop.v15.rx.RxFragment;
 
 import javax.annotation.Nullable;
 

@@ -8,12 +8,8 @@ import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewParent;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import io.nextop.rx.RxDebugger;
-import io.nextop.rx.RxFragment;
-import rx.Notification;
 
 import javax.annotation.Nullable;
 import java.util.*;

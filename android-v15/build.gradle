@@ -25,7 +25,7 @@ android {
     buildToolsVersion '21.1.2'
 
     defaultConfig {
-        minSdkVersion 10
+        minSdkVersion 15
         targetSdkVersion 21
         versionCode androidVersionCode()
     }
@@ -39,22 +39,14 @@ android {
 
 
 dependencies {
-    compile(project(':java-common')) {
-        // not compatible with android; android has its own version baked in
-        exclude module: 'commons-logging'
-    }
-
+    compile project(':android')
     // FIXME why is this not included as a transitive dependency of :java-common?
     compile fileTree(dir: '../java-common/libs', include: ['*.jar'])
 
     compile fileTree(dir: 'libs', include: ['*.jar'])
 
 
-    compile group: 'io.reactivex', name: 'rxandroid', version: '0.24.0'
-
-//    compile fileTree(dir: 'libs', include: ['*.jar'])
-
-    compile group: 'com.android.support', name: 'support-v4', version: '21.0.3'
+    compile group: 'com.android.support', name: 'support-v13', version: '21.0.3'
 
     androidTestCompile 'junit:junit:3.8.2'
     /* (source of warnings) this has a transitive dependency on
@@ -127,11 +119,11 @@ uploadArchives {
             pom.project {
                 groupId project.group
                 artifactId project.name
-                name 'Nextop for Android'
-                description 'Nextop client for Android 10+'
-                url 'http://nextop.io/android'
+                name 'Nextop for Android 15+'
+                description 'Nextop client for Android 15+'
+                url 'http://nextop.io/android-v15'
                 scm {
-                    url 'https://github.com/nextopio/nextop-client/tree/master/android'
+                    url 'https://github.com/nextopio/nextop-client/tree/master/android-v15'
                 }
                 developers {
                     developer {

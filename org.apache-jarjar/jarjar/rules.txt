@@ -1,1 +1,2 @@
-rule org.apache.** io.nextop.org.apache.@1
+rule org.apache.http.** io.nextop.org.apache.http.@1
+rule org.apache.commons.codec.** io.nextop.org.apache.commons.codec.@1
