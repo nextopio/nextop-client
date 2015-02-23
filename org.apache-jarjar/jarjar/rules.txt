@@ -1,2 +1,3 @@
 rule org.apache.http.** io.nextop.org.apache.http.@1
 rule org.apache.commons.codec.** io.nextop.org.apache.commons.codec.@1
+rule javax.naming.** io.nextop.javax.naming.@1

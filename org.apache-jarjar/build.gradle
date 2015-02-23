@@ -19,16 +19,12 @@ repositories {
 }
 
 dependencies {
-    compile('org.apache.httpcomponents:httpclient:4.3.6') {
-        // not compatible with android; android has its own version baked in
-        exclude module: 'commons-logging'
-    }
+    compile 'org.apache.httpcomponents:httpclient:4.3.6'
     // this is a transitive dependency of httpclient that is used elsewhere in the project
     // package it into the jarjar to have control over the version used
-    compile('commons-codec:commons-codec:1.10') {
-        // not compatible with android; android has its own version baked in
-        exclude module: 'commons-logging'
-    }
+    compile 'commons-codec:commons-codec:1.10'
+//    compile 'javax.naming:jndi:1.2.1'
+    compile fileTree(dir: 'libs', include: ['*.jar'])
 }
 
 task jarjar(type:Exec, dependsOn: shadowJar) {
