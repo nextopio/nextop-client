@@ -187,7 +187,8 @@ public class DebugOverlayView extends View {
             for (RxDebugger.Stats stats : allStats) {
                 @Nullable View v;
                 if (null == stats.view
-                        || !stats.view.isAttachedToWindow()
+                        // FIXME(backport)
+//                        || !stats.view.isAttachedToWindow()
                         || View.GONE == stats.view.getVisibility()) {
                     v = null;
                 } else {

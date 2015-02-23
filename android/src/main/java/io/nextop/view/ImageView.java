@@ -9,19 +9,17 @@ import android.graphics.drawable.TransitionDrawable;
 import android.net.Uri;
 import android.util.AttributeSet;
 import com.google.common.annotations.Beta;
+import com.google.common.base.Objects;
 import io.nextop.*;
 import io.nextop.vm.ImageViewModel;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
-import rx.functions.Action0;
 import rx.functions.Action1;
-import rx.functions.Func1;
 import rx.functions.Func2;
 import rx.internal.util.SubscriptionList;
 
 import javax.annotation.Nullable;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 
@@ -191,7 +189,7 @@ public class ImageView extends android.widget.ImageView {
         setSource(source, null);
     }
     public void setSource(@Nullable Source source, @Nullable Transition transition) {
-        if (!Objects.equals(this.source, source)) {
+        if (!Objects.equal(this.source, source)) {
             Transition useTransition = null != transition ? transition : defaultTransition;
             resetLoad();
             if (!useTransition.hold) {
@@ -341,7 +339,7 @@ public class ImageView extends android.widget.ImageView {
 //        System.out.printf("  image progress %s\n", progress);
 
 
-        if (!Objects.equals(this.progress, progress)) {
+        if (!Objects.equal(this.progress, progress)) {
             this.progress = progress;
             invalidate();
         }
@@ -386,6 +384,8 @@ public class ImageView extends android.widget.ImageView {
             // if online, filled grey with white pie
             // if offline, outline grey with white pie
 
+            // FIXME(backport) drawArc
+            /*
             float w = getWidth();
             float h = getHeight();
             float s = 0.2f * Math.min(w, h);
@@ -409,6 +409,7 @@ public class ImageView extends android.widget.ImageView {
             canvas.drawArc(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s,
                     0.f, 360 * progress.progress,
                     true, tempPaint);
+            */
         }
     }
 
@@ -583,8 +584,8 @@ public class ImageView extends android.widget.ImageView {
             }
             Source b = (Source) o;
             return type.equals(b.type)
-                    && Objects.equals(uri, b.uri)
-                    && Objects.equals(localId, b.localId)
+                    && Objects.equal(uri, b.uri)
+                    && Objects.equal(localId, b.localId)
                     && bitmap == b.bitmap;
         }
     }

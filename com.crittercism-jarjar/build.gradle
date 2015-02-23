@@ -13,6 +13,9 @@
 apply plugin: 'java'
 apply plugin: 'com.github.johnrengelman.shadow'
 
+sourceCompatibility = JavaVersion.VERSION_1_6
+targetCompatibility = JavaVersion.VERSION_1_6
+
 repositories {
     maven {
         url 'https://repository.apache.org/content/groups/public/'
