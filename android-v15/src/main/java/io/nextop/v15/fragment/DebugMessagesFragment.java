@@ -5,9 +5,7 @@ import android.support.annotation.Nullable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
-import android.widget.ListView;
-import android.widget.TextView;
+import android.widget.*;
 import io.nextop.NextopAndroid;
 import io.nextop.v15.R;
 import io.nextop.client.MessageControlState;
@@ -45,7 +43,16 @@ public class DebugMessagesFragment extends DebugChildFragment {
         // FIXME header with spinner to set max network speed
         // FIXME header option to go offline when online (TODO force attempt reconnect, surface connectivity)
 
+
         ListView listView = (ListView) view.findViewById(R.id.list);
+
+
+        View profileHeader = LayoutInflater.from(view.getContext()).inflate(R.layout.view_debug_messages_header, listView, false);
+        listView.addHeaderView(profileHeader);
+
+        Spinner profileSpinner = (Spinner) profileHeader.findViewById(R.id.profile_spinner);
+        profileSpinner.setAdapter(new ProfileAdapter());
+
         listView.setAdapter(messageAdapter);
 
         bind(
@@ -224,6 +231,57 @@ public class DebugMessagesFragment extends DebugChildFragment {
                 throw new IllegalArgumentException();
             }
 
+        }
+    }
+
+
+    private static class ProfileAdapter extends BaseAdapter {
+        @Override
+        public int getCount() {
+            return 4;
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return position;
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            if (null == convertView) {
+                convertView = convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.view_debug_messages_profile, parent, false);
+            }
+
+            ImageView imageView = (ImageView) convertView.findViewById(R.id.profile_image);
+            TextView profileTextView = (TextView) convertView.findViewById(R.id.profile_text);
+            switch (position) {
+                default:
+                case 0:
+                    imageView.setVisibility(View.GONE);
+                    profileTextView.setText("Current");
+                    break;
+                case 1:
+                    imageView.setVisibility(View.VISIBLE);
+                    imageView.setImageResource(R.drawable.profile_0);
+                    profileTextView.setText("31% of Users");
+                    break;
+                case 2:
+                    imageView.setVisibility(View.VISIBLE);
+                    imageView.setImageResource(R.drawable.profile_1);
+                    profileTextView.setText("57% of Users");
+                    break;
+                case 3:
+                    imageView.setVisibility(View.VISIBLE);
+                    imageView.setImageResource(R.drawable.profile_2);
+                    profileTextView.setText("12% of Users");
+                    break;
+            }
+            return convertView;
         }
     }
 
