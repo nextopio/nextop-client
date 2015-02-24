@@ -2,10 +2,7 @@ package io.nextop.client.http;
 
 import io.nextop.Message;
 import io.nextop.Route;
-import io.nextop.client.AbstractMessageControlNode;
-import io.nextop.client.MessageControl;
-import io.nextop.client.MessageControlMetrics;
-import io.nextop.client.MessageControlState;
+import io.nextop.client.*;
 import io.nextop.client.retry.SendStrategy;
 import io.nextop.org.apache.http.*;
 import io.nextop.org.apache.http.client.HttpRequestRetryHandler;
@@ -37,7 +34,11 @@ import io.nextop.org.apache.http.io.SessionOutputBuffer;
 import io.nextop.org.apache.http.protocol.*;
 
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.io.OutputStream;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
@@ -52,7 +53,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-// FIXME figure out how to use a wire factory here instead of a socket
 public final class HttpNode extends AbstractMessageControlNode {
 
 
@@ -87,6 +87,9 @@ public final class HttpNode extends AbstractMessageControlNode {
 
     private List<Thread> looperThreads = Collections.emptyList();
 
+
+    @Nullable
+    private Wire.Factory wireAdapterFactory = null;
 
 
     public HttpNode() {
@@ -145,7 +148,14 @@ public final class HttpNode extends AbstractMessageControlNode {
 
 
     private final class RequestLooper extends Thread {
-        @Nullable ProgressCallback progressCallback = null;
+        @Nullable
+        ProgressCallback progressCallback = null;
+
+        @Nullable
+        Wire.Adapter wireAdapter = null;
+        @Nullable
+        Wire.Factory _wireAdapterFactory = null;
+
 
         @Override
         public void run() {
@@ -161,6 +171,13 @@ public final class HttpNode extends AbstractMessageControlNode {
                 if (null != entry) {
                     assert null == entry.end;
                     try {
+                        // set up or switch the wire adapter
+                        if (null != wireAdapterFactory && (null == wireAdapter
+                                || _wireAdapterFactory != wireAdapterFactory)) {
+                            _wireAdapterFactory = wireAdapterFactory;
+                            wireAdapter = wireAdapterFactory.createAdapter();
+                        }
+
                         end(entry, execute(entry));
                     } catch (IOException e) {
                         handleTransportException(entry, e);
@@ -188,7 +205,7 @@ public final class HttpNode extends AbstractMessageControlNode {
 
                 // at this point the entry was elected to yield
                 // in this case, check whether the message has indicated it can be moved to the end of the line
-                if (Message.canYield(entry.message)) {
+                if (Message.isYieldable(entry.message)) {
                     mcs.yield(entry.id);
                 }
                 mcs.release(entry.id, HttpNode.this);
@@ -718,6 +735,11 @@ public final class HttpNode extends AbstractMessageControlNode {
         final int emitQBytes = DEFAULT_EMIT_Q_BYTES;
 
 
+        private boolean wireSet = false;
+        @Nullable
+        private Wire wire = null;
+
+
         public NextopHttpClientConnection(
                 final String id,
                 final int buffersize,
@@ -744,6 +766,50 @@ public final class HttpNode extends AbstractMessageControlNode {
             RequestLooper t = (RequestLooper) Thread.currentThread();
             return t.progressCallback;
         }
+
+        @Nullable
+        private Wire.Adapter getAdapter() {
+            // TODO (see notes in #getProgressCallback)
+            RequestLooper t = (RequestLooper) Thread.currentThread();
+            return t.wireAdapter;
+        }
+
+        /** sets {@link #wire} from the socket input/output,
+         * if there is an adapter (which is most commonly used to condition the wire).
+         * After this call, {@link #wire} may be null. */
+        private void setWire(Socket socket) throws IOException {
+            if (!wireSet) {
+                wireSet = true;
+
+                @Nullable Wire.Adapter adapter = getAdapter();
+                if (null != adapter) {
+                    InputStream is = super.getSocketInputStream(socket);
+                    OutputStream os = super.getSocketOutputStream(socket);
+                    wire = adapter.adapt(Wires.io(is, os));
+                }
+            }
+        }
+
+        @Override
+        protected InputStream getSocketInputStream(Socket socket) throws IOException {
+            setWire(socket);
+            if (null != wire) {
+                return Wires.inputStream(wire);
+            } else {
+                return super.getSocketInputStream(socket);
+            }
+        }
+
+        @Override
+        protected OutputStream getSocketOutputStream(Socket socket) throws IOException {
+            setWire(socket);
+            if (null != wire) {
+                return Wires.outputStream(wire);
+            } else {
+                return super.getSocketOutputStream(socket);
+            }
+        }
+
 
         // FIXME if TCP error on close, throw SendIOException
         // FIXME this means all packets sent up to the tcp window size,

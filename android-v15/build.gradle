@@ -40,23 +40,12 @@ android {
 
 dependencies {
     compile project(':android')
-//    compile fileTree(dir: '../android/libs', include: ['*.jar'])
-    // FIXME why is this not included as a transitive dependency of :java-common?
-//    compile fileTree(dir: '../java-common/libs', include: ['*.jar'])
-
-//    compile fileTree(dir: new File(project(':java-common').projectDir, 'libs'), include: ['*.jar'])
-//    compile fileTree(dir: new File(project(':android').projectDir, 'libs'), include: ['*.jar'])
 
     compile fileTree(dir: 'libs', include: ['*.jar'])
-
 
     compile group: 'com.android.support', name: 'support-v13', version: '21.0.3'
 
     androidTestCompile 'junit:junit:3.8.2'
-    /* (source of warnings) this has a transitive dependency on
-    org.apache.httpcomponents:httpclient:4.0.3
-    commons-logging:commons-logging:1.1.1 */
-//    androidTestCompile 'org.robolectric:robolectric:2.3'
 }
 
 

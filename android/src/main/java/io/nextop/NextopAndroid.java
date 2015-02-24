@@ -86,13 +86,6 @@ public final class NextopAndroid {
     }
 
 
-    /////// IMAGE ///////
-
-    // FIXME EncodedImage to bitmap
-    // FIXME bitmap to EncodedImage
-
-
-
     /////// URI ///////
 
     public static URI toURI(Uri uri) throws URISyntaxException {

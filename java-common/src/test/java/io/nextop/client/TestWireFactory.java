@@ -37,7 +37,8 @@ public class TestWireFactory implements Wire.Factory {
     }
 
 
-
-
-
+    @Override
+    public Wire.Adapter createAdapter() throws UnsupportedOperationException {
+        throw new UnsupportedOperationException();
+    }
 }

@@ -6,6 +6,7 @@ import com.google.common.collect.Multimap;
 import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Route;
+import io.nextop.WireValue;
 import io.nextop.sortedlist.SortedList;
 import io.nextop.sortedlist.SplaySortedList;
 import rx.Observable;
@@ -640,8 +641,7 @@ public final class MessageControlState {
         Message message = entry.message;
 
         return MessageControl.receive(MessageControl.Type.MESSAGE, message.toBuilder()
-                // FIXME
-//                .setHeader(Message.H_LOCATION, message.route)
+                .setHeader(Message.H_REDIRECT, WireValue.of(Collections.singletonList(message.route.toString())))
                 .setRoute(newRoute)
                 .build());
     }

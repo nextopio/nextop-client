@@ -35,12 +35,24 @@ public class Message {
     public static final WireValue P_CODE = WireValue.of("$code");
     public static final WireValue P_REASON = WireValue.of("$reason");
 
-    public static final WireValue H_LOCATION = WireValue.of("$location");
+    /** if the message is redirected, this holds the route (list[string])
+     * that the message was redirected from. */
+    public static final WireValue H_REDIRECT = WireValue.of("$redirect");
+    /** @see #isIdempotent */
+    public static final WireValue H_IDEMPOTENT = WireValue.of("$idempotent");
+    /** @see #isNullipotent */
+    public static final WireValue H_NULLIPOTENT = WireValue.of("$nullopotent");
+    /** @see #isYieldable */
+    public static final WireValue H_YIELDABLE = WireValue.of("$yieldable");
+
 
 
     public static final Id DEFAULT_GROUP_ID = Id.create(0L, 0L, 0L, 0L);
     public static final int DEFAULT_GROUP_PRIORITY = 0;
 
+
+
+    /////// ROUTES ///////
 
     public static Route outboxRoute(Id id) {
         return Route.local(Target.create(Method.PUT, Path.valueOf(id.toString())));
@@ -57,13 +69,60 @@ public class Message {
     public static Route echoHeadRoute(Id id) {
         return Route.local(Target.create(Method.HEAD, Path.valueOf("/" + id)));
     }
-//    /** @see Route#getLocalId */
-//    public static Route statusRoute(Id id) {
-//        return Route.local(Target.create(Method.GET, Path.valueOf("/" + id + "/status")));
-//    }
 
 
-//    public static final WireValue P_PROGRESS = WireValue.of("progress");
+    /////// CONTROL PROPERTIES ///////
+
+    /** Test if the message can be safely received multiple times. */
+    public static boolean isIdempotent(Message message) {
+        @Nullable WireValue idempotentValue = message.headers.get(H_IDEMPOTENT);
+        if (null != idempotentValue) {
+            return idempotentValue.asBoolean();
+        }
+
+        if (isNullipotent(message)) {
+            return true;
+        }
+
+        // not enough info to infer
+        return false;
+    }
+
+    /** Tests if the message does not have side effects. */
+    public static boolean isNullipotent(Message message) {
+        @Nullable WireValue nullipotentValue = message.headers.get(H_NULLIPOTENT);
+        if (null != nullipotentValue) {
+            return nullipotentValue.asBoolean();
+        }
+
+        // not explicitly set; infer
+        switch (message.route.target.method) {
+            case GET:
+            case HEAD:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** Tests if the message can be moved to the end of the queue on failure.
+     * This is one way to solve head of line blocking issues, with failing endpoints,
+     * where yieldable requests hitting the failing endpoints will "get in the back of the line"
+     * and try again.
+     *
+     * The default value assumes all nullipotent ({@link #isNullipotent}) requests can
+     * yield. This may break some cases where the client needs to get an exact state
+     * (e.g. after a certain case), but this can be fixed by either marking the request
+     * explicitly yieldable=false, or bundling the request into the response of the certain case. */
+    public static boolean isYieldable(Message message) {
+        @Nullable WireValue yieldableValue = message.headers.get(H_YIELDABLE);
+        if (null != yieldableValue) {
+            return yieldableValue.asBoolean();
+        }
+
+        // not explicitly set; infer
+        return isNullipotent(message);
+    }
 
 
 
@@ -82,44 +141,6 @@ public class Message {
     }
 
 
-
-
-    public static boolean isIdempotent(Message message) {
-        // FIXME check the controlParameters here
-
-        if (isNullipotent(message)) {
-            return true;
-        }
-
-        // not explicitly set; infer
-        return false;
-    }
-
-    public static boolean isNullipotent(Message message) {
-        // FIXME
-        // FIXME
-//        @Nullable WireValue idValue = entry.message.controlParameters.get(Message.CP_IDEMPOTENT);
-//        if (null != idValue) {
-//            return idValue.asBoolean();
-//        }
-
-        // not explicitly set; infer
-        switch (message.route.target.method) {
-            case GET:
-            case HEAD:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    public static boolean canYield(Message message) {
-        // FIXME
-        // FIXME check control parameter
-
-        // not explicitly set; infer
-        return isNullipotent(message);
-    }
 
 
 

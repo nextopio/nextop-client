@@ -14,8 +14,7 @@
         <!-- see notes in Nextop.js why the Nextop path cannot replace XMLHttpRequest completely.
              the tl;dr is that a Cordova plugin cannot support synchronous calls
              (so async=false falls back to legacy XHR). -->
-        <!-- FIXME bring back when bugs are fixed -->
-        <!--<clobbers target="XMLHttpRequest" />-->
+        <clobbers target="XMLHttpRequest" />
         <clobbers target="Nextop" />
     </js-module>
 

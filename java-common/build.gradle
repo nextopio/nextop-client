@@ -40,6 +40,9 @@ targetCompatibility = JavaVersion.VERSION_1_6
 
 
 
+
+
+
 task copyLibOrgApache(type: Copy, dependsOn: ':org.apache-jarjar:jarjar') {
     def p = project(':org.apache-jarjar');
     def jarName = p.getName() + '.jar'
