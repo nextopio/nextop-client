@@ -109,8 +109,14 @@ public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder 
         evalBinder();
     }
 
-
+    /** calls either #connect or #disconnect on the binder,
+     * depending on the view state. Call this after a change to the view state. */
     private void evalBinder() {
+        if (liftedRxLifecycleBinder.isClosed()) {
+            // abort; already done
+            return;
+        }
+
         boolean connect;
         if (View.VISIBLE == getWindowVisibility()) {
             if (View.VISIBLE == getVisibility()) {

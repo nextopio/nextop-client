@@ -85,6 +85,12 @@ public interface RxLifecycleBinder extends Subscription {
             }
         }
 
+
+        public boolean isClosed() {
+            return closed;
+        }
+
+
         public void connect() {
             connect(null);
         }
