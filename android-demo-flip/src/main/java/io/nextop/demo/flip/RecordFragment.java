@@ -1,18 +1,10 @@
 package io.nextop.demo.flip;
 
-import android.app.Activity;
 import android.graphics.Bitmap;
-import android.graphics.SurfaceTexture;
-import android.hardware.Camera;
 import android.os.Bundle;
-import android.view.*;
 import io.nextop.Id;
-import io.nextop.fragment.ImageCaptureFragment;
-import io.nextop.rx.RxFragment;
+import io.nextop.v15.fragment.ImageCaptureFragment;
 import io.nextop.vm.ImageViewModel;
-
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
 public class RecordFragment extends ImageCaptureFragment {
     public static RecordFragment newInstance(Id flipId) {

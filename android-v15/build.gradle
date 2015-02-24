@@ -1,0 +1,150 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'com.android.tools.build', name: 'gradle', version: '1.0.1'
+//        classpath 'org.robolectric:robolectric-gradle-plugin:0.14.+'
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'maven'
+apply plugin: 'signing'
+//apply plugin: 'robolectric'
+
+sourceCompatibility = JavaVersion.VERSION_1_6
+targetCompatibility = JavaVersion.VERSION_1_6
+
+repositories {
+    mavenCentral()
+}
+
+android {
+    compileSdkVersion 21
+    buildToolsVersion '21.1.2'
+
+    defaultConfig {
+        minSdkVersion 15
+        targetSdkVersion 21
+        versionCode androidVersionCode()
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+
+dependencies {
+    compile project(':android')
+//    compile fileTree(dir: '../android/libs', include: ['*.jar'])
+    // FIXME why is this not included as a transitive dependency of :java-common?
+//    compile fileTree(dir: '../java-common/libs', include: ['*.jar'])
+
+//    compile fileTree(dir: new File(project(':java-common').projectDir, 'libs'), include: ['*.jar'])
+//    compile fileTree(dir: new File(project(':android').projectDir, 'libs'), include: ['*.jar'])
+
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+
+
+    compile group: 'com.android.support', name: 'support-v13', version: '21.0.3'
+
+    androidTestCompile 'junit:junit:3.8.2'
+    /* (source of warnings) this has a transitive dependency on
+    org.apache.httpcomponents:httpclient:4.0.3
+    commons-logging:commons-logging:1.1.1 */
+//    androidTestCompile 'org.robolectric:robolectric:2.3'
+}
+
+
+// @see http://stackoverflow.com/questions/17033878/generate-javadocs-with-android-gradle-plugin
+// @see http://stackoverflow.com/questions/19307341/android-library-gradle-release-jar
+
+android.libraryVariants.all { variant ->
+    task("archive${variant.name.capitalize()}Jar", type: Jar) {
+        description "Jar for $variant.name."
+        from variant.javaCompile
+    }
+
+    task("archive${variant.name.capitalize()}Sources", type: Jar) {
+        description "Generates sources for $variant.name."
+        classifier = 'sources'
+        from variant.javaCompile.source
+    }
+
+    task("generate${variant.name.capitalize()}Javadoc", type: Javadoc) {
+        description "Generates Javadoc for $variant.name."
+        source = variant.javaCompile.source
+        ext.androidJar = "${android.sdkDirectory}/platforms/${android.compileSdkVersion}/android.jar"
+        classpath = files(variant.javaCompile.classpath.files) + files(ext.androidJar)
+        options.links("http://docs.oracle.com/javase/7/docs/api/");
+        options.links("http://d.android.com/reference/");
+        exclude '**/BuildConfig.java'
+        exclude '**/R.java'
+    }
+
+    task("archive${variant.name.capitalize()}Javadoc", type: Jar, dependsOn: "generate${variant.name.capitalize()}Javadoc") {
+        classifier = 'javadoc'
+        from tasks["generate${variant.name.capitalize()}Javadoc"].destinationDir
+    }
+
+    artifacts {
+        archives tasks["archive${variant.name.capitalize()}Jar"]
+        archives tasks["archive${variant.name.capitalize()}Sources"]
+        archives tasks["archive${variant.name.capitalize()}Javadoc"]
+    }
+}
+
+
+// properties defined in $HOME/gradle.properties
+// @see http://central.sonatype.org/pages/gradle.html
+
+signing {
+    sign configurations.archives
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment {
+                MavenDeployment deployment -> signing.signPom(deployment)
+            }
+
+            repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+            snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            pom.project {
+                groupId project.group
+                artifactId project.name
+                name 'Nextop for Android 15+'
+                description 'Nextop client for Android 15+'
+                url 'http://nextop.io/android-v15'
+                scm {
+                    url 'https://github.com/nextopio/nextop-client/tree/master/android-v15'
+                }
+                developers {
+                    developer {
+                        name 'nextop.io'
+                        email 'support@nextop.io'
+                        organizationUrl 'http://nextop.io'
+                    }
+                }
+
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution 'repo'
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,3 +1,4 @@
+include 'android-v15'
 include 'android-demo-globaleye'
 include 'java-common'
 
@@ -9,4 +10,6 @@ include 'cordova'
 include 'org.apache-jarjar'
 
 include 'com.crittercism-jarjar'
+
+include 'org.apache-android-jarjar'
 

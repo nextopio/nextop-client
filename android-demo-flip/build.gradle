@@ -20,7 +20,7 @@ android {
 
     defaultConfig {
         applicationId "io.nextop.demo.flip"
-        minSdkVersion 21
+        minSdkVersion 15
         targetSdkVersion 21
         versionName project.version
         versionCode androidVersionCode()
@@ -43,7 +43,7 @@ android {
 }
 
 dependencies {
-    compile project(':android')
+    compile project(':android-v15')
 //    debugCompile project(':android')
 //    compile group: 'io.reactivex', name: 'rxjava', version: '1.0.4'
 //    compile group: 'io.reactivex', name: 'rxandroid', version: '0.24.0'

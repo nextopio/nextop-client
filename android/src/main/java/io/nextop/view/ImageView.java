@@ -1,5 +1,6 @@
 package io.nextop.view;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.*;
 import android.graphics.drawable.BitmapDrawable;
@@ -9,19 +10,17 @@ import android.graphics.drawable.TransitionDrawable;
 import android.net.Uri;
 import android.util.AttributeSet;
 import com.google.common.annotations.Beta;
+import com.google.common.base.Objects;
 import io.nextop.*;
 import io.nextop.vm.ImageViewModel;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
-import rx.functions.Action0;
 import rx.functions.Action1;
-import rx.functions.Func1;
 import rx.functions.Func2;
 import rx.internal.util.SubscriptionList;
 
 import javax.annotation.Nullable;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 
@@ -57,6 +56,7 @@ public class ImageView extends android.widget.ImageView {
     // DRAW STATE
 
     Paint tempPaint = new Paint();
+    RectF tempRect = new RectF();
 
 
     public ImageView(Context context) {
@@ -68,6 +68,7 @@ public class ImageView extends android.widget.ImageView {
     public ImageView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
     }
+    @SuppressLint("NewApi")
     public ImageView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
     }
@@ -191,7 +192,7 @@ public class ImageView extends android.widget.ImageView {
         setSource(source, null);
     }
     public void setSource(@Nullable Source source, @Nullable Transition transition) {
-        if (!Objects.equals(this.source, source)) {
+        if (!Objects.equal(this.source, source)) {
             Transition useTransition = null != transition ? transition : defaultTransition;
             resetLoad();
             if (!useTransition.hold) {
@@ -341,7 +342,7 @@ public class ImageView extends android.widget.ImageView {
 //        System.out.printf("  image progress %s\n", progress);
 
 
-        if (!Objects.equals(this.progress, progress)) {
+        if (!Objects.equal(this.progress, progress)) {
             this.progress = progress;
             invalidate();
         }
@@ -396,8 +397,9 @@ public class ImageView extends android.widget.ImageView {
             } else {
                 tempPaint.setStyle(Paint.Style.STROKE);
             }
-            canvas.drawArc(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s,
-                    360 * progress.progress, 360 * (1.f - progress.progress),
+            tempRect.set(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s);
+            canvas.drawArc(tempRect,
+                    /* deg */ 360 * progress.progress, /* deg */ 360 * (1.f - progress.progress),
                     true, tempPaint);
 
             if (progress.active) {
@@ -406,8 +408,9 @@ public class ImageView extends android.widget.ImageView {
                 tempPaint.setColor(Color.argb(64, 255, 255, 255));
             }
             tempPaint.setStyle(Paint.Style.FILL);
-            canvas.drawArc(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s,
-                    0.f, 360 * progress.progress,
+            tempRect.set(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s);
+            canvas.drawArc(tempRect,
+                    /* deg */ 0.f, /* deg */ 360 * progress.progress,
                     true, tempPaint);
         }
     }
@@ -583,8 +586,8 @@ public class ImageView extends android.widget.ImageView {
             }
             Source b = (Source) o;
             return type.equals(b.type)
-                    && Objects.equals(uri, b.uri)
-                    && Objects.equals(localId, b.localId)
+                    && Objects.equal(uri, b.uri)
+                    && Objects.equal(localId, b.localId)
                     && bitmap == b.bitmap;
         }
     }

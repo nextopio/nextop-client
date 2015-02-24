@@ -29,11 +29,15 @@ improving transfer of all requests in all network conditions.
 |-----------------|
 | 0.1.3           |
 
+| Module          | Android Versions Supported | Notes                                                             |
+|-----------------|----------------------------|-------------------------------------------------------------------|
+| `android`       | 10+                        |                                                                   |
+| `android-v15`   | 15+                        | Includes all of `android` plus fragments                          |
 
 Gradle dependency (AAR):
 
 ```
-compile 'io.nextop:android:+'
+compile 'io.nextop:${MODULE}:+'
 ```
 
 Maven dependency (AAR). This is for [android-maven-plugin](https://code.google.com/p/maven-android-plugin/) users.
@@ -42,7 +46,7 @@ As of this writing, Eclipse does not support AAR. [See special instructions for 
 ```xml
 <dependency>
   <groupId>io.nextop</groupId>
-  <artifactId>android</artifactId>
+  <artifactId>${MODULE}</artifactId>
   <version>LATEST</version>
   <type>aar</type>
 </dependency>
@@ -53,7 +57,7 @@ Maven dependency ([JARs - see notes](docs/eclipse.md)):
 ```xml
 <dependency>
   <groupId>io.nextop</groupId>
-  <artifactId>android</artifactId>
+  <artifactId>${MODULE}</artifactId>
   <version>LATEST</version>
   <type>jar</type>
 </dependency>
@@ -61,6 +65,7 @@ Maven dependency ([JARs - see notes](docs/eclipse.md)):
 
 Direct downloads to put in `libs/` ([JARs - see notes](docs/eclipse.md)):
 ```
+http://search.maven.org/remotecontent?filepath=io/nextop/android-v15/${CURRENT_VERSION}/android-v15-${CURRENT_VERSION}.jar
 http://search.maven.org/remotecontent?filepath=io/nextop/android/${CURRENT_VERSION}/android-${CURRENT_VERSION}.jar
 http://search.maven.org/remotecontent?filepath=io/nextop/java-common/${CURRENT_VERSION}/java-common-${CURRENT_VERSION}-all.jar
 ```

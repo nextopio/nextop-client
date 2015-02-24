@@ -7,18 +7,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.speech.RecognitionListener;
-import android.speech.RecognizerIntent;
-import android.speech.SpeechRecognizer;
 import android.support.v13.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.view.MenuItem;
-import android.widget.Toast;
 import io.nextop.Id;
-
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
 
 public class FlipActivity extends Activity {
     public static final String ACTION_RECORD = "io.nextop.demo.RECORD";
@@ -59,7 +51,6 @@ public class FlipActivity extends Activity {
         if (Intent.ACTION_VIEW.equals(action)) {
             startRecording = false;
         } else if (ACTION_RECORD.equals(action)) {
-            setIntro();
             startRecording = true;
         } else {
             throw new IllegalArgumentException();
@@ -125,107 +116,9 @@ public class FlipActivity extends Activity {
     }
 
 
-    SpeechRecognizer recognizer;
-
-
-    void setIntro() {
-        Toast toast = Toast.makeText(FlipActivity.this, "Speak an intro now ...", Toast.LENGTH_SHORT);
-        toast.show();
-
-
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,
-                1);
-
-        recognizer = SpeechRecognizer
-                .createSpeechRecognizer(FlipActivity.this);
-
-        RecognitionListener listener = new RecognitionListener() {
-            @Override
-            public void onReadyForSpeech(Bundle params) {
-
-            }
-
-            @Override
-            public void onBeginningOfSpeech() {
-
-            }
-
-            @Override
-            public void onRmsChanged(float rmsdB) {
-
-            }
-
-            @Override
-            public void onBufferReceived(byte[] buffer) {
-
-            }
-
-            @Override
-            public void onEndOfSpeech() {
-
-            }
-
-            @Override
-            public void onError(int error) {
-                recognizer.stopListening();
-                recognizer.destroy();
-            }
-
-            @Override
-            public void onResults(Bundle results) {
-                try {
-//                Set<String> keys = results.keySet();
-//                Log.d("", "" + keys);
-                    Set<String> keys = results.keySet();
-
-                    List<String> rr = results.getStringArrayList("results_recognition");
-                    if (null != rr && !rr.isEmpty()) {
-                        _setIntro(rr.get(0));
-                    } else {
-
-                        // TODO remove, random intro
-                        Random r = new Random();
-                        int n = 5 + r.nextInt(50);
-                        StringBuilder sb = new StringBuilder(n);
-                        for (int i = 0; i < n; ++i) {
-                            switch (r.nextInt(4)) {
-                                case 0:
-                                    sb.append(' ');
-                                    break;
-                                default:
-                                    sb.append((char) ('a' + r.nextInt(25)));
-                            }
-                        }
-                        _setIntro(sb.toString());
-                    }
-                } finally {
-                    recognizer.stopListening();
-                    recognizer.destroy();
-                }
-
-            }
-
-            @Override
-            public void onPartialResults(Bundle partialResults) {
-
-            }
-
-            @Override
-            public void onEvent(int eventType, Bundle params) {
-
-            }
-        };
-
-        recognizer.setRecognitionListener(listener);
-        recognizer.startListening(intent);
-
-    }
-    void _setIntro(String intro) {
-        flip.getFlipInfoVmm().setIntro(flipId, intro);
-    }
+//    void setIntro(String intro) {
+//        flip.getFlipInfoVmm().setIntro(flipId, intro);
+//    }
 
 
 
@@ -241,14 +134,6 @@ public class FlipActivity extends Activity {
         ((RecordFragment) flipAdapter.getItem(1)).onStopRecording();
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (null != recognizer) {
-            recognizer.destroy();
-        }
-
-    }
 
     class FlipAdapter extends FragmentPagerAdapter {
         FlipFragment flipFragment = FlipFragment.newInstance(flipId);

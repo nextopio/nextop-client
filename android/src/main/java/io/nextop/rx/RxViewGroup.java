@@ -1,7 +1,10 @@
 package io.nextop.rx;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.View;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 import rx.Observable;
 import rx.Subscription;
@@ -28,10 +31,13 @@ public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder 
         super(context, attrs, defStyleAttr);
         init();
     }
+
+    @SuppressLint("NewApi")
     public RxViewGroup(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         init();
     }
+
     private void init() {
         setTag(TAG);
     }
@@ -82,17 +88,53 @@ public final class RxViewGroup extends FrameLayout implements RxLifecycleBinder 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        liftedRxLifecycleBinder.connect(this);
+        evalBinder();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        liftedRxLifecycleBinder.disconnect();
+        evalBinder();
     }
 
+    @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        evalBinder();
+    }
 
+    @Override
+    protected void onVisibilityChanged(View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        evalBinder();
+    }
 
+    /** calls either #connect or #disconnect on the binder,
+     * depending on the view state. Call this after a change to the view state. */
+    private void evalBinder() {
+        if (liftedRxLifecycleBinder.isClosed()) {
+            // abort; already done
+            return;
+        }
 
-
+        boolean connect;
+        if (View.VISIBLE == getWindowVisibility()) {
+            if (View.VISIBLE == getVisibility()) {
+                boolean visible = true;
+                for (ViewParent p = getParent(); visible && p instanceof View; p = p.getParent()) {
+                    visible &= View.VISIBLE == ((View) p).getVisibility();
+                }
+                connect = visible;
+            } else {
+                connect = false;
+            }
+        } else {
+            connect = false;
+        }
+        if (connect) {
+            liftedRxLifecycleBinder.connect(this);
+        } else {
+            liftedRxLifecycleBinder.disconnect();
+        }
+    }
 }

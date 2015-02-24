@@ -1,5 +1,6 @@
 package io.nextop.view;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -8,12 +9,8 @@ import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewParent;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import io.nextop.rx.RxDebugger;
-import io.nextop.rx.RxFragment;
-import rx.Notification;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -45,6 +42,8 @@ public class DebugOverlayView extends View {
         super(context, attrs, defStyleAttr);
         init();
     }
+
+    @SuppressLint("NewApi")
     public DebugOverlayView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         init();
@@ -191,8 +190,8 @@ public class DebugOverlayView extends View {
             for (RxDebugger.Stats stats : allStats) {
                 @Nullable View v;
                 if (null == stats.view
-                        || !stats.view.isAttachedToWindow()
-                        || View.GONE == stats.view.getVisibility()) {
+                        || View.VISIBLE != stats.view.getWindowVisibility()
+                        || View.VISIBLE != stats.view.getVisibility()) {
                     v = null;
                 } else {
                     v = stats.view;
