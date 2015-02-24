@@ -1,5 +1,6 @@
 package io.nextop.view;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -41,6 +42,8 @@ public class DebugOverlayView extends View {
         super(context, attrs, defStyleAttr);
         init();
     }
+
+    @SuppressLint("NewApi")
     public DebugOverlayView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         init();
@@ -187,9 +190,8 @@ public class DebugOverlayView extends View {
             for (RxDebugger.Stats stats : allStats) {
                 @Nullable View v;
                 if (null == stats.view
-                        // FIXME(backport)
-//                        || !stats.view.isAttachedToWindow()
-                        || View.GONE == stats.view.getVisibility()) {
+                        || View.VISIBLE != stats.view.getWindowVisibility()
+                        || View.VISIBLE != stats.view.getVisibility()) {
                     v = null;
                 } else {
                     v = stats.view;

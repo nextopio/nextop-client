@@ -1,5 +1,6 @@
 package io.nextop.view;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.*;
 import android.graphics.drawable.BitmapDrawable;
@@ -55,6 +56,7 @@ public class ImageView extends android.widget.ImageView {
     // DRAW STATE
 
     Paint tempPaint = new Paint();
+    RectF tempRect = new RectF();
 
 
     public ImageView(Context context) {
@@ -66,6 +68,7 @@ public class ImageView extends android.widget.ImageView {
     public ImageView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
     }
+    @SuppressLint("NewApi")
     public ImageView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
     }
@@ -384,8 +387,6 @@ public class ImageView extends android.widget.ImageView {
             // if online, filled grey with white pie
             // if offline, outline grey with white pie
 
-            // FIXME(backport) drawArc
-            /*
             float w = getWidth();
             float h = getHeight();
             float s = 0.2f * Math.min(w, h);
@@ -396,8 +397,9 @@ public class ImageView extends android.widget.ImageView {
             } else {
                 tempPaint.setStyle(Paint.Style.STROKE);
             }
-            canvas.drawArc(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s,
-                    360 * progress.progress, 360 * (1.f - progress.progress),
+            tempRect.set(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s);
+            canvas.drawArc(tempRect,
+                    /* deg */ 360 * progress.progress, /* deg */ 360 * (1.f - progress.progress),
                     true, tempPaint);
 
             if (progress.active) {
@@ -406,10 +408,10 @@ public class ImageView extends android.widget.ImageView {
                 tempPaint.setColor(Color.argb(64, 255, 255, 255));
             }
             tempPaint.setStyle(Paint.Style.FILL);
-            canvas.drawArc(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s,
-                    0.f, 360 * progress.progress,
+            tempRect.set(w / 2.f - s, h / 2.f - s, w / 2.f + s, h / 2.f + s);
+            canvas.drawArc(tempRect,
+                    /* deg */ 0.f, /* deg */ 360 * progress.progress,
                     true, tempPaint);
-            */
         }
     }
 
