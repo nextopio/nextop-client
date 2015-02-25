@@ -16,6 +16,12 @@ import java.net.URISyntaxException;
 @Beta
 public final class NextopAndroid {
 
+    public static Nextop getActive() {
+        // FIXME global instance
+        return null;
+    }
+
+
     /** Find the nearest nextop for the view:
      * - tests the view
      * - tests the activity
@@ -56,7 +62,7 @@ public final class NextopAndroid {
             }
         }
         assert null == nextop;
-        return null;
+        return getActive();
     }
 
     @Nullable
@@ -71,7 +77,7 @@ public final class NextopAndroid {
             return nextop;
         }
         assert null == nextop;
-        return null;
+        return getActive();
     }
 
     @Nullable
@@ -82,7 +88,7 @@ public final class NextopAndroid {
                 return nextop;
             }
         }
-        return null;
+        return getActive();
     }
 
 

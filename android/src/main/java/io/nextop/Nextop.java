@@ -21,8 +21,6 @@ import io.nextop.client.MessageControlState;
 import io.nextop.client.SubjectNode;
 import io.nextop.client.http.HttpNode;
 import io.nextop.com.crittercism.app.Crittercism;
-import io.nextop.org.apache.http.HttpResponse;
-import io.nextop.org.apache.http.client.methods.HttpUriRequest;
 import rx.Observable;
 import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
@@ -152,40 +150,6 @@ public class Nextop {
 
     public void cancelSend(Id id) {
         throw new IllegalStateException("Call on a started nextop.");
-    }
-
-    /////// HTTPCLIENT MIGRATION HELPER ///////
-
-    public HttpResponse execute(HttpUriRequest request) {
-        // FIXME 0.2
-        HttpResponse noResponse = null;
-        return send(request).onErrorReturn(new Func1<Throwable, HttpResponse>() {
-            @Override
-            public HttpResponse call(Throwable throwable) {
-                // FIXME unreachable result
-                // FIXME
-                return null;
-            }
-        }).defaultIfEmpty(
-        /* FIXME OK result -- no response if using NX protocol (messages don't have to have a response)
-         * FIXME this needs to be on a timeout */noResponse
-        ).toBlocking().single();
-    }
-
-    public Receiver<HttpResponse> send(HttpUriRequest request) {
-        Message message = Message.fromHttpRequest(request);
-        return Receiver.create(this, message.inboxRoute(),
-                send(message).map(new Func1<Message, HttpResponse>() {
-                    @Override
-                    public HttpResponse call(Message message) {
-                        return Message.toHttpResponse(message);
-                    }
-                }),
-                defaultUnsubscribeBehavior(message));
-    }
-
-    public Receiver<Layer> send(HttpUriRequest request, @Nullable LayersConfig config) {
-        return send(Layer.message(Message.fromHttpRequest(request)), config);
     }
 
 

@@ -18,6 +18,9 @@ targetCompatibility = JavaVersion.VERSION_1_6
 
 repositories {
     mavenCentral()
+    flatDir {
+        dirs 'm2repository'
+    }
 }
 
 android {
@@ -43,6 +46,7 @@ dependencies {
         // use the version included in Android
         exclude module: 'commons-logging'
     }
+    compile project(':volley')
 
     // FIXME why is this not included as a transitive dependency of :java-common?
     // FIXME see http://forums.gradle.org/gradle/topics/including-a-java-project-into-an-android-library-project-does-not-include-transitive-file-dependencies?rfm=1
@@ -51,11 +55,10 @@ dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
 
 
-    compile group: 'io.reactivex', name: 'rxandroid', version: '0.24.0'
+    compile 'io.reactivex:rxandroid:0.24.0'
 
 //    compile fileTree(dir: 'libs', include: ['*.jar'])
 
-    compile group: 'com.android.support', name: 'support-v4', version: '21.0.3'
 
     androidTestCompile 'junit:junit:3.8.2'
     /* (source of warnings) this has a transitive dependency on

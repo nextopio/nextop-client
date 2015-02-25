@@ -14,8 +14,8 @@
       <module fileurl="file://$PROJECT_DIR$/java-common/java-common.iml" filepath="$PROJECT_DIR$/java-common/java-common.iml" />
       <module fileurl="file://$PROJECT_DIR$/nextop-client.iml" filepath="$PROJECT_DIR$/nextop-client.iml" />
       <module fileurl="file://$PROJECT_DIR$/org.apache-android-jarjar/org.apache-android-jarjar.iml" filepath="$PROJECT_DIR$/org.apache-android-jarjar/org.apache-android-jarjar.iml" />
-      <module fileurl="file://$PROJECT_DIR$/org.apache-android-jarjar/org.apache-android-jarjar.iml" filepath="$PROJECT_DIR$/org.apache-android-jarjar/org.apache-android-jarjar.iml" />
       <module fileurl="file://$PROJECT_DIR$/org.apache-jarjar/org.apache-jarjar.iml" filepath="$PROJECT_DIR$/org.apache-jarjar/org.apache-jarjar.iml" />
+      <module fileurl="file://$PROJECT_DIR$/$System.env.HOME/android-src/frameworks/volley/volley.iml" filepath="$PROJECT_DIR$/$System.env.HOME/android-src/frameworks/volley/volley.iml" />
     </modules>
   </component>
 </project>
