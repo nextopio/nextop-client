@@ -1,10 +1,8 @@
 package io.nextop.httpclient;
 
 import io.nextop.Message;
-import io.nextop.MessageAndroid;
 import io.nextop.Nextop;
 import io.nextop.NextopAndroid;
-import io.nextop.org.apache.http.client.methods.HttpRequestWrapper;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -14,18 +12,12 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.conn.ClientConnectionRequest;
-import org.apache.http.conn.ManagedClientConnection;
-import org.apache.http.conn.routing.HttpRoute;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.HttpContext;
 import rx.functions.Func1;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
 public class NextopHttpClient implements HttpClient {
 
@@ -69,22 +61,9 @@ public class NextopHttpClient implements HttpClient {
     public HttpResponse execute(@Nullable HttpHost httpHost, HttpRequest httpRequest, @Nullable HttpContext httpContext) throws IOException, ClientProtocolException {
         // TODO httpContext? currently ignored
 
-        Message message = MessageAndroid.fromHttpRequest(httpHost, httpRequest, nextop);
-        Nextop.Receiver<Message> receiver = nextop.send(message);
-
-        Message responseMessage = receiver.onErrorReturn(new Func1<Throwable, Message>() {
-            @Override
-            public Message call(Throwable throwable) {
-                // TODO handle the error more precisely
-                return Message.newBuilder().setCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).build();
-            }
-        }).defaultIfEmpty(
-                // if using the nextop protocol, some successful messages don't have a response code,
-                // just an ack which closes the channel
-                Message.newBuilder().setCode(HttpStatus.SC_OK).build()
-        ).toBlocking().single();
-
-        return MessageAndroid.toHttpResponse(responseMessage);
+        Message message = fromHttpRequest(httpHost, httpRequest);
+        // FIXME attach cancel policy on request to nextop.cancelSend(id)
+        return execute(nextop, message);
     }
 
     @Override
@@ -125,4 +104,43 @@ public class NextopHttpClient implements HttpClient {
     }
 
 
+
+    public static HttpResponse execute(Nextop nextop, Message message) throws IOException {
+        Nextop.Receiver<Message> receiver = nextop.send(message);
+
+        Message responseMessage = receiver.onErrorReturn(new Func1<Throwable, Message>() {
+            @Override
+            public Message call(Throwable throwable) {
+                // TODO handle the error more precisely
+                return Message.newBuilder().setCode(HttpStatus.SC_INTERNAL_SERVER_ERROR).build();
+            }
+        }).defaultIfEmpty(
+                // if using the nextop protocol, some successful messages don't have a response code,
+                // just an ack which closes the channel
+                Message.newBuilder().setCode(HttpStatus.SC_OK).build()
+        ).toBlocking().single();
+
+        return toHttpResponse(responseMessage);
+    }
+
+
+
+    public static Message fromHttpRequest(HttpHost httpHost, HttpRequest httpRequest) {
+        return fromHttpRequestBuilder(httpHost, httpRequest).build();
+    }
+
+    public static Message.Builder fromHttpRequestBuilder(HttpHost httpHost, HttpRequest httpRequest) {
+        // FIXME support request.abort
+
+        // FIXME adapt org.apache.* to io.nextop.org.apache.* then use Message.fromHttpRequest,
+        // FIXME and adapt back with abort behavior mixed in
+
+        return null;
+    }
+
+    public static HttpResponse toHttpResponse(Message message) {
+        // FIXME use Message.toHttpResponse and adapt back with abort behavior mixed in
+
+        return null;
+    }
 }

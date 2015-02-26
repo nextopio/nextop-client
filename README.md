@@ -29,10 +29,11 @@ improving transfer of all requests in all network conditions.
 |-----------------|
 | 0.1.3           |
 
-| Module          | Android Versions Supported | Notes                                                             |
-|-----------------|----------------------------|-------------------------------------------------------------------|
-| `android`       | 10+                        |                                                                   |
-| `android-v15`   | 15+                        | Includes all of `android` plus fragments                          |
+| Module              | Android Versions Supported   | Notes                                                             |
+|---------------------|------------------------------|-------------------------------------------------------------------|
+| `android`           | 10+                          |                                                                   |
+| `android-v15`       | 15+                          | Includes all of `android` plus fragments                          |
+| `aws-android-sdk`   | 10+                          | Fork of the [Amazon AWS SDK](http://aws.amazon.com/documentation/sdk-for-android/) that uses Nextop for the transport (see demos for performance comparison) |
 
 Gradle dependency (AAR):
 
@@ -73,9 +74,9 @@ http://search.maven.org/remotecontent?filepath=io/nextop/java-common/${CURRENT_V
 
 ### Android Demos
 
-| Demo       | Install                                                                                                                                | Objective                                         | Code                                                                                                                                                        |
-|------------|----------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| dılɟ       | [![Android App on Play](docs/assets/en_app_rgb_wo_60-32.png)](https://play.google.com/store/apps/details?id=io.nextop.demo.flip)       | Ridiculously fast image loading on mobile         | [App](https://github.com/nextopio/nextop-client/tree/master/android-demo-flip), [Server](https://github.com/nextopio/nextop-client/tree/master/backend-demo-flip)     |
+| Demo       | Install                                                                                                                                | Objective                                         | Code                                                                                                                                                                       |
+|------------|----------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| dılɟ       | [![Play](docs/assets/en_app_rgb_wo_60-32.png)](https://play.google.com/store/apps/details?id=io.nextop.demo.flip)                      | Ridiculously fast image loading on mobile         | [App](https://github.com/nextopio/nextop-client/tree/master/android-demo-flip), [Server](https://github.com/nextopio/nextop-client/tree/master/backend-demo-flip)          |
 
 
 ### Android Blog Posts
@@ -84,7 +85,7 @@ http://search.maven.org/remotecontent?filepath=io/nextop/java-common/${CURRENT_V
 |------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | 02.13.15   | [Binding Rx subscriptions to view lifecycles, and using them to optimize your network traffic](docs/02.13.15_SUBSCRIPTIONS_NETWORKING_VIEWS.md)   |
 | 02.16.15   | [![cordova](docs/assets/cordova_24.png) Things you can do with a Custom XMLHttpRequest](docs/02.16.2015_CUSTOM_XMLHTTPREQUEST.md)                 |
-| 02.23.15   | [![profile](docs/assets/profile_32.png) How do mobile app teams QA test poor cellphone connections?](http://t.co/AZKFNkXIFk)                      |
+| 02.23.15   | [![profile](docs/assets/profile_32.png) How do mobile app teams QA test poor cellphone connections?](http://qr.ae/EMeBB)                          |
 
 # About Us
 

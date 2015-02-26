@@ -19,19 +19,4 @@ public class MessageAndroid {
     }
 
 
-    /** @param nextop if not null, enables abort */
-    public static Message fromHttpRequest(HttpHost httpHost, HttpRequest httpRequest, @Nullable Nextop nextop) {
-        // FIXME support request.abort
-
-        // FIXME adapt org.apache.* to io.nextop.org.apache.* then use Message.fromHttpRequest,
-        // FIXME and adapt back with abort behavior mixed in
-
-        return null;
-    }
-
-    public static HttpResponse toHttpResponse(Message message) {
-        // FIXME use Message.toHttpResponse and adapt back with abort behavior mixed in
-
-        return null;
-    }
 }
