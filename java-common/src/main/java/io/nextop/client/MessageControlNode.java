@@ -2,15 +2,18 @@ package io.nextop.client;
 
 import java.util.List;
 
+
+// unless stated otherwise, all calls to the API must be on the context thread
 // all message control nodes run on a single thread (handler) controlled by the top level node,
 // via post and postDelayed
 public interface MessageControlNode extends MessageControlChannel {
 
 
     void init(MessageControlChannel upstream);
-    
-    void start();
-    void stop();
+
+    // onActive(active) may be called multiple times
+    // typically these are called when all used network links drop out or comes back
+    // (via connectivity events, etc)
 
 
 

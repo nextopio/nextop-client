@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Future;
 
+// the foundation of
+// - data shaping
+// - connecting client to server in the same memory space ("pipe wire"). useful for testing
 // blocking interface. each method blocks
 // calling close should interrupt blocked methods
 // must be closed after any exception

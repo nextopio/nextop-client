@@ -10,7 +10,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import io.nextop.*;
-import io.nextop.client.SubjectNode;
 import io.nextop.util.HexBytes;
 
 import java.io.IOException;

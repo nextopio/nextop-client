@@ -1,5 +1,8 @@
-package io.nextop.client;
+package io.nextop.client.node;
 
+import io.nextop.client.MessageControlChannel;
+import io.nextop.client.MessageControlNode;
+import io.nextop.client.MessageControlState;
 import rx.Scheduler;
 
 import javax.annotation.Nullable;
@@ -9,17 +12,10 @@ public abstract class AbstractMessageControlNode implements MessageControlNode {
     @Nullable
     protected MessageControlChannel upstream = null;
 
-    @Nullable
-    protected MessageControlState mcs = null;
-
-
 
     public AbstractMessageControlNode() {
 
     }
-
-
-
 
 
     private void checkUpstream() {
@@ -35,19 +31,6 @@ public abstract class AbstractMessageControlNode implements MessageControlNode {
     protected void initDownstream() {
         // Do nothing
     }
-    protected void startSelf() {
-        // Do nothing
-    }
-    protected void startDownstream() {
-        // Do nothing
-    }
-    protected void stopSelf() {
-        // Do nothing
-    }
-    protected void stopDownstream() {
-        // Do nothing
-    }
-
 
 
 
@@ -62,39 +45,24 @@ public abstract class AbstractMessageControlNode implements MessageControlNode {
     }
 
     @Override
-    public final void start() {
-        checkUpstream();
-        startDownstream();
-        startSelf();
+    public final MessageControlState getMessageControlState() {
+        return upstream.getMessageControlState();
     }
 
     @Override
-    public final void stop() {
-        checkUpstream();
-        stopDownstream();
-        stopSelf();
-    }
-
-
-    @Override
-    public void onTransfer(MessageControlState mcs) {
-        this.mcs = mcs;
-    }
-
-    @Override
-    public void post(Runnable r) {
+    public final void post(Runnable r) {
         checkUpstream();
         upstream.post(r);
     }
 
     @Override
-    public void postDelayed(Runnable r, int delayMs) {
+    public final void postDelayed(Runnable r, int delayMs) {
         checkUpstream();
         upstream.postDelayed(r, delayMs);
     }
 
     @Override
-    public Scheduler getScheduler() {
+    public final Scheduler getScheduler() {
         checkUpstream();
         return upstream.getScheduler();
     }

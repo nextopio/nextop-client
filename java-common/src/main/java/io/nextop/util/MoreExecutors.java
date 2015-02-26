@@ -5,10 +5,10 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.Executor;
 
-public class NextopExecutors {
+public class MoreExecutors {
 
     /** serially executes jobs on one of the threads in the delegate */
-    public static Executor serialExecutor(Executor delegate) {
+    public static Executor serial(Executor delegate) {
         return new SerialExecutor(delegate);
     }
 

@@ -1,8 +1,13 @@
-package io.nextop.client.http;
+package io.nextop.client.node.http;
 
+import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Route;
-import io.nextop.client.*;
+import io.nextop.client.MessageControl;
+import io.nextop.client.MessageControlState;
+import io.nextop.client.Wire;
+import io.nextop.client.Wires;
+import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.client.retry.SendStrategy;
 import io.nextop.org.apache.http.*;
 import io.nextop.org.apache.http.client.HttpRequestRetryHandler;
@@ -46,8 +51,9 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,74 +62,133 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class HttpNode extends AbstractMessageControlNode {
 
 
-    // FIXME pull version from build
-    private static final String DEFAULT_USER_AGENT = "Nextop/0.1.3";
+    public static final class Config {
+        public final String userAgent;
+
+        public final int maxConcurrentConnections;
 
 
-    /** emit progress every 1KiB by default */
-    private static final int DEFAULT_EMIT_Q_BYTES = 1024;
+        public Config(String userAgent, int maxConcurrentConnections) {
+            this.userAgent = userAgent;
+            this.maxConcurrentConnections = maxConcurrentConnections;
+        }
+    }
+
+
+    public static final Config DEFAULT_CONFIG = new Config(
+        /** FIXME set a user agent with the version, e.g. Nextop/0.1.4 */ "Nextop",
+        2
+    );
+
+    public static final SendStrategy DEFAULT_SEND_STRATEGY = new SendStrategy.Builder()
+            .withUniformRandom(2000, TimeUnit.MILLISECONDS)
+            .repeat(2)
+            .build();
+    public static final SendStrategy DEFAULT_RETAKE_STRATEGY = new SendStrategy.Builder()
+            .withUniformRandom(2000, TimeUnit.MILLISECONDS)
+            .repeatIndefinitely()
+            .build();
+    /** guaranteed to repeat indefinitely, in case a custom retake strategy expires */
+    static final SendStrategy FALLBACK_RETAKE_STRATEGY = DEFAULT_RETAKE_STRATEGY;
+
+    /** yield at this many of bytes to emit progress,
+     * transfer request, etc. */
+    static final int DEFAULT_YIELD_Q_BYTES = 1024;
 
 
 
-    private final int maxConcurrentConnections = 2;
+    final Config config;
 
-
-    PoolingHttpClientConnectionManager clientConnectionManager =
+    final PoolingHttpClientConnectionManager clientConnectionManager =
             new PoolingHttpClientConnectionManager(new NextopHttpClientConnectionFactory());
 
 
+    // volatile for reads
+    volatile boolean active = false;
+
+    @Nullable
+    List<Thread> looperThreads = null;
+
+
+    // configuration
 
     // this is the strategy for one entry before possibly yielding
     // each time the entry is taken, the strategy is run from the beginning
     // this is a really aggressive strategy that relies on CONNECTIVITY STATUS
     // to stop retrying on a bad connection
-    private SendStrategy sendStrategy = new SendStrategy.Builder()
-            .init(0, TimeUnit.MILLISECONDS)
-            .withUniformRandom(2000, TimeUnit.MILLISECONDS)
-            .repeat(2)
-            .build();
-
-    volatile boolean active = true;
-
-    private List<Thread> looperThreads = Collections.emptyList();
+    volatile SendStrategy sendStrategy = DEFAULT_SEND_STRATEGY;
+    // if an entry yields or is otherwise taken after a failed take (either a protocol error or sendStrategy expired)
+    // this strategy runs. this strategy should repeat indefinitely, since an entry can circulate indefinitely
+    volatile SendStrategy retakeStrategy = DEFAULT_RETAKE_STRATEGY;
 
 
     @Nullable
-    private Wire.Factory wireAdapterFactory = null;
+    volatile Wire.Factory wireAdapterFactory = null;
+
+
+
 
 
     public HttpNode() {
+        this(DEFAULT_CONFIG);
+    }
+
+    public HttpNode(Config config) {
+        this.config = config;
     }
 
 
+    /////// CONFIG ///////
+
+    public void setSendStrategy(SendStrategy sendStrategy) {
+        this.sendStrategy = sendStrategy;
+        // loopers pick this up eventually
+    }
+
+    public void setWireAdapterFactory(Wire.Factory wireAdapterFactory) {
+        this.wireAdapterFactory = wireAdapterFactory;
+        // loopers pick this up eventually
+    }
+
+
+
+    /////// NODE ///////
+
     @Override
-    public void onActive(boolean active, MessageControlMetrics metrics) {
-        this.active = active;
-
-        if (!active) {
-            for (Thread t : looperThreads) {
-                t.interrupt();
-            }
-
-            // FIXME on false, upstream.onTransfer(mcs)
-        }
+    protected void initSelf() {
+        // ready to receive
+        upstream.onActive(true);
     }
 
     @Override
-    public void onTransfer(MessageControlState mcs) {
-        super.onTransfer(mcs);
+    public void onActive(boolean active) {
+        if (this.active != active) {
+            this.active = active;
 
-        // FIXME bind mcs to the loopers - ultimately remove the onTransfer callback and just pass the mcs in init
-        if (active) {
-            // note that the mcs coordinates between multiple loopers
-            int n = maxConcurrentConnections;
-            Thread[] threads = new Thread[n];
-            for (int i = 0; i < n; ++i) {
-                threads[i] = new RequestLooper();
-            }
-            looperThreads = Arrays.asList(threads);
-            for (int i = 0; i < n; ++i) {
-                threads[i].start();
+            if (!active) {
+                assert null == looperThreads;
+
+                MessageControlState mcs = getMessageControlState();
+                SharedLooperState sls = new SharedLooperState();
+
+                // note that the message control state coordinates between multiple loopers
+                // (and between multiple nodes)
+                int n = config.maxConcurrentConnections;
+                Thread[] threads = new Thread[n];
+                for (int i = 0; i < n; ++i) {
+                    threads[i] = new RequestLooper(mcs, sls);
+                }
+                looperThreads = Arrays.asList(threads);
+                for (int i = 0; i < n; ++i) {
+                    threads[i].start();
+                }
+            } else {
+                assert null != looperThreads;
+
+                for (Thread t : looperThreads) {
+                    t.interrupt();
+                }
+                looperThreads = null;
             }
         }
     }
@@ -131,30 +196,72 @@ public final class HttpNode extends AbstractMessageControlNode {
     @Override
     public void onMessageControl(MessageControl mc) {
         assert MessageControl.Direction.SEND.equals(mc.dir);
-        if (active && !mcs.onActiveMessageControl(mc, upstream)) {
-            switch (mc.type) {
-                case MESSAGE:
-                    mcs.add(mc.message);
-                    break;
-                default:
-                    // ignore
-                    break;
+
+        assert active;
+        if (active) {
+            MessageControlState mcs = getMessageControlState();
+            if (!mcs.onActiveMessageControl(mc, upstream)) {
+                switch (mc.type) {
+                    case MESSAGE:
+                        mcs.add(mc.message);
+                        break;
+                    default:
+                        // ignore
+                        break;
+                }
             }
+        } else {
+            // return to sender
+            upstream.onMessageControl(mc);
         }
     }
 
 
 
+    private static final class SharedLooperState {
+        // FIXME the value should be a pair<strategy, previous attempt timestamp>
+        // FIXME retry should use strategy.timeout - (elapsed time),
+        // FIXME or 0 max
+        // FIXME also if there is a timeout, and the request is yieldable, yield it
+        // FIXME   only yield if min Q <= (elapsed time)
+        // FIXME otherwise sleep min Q, then yield
+        // FIXME default min Q is 50ms
+        final Map<Id, SendStrategy> retakeStrategies = new ConcurrentHashMap<Id, SendStrategy>(8);
+
+        SharedLooperState() {
+        }
+    }
+
+    final class RequestLooper extends Thread {
+        final MessageControlState mcs;
+        final SharedLooperState sls;
 
 
-    private final class RequestLooper extends Thread {
+        // set at the beginning of a request; reset at the end of request
         @Nullable
         ProgressCallback progressCallback = null;
 
+        // set at the top of a request
         @Nullable
         Wire.Adapter wireAdapter = null;
         @Nullable
         Wire.Factory _wireAdapterFactory = null;
+
+
+        RequestLooper(MessageControlState mcs, SharedLooperState sls) {
+            this.mcs = mcs;
+            this.sls = sls;
+        }
+
+
+        private void setWireAdapter() {
+            // set up or switch the wire adapter
+            if (null != wireAdapterFactory && (null == wireAdapter
+                    || _wireAdapterFactory != wireAdapterFactory)) {
+                _wireAdapterFactory = wireAdapterFactory;
+                wireAdapter = wireAdapterFactory.createAdapter();
+            }
+        }
 
 
         @Override
@@ -169,24 +276,32 @@ public final class HttpNode extends AbstractMessageControlNode {
                 }
 
                 if (null != entry) {
-                    assert null == entry.end;
-                    try {
-                        // set up or switch the wire adapter
-                        if (null != wireAdapterFactory && (null == wireAdapter
-                                || _wireAdapterFactory != wireAdapterFactory)) {
-                            _wireAdapterFactory = wireAdapterFactory;
-                            wireAdapter = wireAdapterFactory.createAdapter();
+                    @Nullable SendStrategy retakeStrategy = sls.retakeStrategies.get(entry.id);
+                    if (null != retakeStrategy) {
+                        retakeStrategy = retakeStrategy.retry();
+                        if (!retakeStrategy.isSend()) {
+                            retakeStrategy = FALLBACK_RETAKE_STRATEGY.retry();
+                            assert retakeStrategy.isSend();
+                        }
+                        try {
+                            Thread.sleep((int) retakeStrategy.getDelay(TimeUnit.MILLISECONDS));
+                        } catch (InterruptedException e) {
+                            mcs.release(entry.id, HttpNode.this);
+                            continue;
                         }
 
+                        sls.retakeStrategies.put(entry.id, retakeStrategy);
+                    }
+
+                    assert null == entry.end;
+                    try {
+                        setWireAdapter();
                         end(entry, execute(entry));
                     } catch (IOException e) {
                         handleTransportException(entry, e);
                     } catch (HttpException e) {
                         handleTransportException(entry, e);
                     } catch (Throwable t) {
-                        // FIXME remove
-//                        t.printStackTrace();
-
                         // an internal issue
                         // can never recover from this (assume the system is deterministic)
                         end(entry, MessageControlState.End.ERROR);
@@ -196,12 +311,13 @@ public final class HttpNode extends AbstractMessageControlNode {
         }
         /** factored out exception handling in place of multi-catch */
         private void handleTransportException(MessageControlState.Entry entry, Exception e) {
-            // FIXME remove
-//            e.printStackTrace();
-
             if (null == entry.end) {
                 // FIXME for HttpException the endpoint not speaking the protocol correctly
                 // FIXME the retry should not be as aggressive in this case
+
+                if (!sls.retakeStrategies.containsKey(entry.id)) {
+                    sls.retakeStrategies.put(entry.id, retakeStrategy);
+                }
 
                 // at this point the entry was elected to yield
                 // in this case, check whether the message has indicated it can be moved to the end of the line
@@ -213,6 +329,7 @@ public final class HttpNode extends AbstractMessageControlNode {
         }
         private void end(final MessageControlState.Entry entry, MessageControlState.End end) {
             mcs.remove(entry.id, end);
+            sls.retakeStrategies.remove(entry.id);
 
             final Route route = entry.message.inboxRoute();
             switch (end) {
@@ -307,7 +424,8 @@ public final class HttpNode extends AbstractMessageControlNode {
                     new NextopHttpRequestExecutor(progressCallback),
                     clientConnectionManager,
                     DefaultConnectionReuseStrategy.INSTANCE,
-                    DefaultConnectionKeepAliveStrategy.INSTANCE
+                    DefaultConnectionKeepAliveStrategy.INSTANCE,
+                    config.userAgent
             );
             return new RetryExec(nextopExec, new NextopHttpRequestRetryHandler(sendStrategy, entry, mcs));
         }
@@ -318,6 +436,8 @@ public final class HttpNode extends AbstractMessageControlNode {
 
     final class ProgressAdapter implements ProgressCallback {
         final MessageControlState.Entry entry;
+
+        MessageControlState mcs = getMessageControlState();
 
 
         ProgressAdapter(MessageControlState.Entry entry) {
@@ -491,12 +611,13 @@ public final class HttpNode extends AbstractMessageControlNode {
                 final HttpRequestExecutor requestExecutor,
                 final HttpClientConnectionManager connManager,
                 final ConnectionReuseStrategy reuseStrategy,
-                final ConnectionKeepAliveStrategy keepAliveStrategy) {
+                final ConnectionKeepAliveStrategy keepAliveStrategy,
+                String userAgent) {
             this.httpProcessor = new ImmutableHttpProcessor(
                     new RequestContent(),
                     new RequestTargetHost(),
                     new RequestClientConnControl(),
-                    new RequestUserAgent(DEFAULT_USER_AGENT));
+                    new RequestUserAgent(userAgent));
             this.requestExecutor    = requestExecutor;
             this.connManager        = connManager;
             this.reuseStrategy      = reuseStrategy;
@@ -731,8 +852,7 @@ public final class HttpNode extends AbstractMessageControlNode {
     // be able to reset progress
     // be able to attach callback that gets called after A bytes of upload, B bytes of download indiviudally
     static final class NextopHttpClientConnection extends DefaultManagedHttpClientConnection {
-        // emit progress every 4KiB
-        final int emitQBytes = DEFAULT_EMIT_Q_BYTES;
+        final int yieldQBytes = DEFAULT_YIELD_Q_BYTES;
 
 
         private boolean wireSet = false;
@@ -846,7 +966,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                     sentBytes += bytes;
 
                     if (null != progressCallback) {
-                        long notificationIndex = sentBytes / emitQBytes;
+                        long notificationIndex = sentBytes / yieldQBytes;
                         if (lastNotificationIndex != notificationIndex) {
                             lastNotificationIndex = notificationIndex;
                             progressCallback.onSendProgress(sentBytes, scaledSendTotalBytes(sentBytes));
@@ -873,8 +993,8 @@ public final class HttpNode extends AbstractMessageControlNode {
 
                 @Override
                 public void write(byte[] b, int off, int len) throws IOException {
-                    for (int i = 0; i < len; i += emitQBytes) {
-                        int c = Math.min(emitQBytes, len - i);
+                    for (int i = 0; i < len; i += yieldQBytes) {
+                        int c = Math.min(yieldQBytes, len - i);
                         os.write(b, off + i, c);
                         onSendProgress(c);
 
@@ -937,7 +1057,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                     receivedBytes += bytes;
 
                     if (null != progressCallback) {
-                        long notificationIndex = receivedBytes / emitQBytes;
+                        long notificationIndex = receivedBytes / yieldQBytes;
                         if (lastNotificationIndex != notificationIndex) {
                             lastNotificationIndex = notificationIndex;
                             progressCallback.onReceiveProgress(receivedBytes, scaledReceiveTotalBytes(receivedBytes));
@@ -967,8 +1087,8 @@ public final class HttpNode extends AbstractMessageControlNode {
 
                 @Override
                 public int read(byte[] b, int off, int len) throws IOException {
-                    for (int i = 0; i < len; i += emitQBytes) {
-                        int c = Math.min(emitQBytes, len - i);
+                    for (int i = 0; i < len; i += yieldQBytes) {
+                        int c = Math.min(yieldQBytes, len - i);
                         int r = is.read(b, off + i, c);
                         if (0 < r) {
                             onReceiveProgress(r);

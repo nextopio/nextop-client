@@ -1,5 +1,9 @@
-package io.nextop.client;
+package io.nextop.client.node;
 
+import io.nextop.client.MessageControl;
+import io.nextop.client.MessageControlChannel;
+import io.nextop.client.MessageControlNode;
+import io.nextop.client.MessageControlState;
 import rx.Scheduler;
 
 public class PassthroughNode extends AbstractMessageControlNode {
@@ -15,18 +19,18 @@ public class PassthroughNode extends AbstractMessageControlNode {
     protected void initDownstream() {
         downstream.init(new MessageControlChannel() {
             @Override
-            public void onActive(boolean active, MessageControlMetrics metrics) {
-                upstream.onActive(active, metrics);
-            }
-
-            @Override
-            public void onTransfer(MessageControlState mcs) {
-                upstream.onTransfer(mcs);
+            public void onActive(boolean active) {
+                upstream.onActive(active);
             }
 
             @Override
             public void onMessageControl(MessageControl mc) {
                 upstream.onMessageControl(mc);
+            }
+
+            @Override
+            public MessageControlState getMessageControlState() {
+                return upstream.getMessageControlState();
             }
 
             @Override
@@ -47,24 +51,8 @@ public class PassthroughNode extends AbstractMessageControlNode {
     }
 
     @Override
-    protected void startDownstream() {
-        downstream.start();
-    }
-
-    @Override
-    protected void stopDownstream() {
-        downstream.stop();
-    }
-
-
-    @Override
-    public void onActive(boolean active, MessageControlMetrics metrics) {
-        downstream.onActive(active, metrics);
-    }
-
-    @Override
-    public void onTransfer(MessageControlState mcs) {
-        downstream.onTransfer(mcs);
+    public void onActive(boolean active) {
+        downstream.onActive(active);
     }
 
     @Override

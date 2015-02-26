@@ -1,9 +1,13 @@
-package io.nextop.client;
+package io.nextop.client.node;
 
 import com.google.common.collect.*;
 import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Route;
+import io.nextop.client.MessageControl;
+import io.nextop.client.MessageControlChannel;
+import io.nextop.client.MessageControlNode;
+import io.nextop.client.MessageControlState;
 import rx.Observable;
 import rx.Scheduler;
 import rx.Subscriber;
@@ -13,7 +17,6 @@ import rx.subscriptions.BooleanSubscription;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 public class SubjectNode extends AbstractMessageControlNode {
