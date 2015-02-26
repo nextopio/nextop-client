@@ -33,7 +33,7 @@ improving transfer of all requests in all network conditions.
 |---------------------|------------------------------|-------------------------------------------------------------------|
 | `android`           | 10+                          |                                                                   |
 | `android-v15`       | 15+                          | Includes all of `android` plus fragments                          |
-| `aws-android-sdk`   | 10+                          | [Amazon AWS SDK](http://aws.amazon.com/documentation/sdk-for-android/) plus Nextop<br>(see demos for perf) |
+| `aws-android-sdk`   | 10+                          | [Amazon AWS SDK](http://aws.amazon.com/documentation/sdk-for-android/) on Nextop<br>(see demos for perf) |
 
 Gradle dependency (AAR):
 
