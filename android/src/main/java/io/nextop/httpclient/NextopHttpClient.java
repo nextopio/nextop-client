@@ -19,6 +19,7 @@ import rx.functions.Func1;
 import javax.annotation.Nullable;
 import java.io.IOException;
 
+// FIXME(compat)
 public class NextopHttpClient implements HttpClient {
 
     private final Nextop nextop;

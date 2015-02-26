@@ -12,6 +12,7 @@ import org.apache.http.HttpResponse;
 import java.io.IOException;
 import java.util.Map;
 
+// FIXME(compat)
 public class NextopHttpStack implements HttpStack {
     private final Nextop nextop;
 

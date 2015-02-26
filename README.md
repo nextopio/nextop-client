@@ -83,9 +83,19 @@ http://search.maven.org/remotecontent?filepath=io/nextop/java-common/${CURRENT_V
 
 | Date       | Post                                                                                                                                              |
 |------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| 02.13.15   | [Binding Rx subscriptions to view lifecycles, and using them to optimize your network traffic](docs/02.13.15_SUBSCRIPTIONS_NETWORKING_VIEWS.md)   |
-| 02.16.15   | [![cordova](docs/assets/cordova_24.png) Things you can do with a Custom XMLHttpRequest](docs/02.16.2015_CUSTOM_XMLHTTPREQUEST.md)                 |
+| 02.13.15   | [Binding Rx subscriptions to view lifecycles, and using them to optimize your network traffic](docs/02.13.15_SUBSCRIPTIONS_NETWORKING_VIEWS.md)   ||
 | 02.23.15   | [![profile](docs/assets/profile_32.png) How do mobile app teams QA test poor cellphone connections?](http://qr.ae/EMeBB)                          |
+
+## Cordova
+
+See [io.nextop.cordova on the Cordova Plugins Registry](http://plugins.cordova.io/#/package/io.nextop.cordova).
+
+### Cordova Blog Posts
+
+| Date       | Post                                                                                                                                              |
+|------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| 02.16.15   | [![cordova](docs/assets/cordova_24.png) Things you can do with a Custom XMLHttpRequest](docs/02.16.2015_CUSTOM_XMLHTTPREQUEST.md)                 |
+
 
 # About Us
 
