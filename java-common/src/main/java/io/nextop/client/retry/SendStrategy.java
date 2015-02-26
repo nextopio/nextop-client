@@ -34,10 +34,10 @@ public interface SendStrategy {
     ).repeatIndefinitely(
     ).build();
 
-    SendStrategy MAX_30S = new Builder().init(0, TimeUnit.MILLISECONDS
-    ).withLinearRandom(5, TimeUnit.SECONDS
-    ).repeat(3
+    SendStrategy NO_RETRY = new Builder().init(0, TimeUnit.MILLISECONDS
+    ).repeat(0
     ).build();
+
 
 
 

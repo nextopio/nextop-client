@@ -24,6 +24,7 @@ import io.nextop.org.apache.http.conn.routing.HttpRoute;
 import io.nextop.org.apache.http.entity.ContentLengthStrategy;
 import io.nextop.org.apache.http.impl.DefaultConnectionReuseStrategy;
 import io.nextop.org.apache.http.impl.client.DefaultConnectionKeepAliveStrategy;
+import io.nextop.org.apache.http.impl.client.SystemDefaultCredentialsProvider;
 import io.nextop.org.apache.http.impl.conn.ConnectionShutdownException;
 import io.nextop.org.apache.http.impl.conn.DefaultHttpResponseParserFactory;
 import io.nextop.org.apache.http.impl.conn.DefaultManagedHttpClientConnection;
@@ -80,10 +81,11 @@ public final class HttpNode extends AbstractMessageControlNode {
         2
     );
 
-    public static final SendStrategy DEFAULT_SEND_STRATEGY = new SendStrategy.Builder()
-            .withUniformRandom(2000, TimeUnit.MILLISECONDS)
-            .repeat(2)
-            .build();
+    /** retry once immediately, then defer to the retake strategy.
+     * this is a heuristic in case the request got redirected to a bad box. */
+    public static final SendStrategy DEFAULT_SEND_STRATEGY = new SendStrategy.Builder().init(0, TimeUnit.MILLISECONDS
+    ).repeat(1
+    ).build();
     public static final SendStrategy DEFAULT_RETAKE_STRATEGY = new SendStrategy.Builder()
             .withUniformRandom(2000, TimeUnit.MILLISECONDS)
             .repeatIndefinitely()
@@ -111,6 +113,15 @@ public final class HttpNode extends AbstractMessageControlNode {
 
 
     // configuration
+
+    /* retry in the http node is controlled by two strategies: send and retake.
+     * send = [send attempt, [send delay, [send attempt, ...]?]?]
+     * retake (for yieldable messages) = [[send], [move to back, other sends, delay?, [send], [move to back, other sends, delay?, [send], ...]?]?]
+     * retake (for un-yieldable messages) = [[send], [delay?, [send], [delay?, [send], ...]?]?]
+     *
+     * the delay in the send sequence is controlled by #sendStrategy
+     * the delay in the retake sequences is controlled by #retakeStrategy
+     */
 
     // this is the strategy for one entry before possibly yielding
     // each time the entry is taken, the strategy is run from the beginning
@@ -219,16 +230,26 @@ public final class HttpNode extends AbstractMessageControlNode {
 
 
     private static final class SharedLooperState {
-        // FIXME the value should be a pair<strategy, previous attempt timestamp>
-        // FIXME retry should use strategy.timeout - (elapsed time),
-        // FIXME or 0 max
-        // FIXME also if there is a timeout, and the request is yieldable, yield it
-        // FIXME   only yield if min Q <= (elapsed time)
-        // FIXME otherwise sleep min Q, then yield
-        // FIXME default min Q is 50ms
-        final Map<Id, SendStrategy> retakeStrategies = new ConcurrentHashMap<Id, SendStrategy>(8);
+        final Map<Id, MostRecentSend> mostRecentSends = new ConcurrentHashMap<Id, MostRecentSend>(8);
+
+        /** this is here to handle a one bad case: an entry is retaken that can yield,
+         * but it has been less than this number of ms since the last yield.
+         * To avoid spinning the CPU yielding the same id(s), wait this number of ms before the next eval. */
+        final int retakeYieldQMs = 50;
+
 
         SharedLooperState() {
+        }
+
+
+        static final class MostRecentSend {
+            final long nanos;
+            final SendStrategy activeStrategy;
+
+            MostRecentSend(long nanos, SendStrategy activeStrategy) {
+                this.nanos = nanos;
+                this.activeStrategy = activeStrategy;
+            }
         }
     }
 
@@ -276,21 +297,55 @@ public final class HttpNode extends AbstractMessageControlNode {
                 }
 
                 if (null != entry) {
-                    @Nullable SendStrategy retakeStrategy = sls.retakeStrategies.get(entry.id);
-                    if (null != retakeStrategy) {
-                        retakeStrategy = retakeStrategy.retry();
-                        if (!retakeStrategy.isSend()) {
-                            retakeStrategy = FALLBACK_RETAKE_STRATEGY.retry();
-                            assert retakeStrategy.isSend();
-                        }
-                        try {
-                            Thread.sleep((int) retakeStrategy.getDelay(TimeUnit.MILLISECONDS));
-                        } catch (InterruptedException e) {
-                            mcs.release(entry.id, HttpNode.this);
-                            continue;
-                        }
+                    @Nullable SharedLooperState.MostRecentSend mostRecentSend = sls.mostRecentSends.get(entry.id);
+                    if (null != mostRecentSend) {
+                        int delayMs = (int) mostRecentSend.activeStrategy.getDelay(TimeUnit.MILLISECONDS);
+                        int elapsedMs = (int) TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - mostRecentSend.nanos);
 
-                        sls.retakeStrategies.put(entry.id, retakeStrategy);
+                        if (elapsedMs < delayMs) {
+                            // - if entry is not yieldable, wait delayMs - elapsedMs
+                            // - else (yieldable)
+                            //   - if elapsesMs < retakeYieldQMs
+                            //     - if delayMs - elapsesMs < retakeYieldQMs, wait delayMs - elapsesMs then exec
+                            //     - else wait retakeYieldQMs then yield
+                            //   - else yield
+
+                            int remainingMs = delayMs - elapsedMs;
+                            if (!Message.isYieldable(entry.message)) {
+                                try {
+                                    Thread.sleep(remainingMs);
+                                } catch (InterruptedException e) {
+                                    mcs.release(entry.id, HttpNode.this);
+                                    continue;
+                                }
+                            } else {
+                                // message is yieldable
+                                if (elapsedMs < sls.retakeYieldQMs) {
+                                    if (remainingMs < sls.retakeYieldQMs) {
+                                        try {
+                                            Thread.sleep(remainingMs);
+                                        } catch (InterruptedException e) {
+                                            mcs.release(entry.id, HttpNode.this);
+                                            continue;
+                                        }
+                                    } else {
+                                        try {
+                                            Thread.sleep(sls.retakeYieldQMs);
+                                        } catch (InterruptedException e) {
+                                            mcs.release(entry.id, HttpNode.this);
+                                            continue;
+                                        }
+                                        mcs.yield(entry.id);
+                                        mcs.release(entry.id, HttpNode.this);
+                                        continue;
+                                    }
+                                } else {
+                                    mcs.yield(entry.id);
+                                    mcs.release(entry.id, HttpNode.this);
+                                    continue;
+                                }
+                            }
+                        }
                     }
 
                     assert null == entry.end;
@@ -298,9 +353,9 @@ public final class HttpNode extends AbstractMessageControlNode {
                         setWireAdapter();
                         end(entry, execute(entry));
                     } catch (IOException e) {
-                        handleTransportException(entry, e);
+                        retake(entry);
                     } catch (HttpException e) {
-                        handleTransportException(entry, e);
+                        retake(entry);
                     } catch (Throwable t) {
                         // an internal issue
                         // can never recover from this (assume the system is deterministic)
@@ -309,27 +364,35 @@ public final class HttpNode extends AbstractMessageControlNode {
                 }
             }
         }
-        /** factored out exception handling in place of multi-catch */
-        private void handleTransportException(MessageControlState.Entry entry, Exception e) {
-            if (null == entry.end) {
-                // FIXME for HttpException the endpoint not speaking the protocol correctly
-                // FIXME the retry should not be as aggressive in this case
+        private void retake(MessageControlState.Entry entry) {
+            assert null == entry.end;
 
-                if (!sls.retakeStrategies.containsKey(entry.id)) {
-                    sls.retakeStrategies.put(entry.id, retakeStrategy);
-                }
+            SendStrategy nextStrategy;
+            @Nullable SharedLooperState.MostRecentSend mostRecentSend = sls.mostRecentSends.get(entry.id);
+            if (null != mostRecentSend) {
+                nextStrategy = mostRecentSend.activeStrategy.retry();
+            } else {
+                nextStrategy = retakeStrategy.retry();
+            }
+            if (!nextStrategy.isSend()) {
+                // this case indicates a bug in a custom retake strategy, where the strategy does not repeat indefinitely
+                nextStrategy = FALLBACK_RETAKE_STRATEGY.retry();
+            }
+            assert nextStrategy.isSend();
+            sls.mostRecentSends.put(entry.id, new SharedLooperState.MostRecentSend(System.nanoTime(), nextStrategy));
 
-                // at this point the entry was elected to yield
-                // in this case, check whether the message has indicated it can be moved to the end of the line
-                if (Message.isYieldable(entry.message)) {
-                    mcs.yield(entry.id);
-                }
-                mcs.release(entry.id, HttpNode.this);
-            } // else already removed
+            // at this point the entry was elected to yield
+            // in this case, check whether the message has indicated it can be moved to the end of the line
+            if (Message.isYieldable(entry.message)) {
+                mcs.yield(entry.id);
+            }
+            mcs.release(entry.id, HttpNode.this);
         }
         private void end(final MessageControlState.Entry entry, MessageControlState.End end) {
+            assert null == entry.end;
+
+            sls.mostRecentSends.remove(entry.id);
             mcs.remove(entry.id, end);
-            sls.retakeStrategies.remove(entry.id);
 
             final Route route = entry.message.inboxRoute();
             switch (end) {
