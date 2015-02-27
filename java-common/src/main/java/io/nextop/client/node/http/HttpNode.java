@@ -176,7 +176,7 @@ public final class HttpNode extends AbstractMessageControlNode {
         if (this.active != active) {
             this.active = active;
 
-            if (!active) {
+            if (active) {
                 assert null == looperThreads;
 
                 MessageControlState mcs = getMessageControlState();

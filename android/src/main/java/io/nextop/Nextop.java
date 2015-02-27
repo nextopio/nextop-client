@@ -16,9 +16,11 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.nextop.client.MessageContext;
+import io.nextop.client.MessageContexts;
 import io.nextop.client.MessageControlNode;
 import io.nextop.client.MessageControlState;
-import io.nextop.client.node.SubjectNode;
+import io.nextop.client.node.Head;
 import io.nextop.client.node.http.HttpNode;
 import io.nextop.com.crittercism.app.Crittercism;
 import rx.Observable;
@@ -501,7 +503,7 @@ public class Nextop {
         private boolean cameraConnected = false;
         private BehaviorSubject<CameraAdapter> cameraSubject = BehaviorSubject.create();
 
-        SubjectNode subjectNode;
+        Head head;
         MessageControlState mcs;
         MessageControlNode node;
 
@@ -512,13 +514,11 @@ public class Nextop {
 
             this.node = node;
 
-            AndroidMessageContext messageContext = new AndroidMessageContext();
-            subjectNode = new SubjectNode(node);
+            MessageContext messageContext = MessageContexts.create(/* FIXME don't use main, fix scheduler issues in general */ AndroidSchedulers.mainThread());
             mcs = new MessageControlState(messageContext);
-            subjectNode.init(messageContext);
-            subjectNode.start();
-            subjectNode.onActive(true, null);
-            subjectNode.onTransfer(mcs);
+            head = Head.create(messageContext, mcs, node, /* FIXME */ AndroidSchedulers.mainThread());
+            head.init();
+            head.start();
         }
 
 
@@ -535,7 +535,7 @@ public class Nextop {
 
         @Override
         public Nextop stop() {
-            node.stop();
+            head.stop();
             closeCamera();
 
             return Nextop.create(context, this);
@@ -549,18 +549,18 @@ public class Nextop {
 
         @Override
         public Receiver<Message> send(Message message) {
-            subjectNode.send(message);
+            head.send(message);
             return receive(message.inboxRoute());
         }
 
         @Override
         public Receiver<Message> receive(Route route) {
-            return Receiver.create(this, route, subjectNode.receive(route), Receiver.UnsubscribeBehavior.DETACH);
+            return Receiver.create(this, route, head.receive(route), Receiver.UnsubscribeBehavior.DETACH);
         }
 
         @Override
         public void cancelSend(Id id) {
-            subjectNode.cancelSend(id);
+            head.cancelSend(id);
             // FIXME
             inFlight.inverse().remove(id);
         }
@@ -661,7 +661,7 @@ public class Nextop {
                 }
 
 
-                subjectNode.send(tmessage);
+                head.send(tmessage);
                 route = tmessage.inboxRoute();
                 inFlight.put(uri, tmessage.id);
 
@@ -673,7 +673,7 @@ public class Nextop {
 
             // FIXME subject node needs to put dispatch on the MAIN thread. get scheduling everywhere fixed
             // FIXME (otherwise could miss the receive)
-            return Receiver.create(this, route, subjectNode.receive(route).map(new Func1<Message, Layer>() {
+            return Receiver.create(this, route, head.receive(route).map(new Func1<Message, Layer>() {
                 @Override
                 public Layer call(Message message) {
                     WireValue content = message.getContent();
