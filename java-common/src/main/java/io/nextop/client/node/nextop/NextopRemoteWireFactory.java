@@ -138,7 +138,7 @@ public class NextopRemoteWireFactory implements Wire.Factory {
                 if (null == mostRecentDnsSendStrategy) {
                     mostRecentDnsSendStrategy = dnsSendStrategy;
                 }
-                while (null == (upAuthority = state.findFirstUpAuthority(config.allowedFailsPerAuthority)) && nextopNode.active) {
+                while (null == (upAuthority = state.getFirstUpAuthority(config.allowedFailsPerAuthority)) && nextopNode.active) {
                     doDnsSendDelay();
                     if (!doDnsReset()) {
                         // there was an error with dns
@@ -210,12 +210,26 @@ public class NextopRemoteWireFactory implements Wire.Factory {
         Authority dnsAuthority = Authority.valueOf("54.149.233.13:2778");
         // FIXME "dns.nextop.io" in prod
 
-        // FIXME post down authorities
-        Message dnsRequest = Message.newBuilder()
-                .setRoute(Route.valueOf("GET http://" + dnsAuthority + "/$access-key/edge.json"))
-                .set("access-key", nextopNode.accessKey)
-                .build();
+        List<Authority> reportDownAuthorities = state.getUnreportedDownAuthorities(config.allowedFailsPerAuthority);
+        Message dnsRequest;
+        if (reportDownAuthorities.isEmpty()) {
+            dnsRequest = Message.newBuilder()
+                    .setRoute(Route.valueOf("GET http://" + dnsAuthority + "/$access-key/edge.json"))
+                    .set("access-key", nextopNode.accessKey)
+                    .build();
+        } else {
+            // report the down authorities
+            List<String> reportDownAuthorityStrings = new ArrayList<String>(reportDownAuthorities.size());
+            for (Authority reportDownAuthority : reportDownAuthorities) {
+                reportDownAuthorityStrings.add(reportDownAuthority.toString());
+            }
 
+            dnsRequest = Message.newBuilder()
+                    .setRoute(Route.valueOf("POST http://" + dnsAuthority + "/$access-key/edge.json"))
+                    .set("access-key", nextopNode.accessKey)
+                    .set("bad-authorities", WireValue.of(reportDownAuthorityStrings))
+                    .build();
+        }
 
         Head dnsHead = nextopNode.dnsHead;
         Message dnsResponse;
@@ -231,6 +245,11 @@ public class NextopRemoteWireFactory implements Wire.Factory {
         if (HttpStatus.SC_OK != dnsResponse.getCode()) {
             return false;
         } else {
+            // mark the unreported down as reported
+            for (Authority reportDownAuthority : reportDownAuthorities) {
+                state.setReportedDown(reportDownAuthority);
+            }
+
             try {
                 @Nullable WireValue contentValue = dnsResponse.getContent();
                 if (null != contentValue) {
@@ -241,6 +260,7 @@ public class NextopRemoteWireFactory implements Wire.Factory {
                         for (WireValue dnsAuthorityValue : dnsAuthorityValues) {
                             dnsAuthorities.add(Authority.valueOf(dnsAuthority.toString()));
                         }
+
                         state.resetDnsAuthorities(dnsAuthorities);
                         return true;
                     }
@@ -368,13 +388,23 @@ public class NextopRemoteWireFactory implements Wire.Factory {
 
 
         @Nullable
-        Authority findFirstUpAuthority(int allowedFailsPerAuthority) {
+        Authority getFirstUpAuthority(int allowedFailsPerAuthority) {
             for (AuthorityState authorityState : authorityStates) {
                 if (!authorityState.isDown(allowedFailsPerAuthority)) {
                     return authorityState.authority;
                 }
             }
             return null;
+        }
+
+        List<Authority> getUnreportedDownAuthorities(int allowedFailsPerAuthority) {
+            List<Authority> unreportedDownAuthorities = new LinkedList<Authority>();
+            for (AuthorityState authorityState : authorityStates) {
+                if (authorityState.isDown(allowedFailsPerAuthority) && !authorityState.reportedDown) {
+                    unreportedDownAuthorities.add(authorityState.authority);
+                }
+            }
+            return unreportedDownAuthorities;
         }
 
 
@@ -407,6 +437,14 @@ public class NextopRemoteWireFactory implements Wire.Factory {
             assert null != authorityState;
             if (null != authorityState) {
                 authorityState.addAttempt(AuthorityState.Attempt.create(AuthorityState.Attempt.Type.FAIL));
+            }
+        }
+
+        void setReportedDown(Authority authority) {
+            @Nullable AuthorityState authorityState = allAuthorityStates.get(authority);
+            assert null != authorityState;
+            if (null != authorityState) {
+                authorityState.reportedDown = true;
             }
         }
 
