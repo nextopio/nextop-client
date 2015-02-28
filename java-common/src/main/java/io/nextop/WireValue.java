@@ -100,14 +100,16 @@ public abstract class WireValue {
     }
 
 
-    static WireValue valueOf(ByteBuffer bb) {
+    // FIXME rename to "fromBytes"
+    public static WireValue valueOf(ByteBuffer bb) {
         int n = bb.remaining();
         byte[] bytes = new byte[n];
         bb.get(bytes, 0, n);
         return valueOf(bytes, 0);
     }
 
-    static WireValue valueOf(byte[] bytes) {
+    // FIXME rename to "fromBytes"
+    public static WireValue valueOf(byte[] bytes) {
         return valueOf(bytes, 0);
     }
 

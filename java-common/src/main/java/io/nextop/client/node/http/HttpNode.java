@@ -166,7 +166,7 @@ public final class HttpNode extends AbstractMessageControlNode {
     /////// NODE ///////
 
     @Override
-    protected void initSelf() {
+    protected void initSelf(@Nullable Bundle savedState) {
         // ready to receive
         upstream.onActive(true);
     }

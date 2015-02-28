@@ -44,8 +44,6 @@ public class Head implements MessageControlNode {
 
 
 
-
-
     Head(MessageContext context, MessageControlState mcs, MessageControlNode downstream, Scheduler callbackScheduler) {
         this.context = context;
         this.mcs = mcs;
@@ -53,7 +51,6 @@ public class Head implements MessageControlNode {
         this.callbackScheduler = callbackScheduler;
         callbackWorker = callbackScheduler.createWorker();
     }
-
 
 
 
@@ -125,11 +122,11 @@ public class Head implements MessageControlNode {
 
 
     /** thread-safe */
-    public void init() {
+    public void init(final @Nullable Bundle savedState) {
         post(new Runnable() {
             @Override
             public void run() {
-                init(null);
+                init(null, savedState);
             }
         });
     }
@@ -160,7 +157,7 @@ public class Head implements MessageControlNode {
     /////// MessageControlNode IMPLEMENTATION ///////
 
     @Override
-    public void init(@Nullable MessageControlChannel upstream) {
+    public void init(@Nullable final MessageControlChannel upstream, @Nullable Bundle savedState) {
         if (null != upstream) {
             throw new IllegalArgumentException();
         }
@@ -234,7 +231,12 @@ public class Head implements MessageControlNode {
             public Scheduler getScheduler() {
                 return Head.this.getScheduler();
             }
-        });
+        }, savedState);
+    }
+
+    @Override
+    public void onSaveState(Bundle savedState) {
+        downstream.onSaveState(savedState);
     }
 
 

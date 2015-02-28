@@ -6,15 +6,23 @@ import io.nextop.client.MessageControl;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.Wire;
 import io.nextop.client.node.AbstractMessageControlNode;
+import io.nextop.client.node.Head;
 import io.nextop.client.retry.SendStrategy;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 // FIXME base on a wire factory
 // FIXME use a wire adapter factory
 public class NextopNode extends AbstractMessageControlNode {
+
+
+    public static final class Config {
+
+    }
 
 
     // big assumption for ordering: nextop endpoint will not crash
@@ -26,8 +34,11 @@ public class NextopNode extends AbstractMessageControlNode {
     // phase 2: correctness (never lose), reordering, etc, focus on perf
 
 
-    Wire.Factory wireFactory;
-    Wire.Factory wireAdapterFactory;
+    final Config config;
+
+    volatile NextopRemoteWireFactory wireFactory;
+    @Nullable
+    volatile Wire.Factory wireAdapterFactory = null;
 
     SendStrategy retakeStrategy;
 
@@ -37,13 +48,36 @@ public class NextopNode extends AbstractMessageControlNode {
     ControlLooper controlLooper = null;
 
 
+    // FIXME set to an internal httpnode used for dns lookups
+    Head dnsHead;
+
+
+    // FIXME
+    Id accessKey = Id.create();
+    Set<Id> grantKeys = Collections.emptySet();
+
+
+
+    public NextopNode(Config config) {
+        this.config = config;
+    }
+
+
+
+    public void setWireAdapterFactory(Wire.Factory wireAdapterFactory) {
+        this.wireAdapterFactory = wireAdapterFactory;
+    }
+
+
 
 
 
     /////// NODE ///////
 
     @Override
-    protected void initSelf() {
+    protected void initSelf(@Nullable Bundle savedState) {
+        // FIXME create wire factory
+
         // ready to receive
         upstream.onActive(true);
     }

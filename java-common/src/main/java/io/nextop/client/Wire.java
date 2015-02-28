@@ -28,7 +28,8 @@ public interface Wire {
 
     interface Factory {
         // this can block until the wire is available
-        Wire create() throws NoSuchElementException;
+        // @param indicates a wire that failed, to be replaced. the wire factory can use this to infleunce load balancing, etc
+        Wire create(@Nullable Wire replace) throws NoSuchElementException;
 
         // adapter state that can be used to adapt a sequence of wires
         // this is useful some other factory is creating the wires,

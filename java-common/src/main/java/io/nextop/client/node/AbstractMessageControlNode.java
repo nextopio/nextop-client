@@ -25,23 +25,28 @@ public abstract class AbstractMessageControlNode implements MessageControlNode {
     }
 
 
-    protected void initSelf() {
+    protected void initSelf(Bundle savedState) {
         // Do nothing
     }
-    protected void initDownstream() {
+    protected void initDownstream(Bundle savedState) {
         // Do nothing
     }
 
 
 
     @Override
-    public final void init(MessageControlChannel upstream) {
+    public final void init(MessageControlChannel upstream, @Nullable Bundle savedState) {
         if (null != this.upstream) {
             throw new IllegalStateException();
         }
         this.upstream = upstream;
-        initSelf();
-        initDownstream();
+        initSelf(savedState);
+        initDownstream(savedState);
+    }
+
+    @Override
+    public void onSaveState(Bundle savedState) {
+        // Do nothing
     }
 
     @Override

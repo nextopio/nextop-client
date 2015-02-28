@@ -517,7 +517,7 @@ public class Nextop {
             MessageContext messageContext = MessageContexts.create(/* FIXME don't use main, fix scheduler issues in general */ AndroidSchedulers.mainThread());
             mcs = new MessageControlState(messageContext);
             head = Head.create(messageContext, mcs, node, /* FIXME */ AndroidSchedulers.mainThread());
-            head.init();
+            head.init(null);
             head.start();
         }
 

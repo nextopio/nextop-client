@@ -90,12 +90,12 @@ public class MultiNode extends AbstractMessageControlNode {
 
 
     @Override
-    protected void initSelf() {
+    protected void initSelf(@Nullable Bundle savedState) {
         upstream.onActive(true);
     }
 
     @Override
-    protected void initDownstream() {
+    protected void initDownstream(final @Nullable Bundle savedState) {
         final int n = downstreamStates.length;
         for (int i = 0; i < n; ++i) {
             final DownstreamState state = downstreamStates[i];
@@ -141,7 +141,7 @@ public class MultiNode extends AbstractMessageControlNode {
                 public Scheduler getScheduler() {
                     return MultiNode.this.getScheduler();
                 }
-            });
+            }, savedState);
         }
     }
 
