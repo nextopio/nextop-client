@@ -30,12 +30,12 @@ public interface Wire {
     interface Factory {
         // this can block until the wire is available
         // @param indicates a wire that failed, to be replaced. the wire factory can use this to infleunce load balancing, etc
-        Wire create(@Nullable Wire replace) throws NoSuchElementException;
+        Wire create(@Nullable Wire replace) throws InterruptedException, NoSuchElementException;
     }
     /** thread-safe */
     interface Adapter {
         // this can block until the wire is available
-        Wire adapt(Wire wire) throws NoSuchElementException;
+        Wire adapt(Wire wire) throws InterruptedException, NoSuchElementException;
     }
 }
 
