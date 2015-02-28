@@ -1,12 +1,11 @@
 package io.nextop.client.node.nextop;
 
-import io.nextop.Authority;
-import io.nextop.Message;
-import io.nextop.Route;
-import io.nextop.WireValue;
+import io.nextop.*;
+import io.nextop.client.MessageControlNode;
 import io.nextop.client.Wire;
 import io.nextop.client.Wires;
 import io.nextop.client.node.Head;
+import io.nextop.client.node.http.HttpNode;
 import io.nextop.client.retry.SendStrategy;
 import io.nextop.org.apache.http.HttpStatus;
 
@@ -23,7 +22,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 // must be called from a single thread
-public class NextopRemoteWireFactory implements Wire.Factory {
+// FIXME rename NextopClientWireFactory
+public class NextopClientWireFactoryNode implements Wire.Factory, MessageControlNode {
 
     public static final class Config {
         final int allowedFailsPerAuthority;
@@ -56,8 +56,12 @@ public class NextopRemoteWireFactory implements Wire.Factory {
 
 
     final Config config;
-    final NextopNode nextopNode;
+
+    // FIXME want to save this state, so that when the node comes back,
+    // FIXME it doesn't have to hit DNS to get active
     final State state;
+
+//    NextopNode nextopNode;
 
 
     // this should be an aggressive uniform poll
@@ -78,24 +82,34 @@ public class NextopRemoteWireFactory implements Wire.Factory {
 
 
 
+    final HttpNode dnsHttpNode;
+    final Head dnsHead;
 
-    public NextopRemoteWireFactory(NextopNode nextopNode) {
-        this(DEFAULT_CONFIG, nextopNode);
+
+    // FIXME
+    Id accessKey = Id.create();
+    Set<Id> grantKeys = Collections.emptySet();
+
+
+
+    public NextopClientWireFactoryNode() {
+        this(DEFAULT_CONFIG, new State());
     }
-    public NextopRemoteWireFactory(Config config, NextopNode nextopNode) {
-        this(config, nextopNode, new State());
-    }
-    public NextopRemoteWireFactory(Config config, NextopNode nextopNode, State state) {
+    public NextopClientWireFactoryNode(Config config, State state) {
         this.config = config;
-        this.nextopNode = nextopNode;
         this.state = state;
+
+
+        dnsHttpNode = new HttpNode();
+        dnsHead = Head.create(this, getMessageControlState(), dnsHttpNode, getScheduler());
     }
 
 
-    public State snapshotState() {
-        // FIXME
-        return state;
-    }
+//
+//    public State snapshotState() {
+//        // FIXME
+//        return state;
+//    }
 
 
 
@@ -274,6 +288,7 @@ public class NextopRemoteWireFactory implements Wire.Factory {
     }
 
     void writeGreeting(OutputStream os) throws IOException {
+        // FIXME send the client ID (each client has a unique ID that is used for reconnects)
         Message greeting = Message.newBuilder()
                 .set("accessKey", nextopNode.accessKey)
                 .set("grantKeys", WireValue.of(nextopNode.grantKeys))

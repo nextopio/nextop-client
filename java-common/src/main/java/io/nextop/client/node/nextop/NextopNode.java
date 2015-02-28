@@ -3,17 +3,17 @@ package io.nextop.client.node.nextop;
 import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.client.MessageControl;
+import io.nextop.client.MessageControlNode;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.Wire;
 import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.client.node.Head;
+import io.nextop.client.node.http.HttpNode;
 import io.nextop.client.retry.SendStrategy;
 
 import javax.annotation.Nullable;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
+import java.io.IOException;
+import java.util.*;
 
 // FIXME base on a wire factory
 // FIXME use a wire adapter factory
@@ -36,9 +36,13 @@ public class NextopNode extends AbstractMessageControlNode {
 
     final Config config;
 
-    volatile NextopRemoteWireFactory wireFactory;
     @Nullable
-    volatile Wire.Factory wireAdapterFactory = null;
+    Wire.Factory wireFactory;
+
+
+
+    @Nullable
+    volatile Wire.Adapter wireAdapter = null;
 
     SendStrategy retakeStrategy;
 
@@ -48,24 +52,21 @@ public class NextopNode extends AbstractMessageControlNode {
     ControlLooper controlLooper = null;
 
 
-    // FIXME set to an internal httpnode used for dns lookups
-    Head dnsHead;
-
-
-    // FIXME
-    Id accessKey = Id.create();
-    Set<Id> grantKeys = Collections.emptySet();
-
 
 
     public NextopNode(Config config) {
         this.config = config;
+
+    }
+
+    /** @param wireFactory can be an instance of MessageControlNode */
+    public void setWireFactory(Wire.Factory wireFactory) {
+        this.wireFactory = wireFactory;
     }
 
 
-
-    public void setWireAdapterFactory(Wire.Factory wireAdapterFactory) {
-        this.wireAdapterFactory = wireAdapterFactory;
+    public void setWireAdapter(Wire.Adapter wireAdapter) {
+        this.wireAdapter = wireAdapter;
     }
 
 
@@ -74,16 +75,26 @@ public class NextopNode extends AbstractMessageControlNode {
 
     /////// NODE ///////
 
+
+    @Override
+    protected void initDownstream(Bundle savedState) {
+        if (wireFactory instanceof MessageControlNode) {
+            ((MessageControlNode) wireFactory).init(this, savedState);
+        }
+    }
+
     @Override
     protected void initSelf(@Nullable Bundle savedState) {
-        // FIXME create wire factory
-
         // ready to receive
         upstream.onActive(true);
     }
 
     @Override
     public void onActive(boolean active) {
+        if (active && wireFactory instanceof MessageControlNode) {
+            ((MessageControlNode) wireFactory).onActive(active);
+        }
+
         if (this.active != active) {
             this.active = active;
 
@@ -98,6 +109,10 @@ public class NextopNode extends AbstractMessageControlNode {
                 controlLooper.interrupt();
                 controlLooper = null;
             }
+        }
+
+        if (!active && wireFactory instanceof MessageControlNode) {
+            ((MessageControlNode) wireFactory).onActive(active);
         }
     }
 
@@ -118,9 +133,6 @@ public class NextopNode extends AbstractMessageControlNode {
                         break;
                 }
             }
-        } else {
-            // return to sender
-            upstream.onMessageControl(mc);
         }
     }
 
@@ -129,25 +141,111 @@ public class NextopNode extends AbstractMessageControlNode {
 
 
     static final class SharedTransferState {
+        // FIXME active session ID
+
         // FIXME ignore this for now
         // TODO on end of control looper, release these messages back into the upstream
 //        Map<Id, Message> pendingAck;
+
+        // FIXME for each pending, rx listen to mcs for cancel/end
     }
 
 
     final class ControlLooper extends Thread {
+        SharedTransferState sts;
+
 
         @Override
         public void run() {
-            // FIXME retake timeout, create Wire, initial handshake, initial state sync
+
+            @Nullable SharedWireState sws;
+
+
+            while (active) {
+                try {
+                    if (null == sws || !sws.active) {
+                        // FIXME retake
+
+                        Wire wire;
+                        try {
+                            wire = wireFactory.create(null != sws ? sws.wire : null);
+                        } catch (NoSuchElementException e) {
+                            sws = null;
+                            continue;
+                        }
+
+                        Wire.Adapter wireAdapter = NextopNode.this.wireAdapter;
+                        if (null != wireAdapter) {
+                            wire = wireAdapter.adapt(wire);
+                        }
+
+                        try {
+                            syncTransferState(wire);
+                        } catch (IOException e) {
+                            // FIXME log
+                            continue;
+                        }
+
+                        sws = new SharedWireState(wire);
+                        new WriteLooper(sws).start();
+                        new ReadLooper(sws).start();
+                    }
+
+                    try {
+                        sws.awaitEnd();
+                    } catch (InterruptedException e) {
+                        continue;
+                    }
+
+                } catch (Exception e) {
+                    // FIXME log
+                    continue;
+                }
+            }
+
+            if (null != sws) {
+                sws.end();
+            }
+        }
+
+        void syncTransferState(Wire wire) throws IOException {
+            // each side sends a session ID
+
+            // FIXME
+
         }
     }
 
     /* nextop framed format:
      * [byte type][next bytes depend on type] */
 
+    static final class SharedWireState {
+        final Wire wire;
+        volatile boolean active;
+
+
+        SharedWireState(Wire wire) {
+            this.wire = wire;
+        }
+
+
+        void end() {
+
+        }
+
+        void awaitEnd() throws InterruptedException {
+
+        }
+    }
+
     final class WriteLooper extends Thread {
-        Wire wire;
+        final SharedWireState sws;
+
+
+        WriteLooper(SharedWireState sws) {
+            this.sws = sws;
+        }
+
 
         @Override
         public void run() {
@@ -156,7 +254,12 @@ public class NextopNode extends AbstractMessageControlNode {
     }
 
     final class ReadLooper extends Thread {
-        Wire wire;
+        final SharedWireState sws;
+
+
+        ReadLooper(SharedWireState sws) {
+            this.sws = sws;
+        }
 
 
         @Override
@@ -165,15 +268,6 @@ public class NextopNode extends AbstractMessageControlNode {
         }
     }
 
-
-    /** [id] */
-    static final byte F_START_MESSAGE = 0x01;
-    /** [int length][data] */
-    static final byte F_MESSAGE_CHUNK = 0x02;
-    /** [md5] */
-    static final byte F_MESSAGE_END = 0x03;
-    /** [id] */
-//    static final byte F_ACK = 0x04;
 
 
 

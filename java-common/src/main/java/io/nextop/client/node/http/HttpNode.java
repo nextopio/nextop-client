@@ -134,7 +134,7 @@ public final class HttpNode extends AbstractMessageControlNode {
 
 
     @Nullable
-    volatile Wire.Factory wireAdapterFactory = null;
+    volatile Wire.Adapter wireAdapter = null;
 
 
 
@@ -156,8 +156,8 @@ public final class HttpNode extends AbstractMessageControlNode {
         // loopers pick this up eventually
     }
 
-    public void setWireAdapterFactory(Wire.Factory wireAdapterFactory) {
-        this.wireAdapterFactory = wireAdapterFactory;
+    public void setWireAdapter(Wire.Adapter wireAdapter) {
+        this.wireAdapter = wireAdapter;
         // loopers pick this up eventually
     }
 
@@ -221,9 +221,6 @@ public final class HttpNode extends AbstractMessageControlNode {
                         break;
                 }
             }
-        } else {
-            // return to sender
-            upstream.onMessageControl(mc);
         }
     }
 
@@ -262,26 +259,14 @@ public final class HttpNode extends AbstractMessageControlNode {
         @Nullable
         ProgressCallback progressCallback = null;
 
-        // set at the top of a request
+        /** local cache of HttpNode#wireAdapter */
         @Nullable
         Wire.Adapter wireAdapter = null;
-        @Nullable
-        Wire.Factory _wireAdapterFactory = null;
 
 
         RequestLooper(MessageControlState mcs, SharedLooperState sls) {
             this.mcs = mcs;
             this.sls = sls;
-        }
-
-
-        private void setWireAdapter() {
-            // set up or switch the wire adapter
-            if (null != wireAdapterFactory && (null == wireAdapter
-                    || _wireAdapterFactory != wireAdapterFactory)) {
-                _wireAdapterFactory = wireAdapterFactory;
-                wireAdapter = wireAdapterFactory.createAdapter();
-            }
         }
 
 
@@ -348,9 +333,10 @@ public final class HttpNode extends AbstractMessageControlNode {
                         }
                     }
 
+                    this.wireAdapter = HttpNode.this.wireAdapter;
+
                     assert null == entry.end;
                     try {
-                        setWireAdapter();
                         end(entry, execute(entry));
                     } catch (IOException e) {
                         retake(entry);

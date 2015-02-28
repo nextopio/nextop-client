@@ -11,6 +11,8 @@ import javax.annotation.Nullable;
 import java.util.LinkedList;
 import java.util.Queue;
 
+// multi down
+
 // this node maintains multiple (n) downstream nodes ranked by preference
 // routes control to the highest pref downsteam that is active
 // when the active state of a downstream changes, this node ensures that the active state of the highest downstream is exclusively set
@@ -34,8 +36,7 @@ public class MultiNode extends AbstractMessageControlNode {
 
     @Nullable
     private MessageControlNode getActiveDownstream() {
-        for (int i = 0, n = downstreamStates.length; i < n; ++i) {
-            DownstreamState state = downstreamStates[i];
+        for (DownstreamState state : downstreamStates) {
             if (state.downActive) {
                 assert state.upActive;
                 return state.downstream;
@@ -153,13 +154,24 @@ public class MultiNode extends AbstractMessageControlNode {
 
     @Override
     public void onMessageControl(MessageControl mc) {
-        @Nullable MessageControlNode activeDownstream = getActiveDownstream();
-        if (null != activeDownstream) {
-            activeDownstream.onMessageControl(mc);
-        } else {
-            // append to the queue for when the active state flips, see #setActiveDownstream
-            pendingMessageControls.add(mc);
-        }
+//        switch (mc.type) {
+//            case COMPLETE:
+//            case ERROR:
+//                // always send control messages regardless of upActive and downActive
+//                for (DownstreamState state : downstreamStates) {
+//                    state.downstream.onMessageControl(mc);
+//                }
+//                break;
+//            case MESSAGE:
+                @Nullable MessageControlNode activeDownstream = getActiveDownstream();
+                if (null != activeDownstream) {
+                    activeDownstream.onMessageControl(mc);
+                } else {
+                    // append to the queue for when the active state flips, see #setActiveDownstream
+                    pendingMessageControls.add(mc);
+                }
+//                break;
+//        }
     }
 
 
