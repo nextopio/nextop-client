@@ -1,5 +1,7 @@
 package io.nextop;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 /** To convert this to pixels, do transcoding, or scaling,
@@ -17,6 +19,9 @@ public class EncodedImage {
         /** mirrored */
         FRONT_FACING
     }
+
+    public static final Orientation DEFAULT_ORIENTATION = Orientation.REAR_FACING;
+
 
     public static final int UNKNOWN_WIDTH = -1;
     public static final int UNKNOWN_HEIGHT = -1;
@@ -78,5 +83,9 @@ public class EncodedImage {
 
     protected ByteBuffer toBuffer() {
         return ByteBuffer.wrap(bytes, offset, length);
+    }
+
+    public InputStream getInputStream() {
+        return new ByteArrayInputStream(bytes, offset, length);
     }
 }

@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 /** Shared state for all {@link MessageControlChannel} objects
  * for SEND.MESSAGE.
+ * FIXME all MessageControl should go in here
  * TODO RECEIVE.* and SEND.{COMPLETED, ERROR} are multicasted
  * TODO to all upstream/downstream and not persisted in the state.
  *

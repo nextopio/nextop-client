@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 public final class MessageContexts {
 
     public static MessageContext create(Executor executor) {
-        return SchedulerMessageContext.create(Schedulers.from(MoreExecutors.serial(executor)));
+        return SchedulerMessageContext.create(MoreSchedulers.serial(executor));
     }
 
     public static MessageContext create(Scheduler scheduler) {

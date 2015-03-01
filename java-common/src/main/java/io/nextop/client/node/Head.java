@@ -66,6 +66,26 @@ public class Head implements MessageControlNode {
         });
     }
 
+    public void complete(final Message message) {
+        mcs.notifyPending(message.id);
+        post(new Runnable() {
+            @Override
+            public void run() {
+                onMessageControl(MessageControl.send(MessageControl.Type.COMPLETE, message));
+            }
+        });
+    }
+
+    public void error(final Message message) {
+        mcs.notifyPending(message.id);
+        post(new Runnable() {
+            @Override
+            public void run() {
+                onMessageControl(MessageControl.send(MessageControl.Type.ERROR, message));
+            }
+        });
+    }
+
     /** must be called on callbackScheduler thread */
     public void cancelSend(final Id id) {
         post(new Runnable() {

@@ -177,10 +177,10 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
                 writeGreeting(socket.getOutputStream());
                 readGreetingResponse(socket.getInputStream());
 
-                socket = startTls(socket);
+                Socket tlsSocket = startTls(socket);
 
                 state.success(upAuthority);
-                return Wires.io(socket.getInputStream(), socket.getOutputStream());
+                return Wires.io(tlsSocket.getInputStream(), tlsSocket.getOutputStream());
             } catch (Exception e) {
                 state.fail(upAuthority);
                 continue;
@@ -292,6 +292,7 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
         Message greeting = Message.newBuilder()
                 .set("accessKey", nextopNode.accessKey)
                 .set("grantKeys", WireValue.of(nextopNode.grantKeys))
+                .set("clientId", clientId)
                 .build();
 
         ByteBuffer bb = ByteBuffer.wrap(greetingBuffer, 2, greetingBuffer.length - 2);
@@ -337,8 +338,8 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
                 throw new IOException("Bad greeting response.");
         }
     }
-    void handleGreetingResponse(Message responseMessage) {
-        // FIXME
+    void handleGreetingResponse(Message response) {
+        // FIXME sessionId
     }
 
     /** starts a TLS session on the socket. blocks until the handshake is completed,

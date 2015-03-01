@@ -1,9 +1,16 @@
 package io.nextop.rx;
 
+import io.nextop.util.MoreExecutors;
 import rx.Scheduler;
+import rx.schedulers.Schedulers;
+
+import java.util.concurrent.Executor;
 
 public class MoreSchedulers {
 
+    public static Scheduler serial(Executor executor) {
+        return Schedulers.from(MoreExecutors.serial(executor));
+    }
 
     public static Scheduler serial(Scheduler scheduler) {
         return from(scheduler.createWorker());

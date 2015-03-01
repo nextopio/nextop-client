@@ -1422,6 +1422,8 @@ public abstract class WireValue {
         }
     }
 
+
+
     public void toBytes(ByteBuffer bb) {
 
         Lb lb = new Lb();
@@ -1931,10 +1933,21 @@ public abstract class WireValue {
     }
 
 
-
+//    static final class SizeEstimate {
+//        long bytes;
+//        int verifiedNodes;
+//        int unverifiedNodes;
+//    }
+//
+//    public abstract SizeEstimate estimateSize();
 
 
     // logical view, regardless of wire format
+
+    // FIXME move Id to first class type
+    public Id asId() {
+        return Id.valueOf(asString());
+    }
 
     public abstract String asString();
     public abstract int asInt();

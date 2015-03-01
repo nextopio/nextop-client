@@ -15,23 +15,14 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
 
-// FIXME base on a wire factory
-// FIXME use a wire adapter factory
+/** Nextop is symmetric protocol, so the client and server both use an instance
+ * of this class to communicate. The difference between instances is the
+ * Wire.Factory, which is responsible for a secure connection. */
 public class NextopNode extends AbstractMessageControlNode {
-
 
     public static final class Config {
 
     }
-
-
-    // big assumption for ordering: nextop endpoint will not crash
-    // compromise: maintain order and never lose a message if this is true
-    // if not true, at least never lose a message (but order will be lost)
-
-    // two phase dev:
-    // (current) phase 1: just get it working, buggy in some cases, no reordering, etc
-    // phase 2: correctness (never lose), reordering, etc, focus on perf
 
 
     final Config config;
@@ -39,12 +30,8 @@ public class NextopNode extends AbstractMessageControlNode {
     @Nullable
     Wire.Factory wireFactory;
 
-
-
     @Nullable
     volatile Wire.Adapter wireAdapter = null;
-
-    SendStrategy retakeStrategy;
 
     boolean active;
 
@@ -140,16 +127,6 @@ public class NextopNode extends AbstractMessageControlNode {
 
 
 
-    static final class SharedTransferState {
-        // FIXME active session ID
-
-        // FIXME ignore this for now
-        // TODO on end of control looper, release these messages back into the upstream
-//        Map<Id, Message> pendingAck;
-
-        // FIXME for each pending, rx listen to mcs for cancel/end
-    }
-
 
     final class ControlLooper extends Thread {
         SharedTransferState sts;
@@ -158,14 +135,12 @@ public class NextopNode extends AbstractMessageControlNode {
         @Override
         public void run() {
 
-            @Nullable SharedWireState sws;
+            @Nullable SharedWireState sws = null;
 
 
             while (active) {
                 try {
                     if (null == sws || !sws.active) {
-                        // FIXME retake
-
                         Wire wire;
                         try {
                             wire = wireFactory.create(null != sws ? sws.wire : null);
@@ -187,9 +162,14 @@ public class NextopNode extends AbstractMessageControlNode {
                         }
 
                         sws = new SharedWireState(wire);
-                        new WriteLooper(sws).start();
-                        new ReadLooper(sws).start();
-                    }
+                        WriteLooper writeLooper = new WriteLooper(sws);
+                        ReadLooper readLooper = new ReadLooper(sws);
+                        sws.writeLooper = writeLooper;
+                        sws.readLooper = readLooper;
+                        writeLooper.start();
+                        readLooper.start();
+
+                    } // else it was just an interruption
 
                     try {
                         sws.awaitEnd();
@@ -209,7 +189,8 @@ public class NextopNode extends AbstractMessageControlNode {
         }
 
         void syncTransferState(Wire wire) throws IOException {
-            // each side sends a session ID
+            // each side sends SharedTransferState (id->transferred chunks)
+            // each side removes parts of the shared transfer state that the other side does not have
 
             // FIXME
 
@@ -223,6 +204,8 @@ public class NextopNode extends AbstractMessageControlNode {
         final Wire wire;
         volatile boolean active;
 
+        WriteLooper writeLooper;
+        ReadLooper readLooper;
 
         SharedWireState(Wire wire) {
             this.wire = wire;
@@ -230,6 +213,10 @@ public class NextopNode extends AbstractMessageControlNode {
 
 
         void end() {
+            // interrupt writer, reader
+            active = false;
+            writeLooper.interrupt();
+            readLooper.interrupt();
 
         }
 
@@ -240,7 +227,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
     final class WriteLooper extends Thread {
         final SharedWireState sws;
-
+        final MessageControlState mcs = getMessageControlState();
 
         WriteLooper(SharedWireState sws) {
             this.sws = sws;
@@ -249,6 +236,13 @@ public class NextopNode extends AbstractMessageControlNode {
 
         @Override
         public void run() {
+
+
+            // take top
+            // write
+            // every chunkQ, check if there if a more important, before writing the next chunk
+            // if so put back
+
 
         }
     }
@@ -267,6 +261,78 @@ public class NextopNode extends AbstractMessageControlNode {
 
         }
     }
+
+
+
+
+    static final class SharedTransferState {
+        // FIXME active session ID
+
+        // FIXME ignore this for now
+        // TODO on end of control looper, release these messages back into the upstream
+//        Map<Id, Message> pendingAck;
+
+        // write
+        // id -> MessageWriteState (bytes, transferred chunks)
+
+        // read
+        // id -> MessageReadState
+
+        // FIXME for each pending, rx listen to mcs for cancel/end
+    }
+
+    static final class MessageWriteState {
+        Id id;
+
+        byte[] bytes;
+        // [0] is the start of the first chunk
+        int[] chunkOffsets;
+        boolean[] chunkWrites;
+
+
+    }
+
+    static final class MessageReadState {
+        Id id;
+
+        byte[] bytes;
+        // [0] is the start of the first chunk
+        int[] chunkOffsets;
+        boolean[] chunkReads;
+
+    }
+
+
+
+
+
+    /////// NEXTOP PROTOCOL ///////
+
+    // FIXME be able to transfer MessageControl not just message
+    /** [id][total length][total chunks] */
+    public static final byte F_START_MESSAGE = 0x01;
+    /** [chunk index][chunk offset][chunk length][data] */
+    public static final byte F_MESSAGE_CHUNK = 0x02;
+    /** [md5] */
+    public static final byte F_MESSAGE_END = 0x03;
+
+    // FIXME next step, ack
+
+    // CANCEL [id]
+    /** [id] */
+//    static final byte F_ACK = 0x04;
+
+
+
+
+    // TODO work out a more robust fallback
+    // big assumption for ordering: nextop endpoint will not crash
+    // compromise: maintain order and never lose a message if this is true
+    // if not true, at least never lose a message (but order will be lost)
+
+    // two phase dev:
+    // (current) phase 1: just get it working, buggy in some cases, no reordering, etc
+    // phase 2: correctness (never lose), reordering, etc, focus on perf
 
 
 

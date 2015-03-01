@@ -263,11 +263,12 @@ public class Message {
         return b;
     }
 
-    public Message toSpec() {
-        return newBuilder()
-                .setRoute(route)
-                .build();
-    }
+    // FIXME this needs to set parameters that are part of the path
+//    public Message toSpec() {
+//        return newBuilder()
+//                .setRoute(route)
+//                .build();
+//    }
 
 
 //    public Message newId() {
