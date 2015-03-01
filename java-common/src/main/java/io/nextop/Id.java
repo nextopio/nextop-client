@@ -55,6 +55,23 @@ public final class Id implements Comparable<Id> {
 
 
 
+    public static void toBytes(Id id, byte[] buffer, int offset) {
+        if (offset < 0 || buffer.length <= offset + 32) {
+            throw new IllegalArgumentException();
+        }
+        System.arraycopy(id.bytes, id.offset, buffer, offset, 32);
+    }
+
+    public static Id fromBytes(byte[] buffer, int offset) {
+        if (offset < 0 || buffer.length <= offset + 32) {
+            throw new IllegalArgumentException();
+        }
+        byte[] bytes = Arrays.copyOfRange(buffer, offset, offset + 32);
+        return new Id(bytes, 0);
+    }
+
+
+
     final byte[] bytes;
     final int offset;
     final long hashCode;
@@ -68,6 +85,10 @@ public final class Id implements Comparable<Id> {
         this.offset = offset;
         hashCode = Hashing.murmur3_128().hashBytes(bytes, offset, LENGTH).asLong();
     }
+
+
+
+
 
 
     @Override

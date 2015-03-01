@@ -182,6 +182,7 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
                 state.success(upAuthority);
                 return Wires.io(tlsSocket.getInputStream(), tlsSocket.getOutputStream());
             } catch (Exception e) {
+                // FIXME work out the case where this was a network outage
                 state.fail(upAuthority);
                 continue;
             }
@@ -289,6 +290,7 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
 
     void writeGreeting(OutputStream os) throws IOException {
         // FIXME send the client ID (each client has a unique ID that is used for reconnects)
+        // FIXME send the client certificate for TLS
         Message greeting = Message.newBuilder()
                 .set("accessKey", nextopNode.accessKey)
                 .set("grantKeys", WireValue.of(nextopNode.grantKeys))
