@@ -19,10 +19,10 @@ public interface Wire {
 
     // return the termination future
     Future<IOException> open() throws IOException;
-    int read(byte[] buffer, int offset, int n, int messageBoundary) throws IOException;
+    int read(byte[] buffer, int offset, int length, int messageBoundary) throws IOException;
     // messageBoundary indicates the read is up to a message boundary
     // this helps testing count messages, e.g. pass one message, fail at the nth message, etc
-    void write(byte[] buffer, int offset, int n, int messageBoundary) throws IOException;
+    void write(byte[] buffer, int offset, int length, int messageBoundary) throws IOException;
     void flush() throws IOException;
 
 
@@ -30,7 +30,7 @@ public interface Wire {
     interface Factory {
         // this can block until the wire is available
         // @param indicates a wire that failed, to be replaced. the wire factory can use this to infleunce load balancing, etc
-        Wire create(@Nullable Wire replace) throws InterruptedException, NoSuchElementException;
+        Wire create(@Nullable Wire replace /* FIXME take flags for the replacement reason, e.g. error or known endpoint shutdown, etc */) throws InterruptedException, NoSuchElementException;
     }
     /** thread-safe */
     interface Adapter {

@@ -351,13 +351,14 @@ public final class MessageControlState {
     }
 
 
-    public boolean remove(Id id, End end) {
+    @Nullable
+    public Message remove(Id id, End end) {
         Entry entry;
         synchronized (mutex) {
             entry = entries.remove(id);
 
             if (null == entry) {
-                return false;
+                return null;
             }
 
 
@@ -379,7 +380,7 @@ public final class MessageControlState {
         entry.publish();
         entry.publishComplete();
         publish();
-        return true;
+        return entry.message;
     }
 
     public boolean yield(Id id) {
@@ -649,7 +650,6 @@ public final class MessageControlState {
 
 
     public static enum End {
-        CANCELED,
         COMPLETED,
         ERROR
     }

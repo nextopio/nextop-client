@@ -11,6 +11,7 @@ import io.nextop.client.retry.SendStrategy;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
 /** Nextop is symmetric protocol, so the client and server both use an instance
@@ -237,7 +238,7 @@ public class NextopNode extends AbstractMessageControlNode {
         final SharedWireState sws;
         final MessageControlState mcs = getMessageControlState();
 
-        byte[] controlBuffer = new byte[1024];
+        final byte[] controlBuffer = new byte[1024];
 
         WriteLooper(SharedWireState sws) {
             this.sws = sws;
@@ -259,9 +260,21 @@ public class NextopNode extends AbstractMessageControlNode {
 
                 top:
                 while (sws.active) {
+                    // clear the interrrupted status
+                    Thread.interrupted();
+
+                    // poll urgent
+                    for (byte[] urgentMessage; null != (urgentMessage = sts.writeUrgentMessages.poll()); ) {
+                        sws.wire.write(urgentMessage, 0, urgentMessage.length, 0);
+                    }
+
+
                     if (null == entry) {
                         try {
                             entry = mcs.takeFirstAvailable(NextopNode.this, Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
+                            if (null == entry) {
+                                continue;
+                            }
                         } catch (InterruptedException e) {
                             continue;
                         }
@@ -289,6 +302,11 @@ public class NextopNode extends AbstractMessageControlNode {
                     }
 
                     for (int i = 0; i < n; ++i) {
+                        // poll urgent
+                        for (byte[] urgentMessage; null != (urgentMessage = sts.writeUrgentMessages.poll()); ) {
+                            sws.wire.write(urgentMessage, 0, urgentMessage.length, 0);
+                        }
+
                         if (!writeState.chunkWrites[i]) {
                             if (null != entry.end) {
                                 // ended
@@ -329,13 +347,11 @@ public class NextopNode extends AbstractMessageControlNode {
                         }
                     }
 
-                    // F_MESSAGE_END [id]
+                    // F_MESSAGE_END
                     {
                         int c = 0;
                         controlBuffer[c] = F_MESSAGE_END;
                         c += 1;
-                        Id.toBytes(entry.id, controlBuffer, c);
-                        c += 32;
                         sws.wire.write(controlBuffer, 0, c, 0);
                     }
 
@@ -361,6 +377,9 @@ public class NextopNode extends AbstractMessageControlNode {
 
     final class ReadLooper extends Thread {
         final SharedWireState sws;
+        final MessageControlState mcs = getMessageControlState();
+
+        final byte[] controlBuffer = new byte[1024];
 
 
         ReadLooper(SharedWireState sws) {
@@ -375,8 +394,149 @@ public class NextopNode extends AbstractMessageControlNode {
             // as soon as get a COMPLETE, send an ACK (this is not resilient to crash, but works for now to keep the client buffer limited)
             // on F_MESSAGE_COMPLETE or F_MESSAGE_CHUNK, if there is a verification error, send back a NACK
             // if read NACK, move message from pendingWrite back to mcs
+
+            sts.membar();
+
+            @Nullable Id id = null;
+            @Nullable MessageReadState readState = null;
+
+            try {
+                top:
+                while (sws.active) {
+                    sws.wire.read(controlBuffer, 0, 1, 0);
+
+                    switch (controlBuffer[0]) {
+                        case F_MESSAGE_START: {
+                            // F_MESSAGE_START [id][total length][total chunks]
+                            int c = 32 + 4 + 4;
+                            sws.wire.read(controlBuffer, 0, c, 0);
+                            c = 0;
+                            id = Id.fromBytes(controlBuffer, c);
+                            c += 32;
+                            int length = getint(controlBuffer, c);
+                            c += 4;
+                            int chunkCount = getint(controlBuffer, c);
+                            c += 4;
+
+                            // FIXME create read state
+
+                            break;
+                        }
+                        case F_MESSAGE_CHUNK: {
+                            // F_MESSAGE_CHUNK [chunk index][chunk offset][chunk length][data]
+                            int c = 4 + 4 + 4;
+                            sws.wire.read(controlBuffer, 0, c, 0);
+                            c = 0;
+                            int chunkIndex = getint(controlBuffer, c);
+                            c += 4;
+                            int chunkOffset = getint(controlBuffer, c);
+                            c += 4;
+                            int chunkLength = getint(controlBuffer, c);
+                            c += 4;
+                            sws.wire.read(readState.bytes, chunkOffset, chunkLength, 0);
+
+
+                            // FIXME verify readState - do the values conflict with existing?
+                            if (confict) {
+                                sts.writeUrgentMessages.add(nack(id));
+                                sws.writeLooper.interrupt();
+                                // FIXME discard readState
+                                continue top;
+                            }
+
+                            // FIXME update readState
+
+
+                            break;
+                        }
+                        case F_MESSAGE_END: {
+                            // F_MESSAGE_END
+                            // nothing to read
+
+                            for (int i = 0, n = readState.chunkOffsets.length; i < n; ++i) {
+                                if (!readState.chunkReads[i]) {
+                                    sts.writeUrgentMessages.add(nack(id));
+                                    sws.writeLooper.interrupt();
+                                    // FIXME discard read state
+                                    continue top;
+                                }
+                            }
+
+                            // received
+                            // TODO move this to where the message is actually completed
+                            sts.writeUrgentMessages.add(ack(id));
+                            sws.writeLooper.interrupt();
+
+                            break;
+                        }
+                        case F_ACK: {
+                            // F_ACK [id]
+                            int c = 32;
+                            sws.wire.read(controlBuffer, 0, c, 0);
+                            c = 0;
+                            Id uid = Id.fromBytes(controlBuffer, c);
+                            c += 32;
+
+                            // remove from pending
+                            sts.writePendingAck.remove(uid, MessageControlState.End.COMPLETED);
+
+                            break;
+                        }
+                        case F_NACK: {
+                            // F_NACK [id]
+                            int c = 32;
+                            sws.wire.read(controlBuffer, 0, c, 0);
+                            c = 0;
+                            Id uid = Id.fromBytes(controlBuffer, c);
+                            c += 32;
+
+                            // move from pending to active
+                            @Nullable Message message = sts.writePendingAck.remove(uid, MessageControlState.End.ERROR);
+                            if (null != message) {
+                                mcs.add(message);
+                            } // TODO else something wrong
+
+                            break;
+                        }
+                        default:
+                            // protocol error
+                            throw new IOException("Protocol error.");
+                    }
+
+                }
+            } catch (IOException e) {
+                // fatal
+                sws.end();
+            }
+
+            sts.membar();
         }
     }
+
+    // urgent messages
+
+    static byte[] nack(Id id) {
+        // F_NACK [id]
+        byte[] nack = new byte[1 + 32];
+        int c = 0;
+        nack[c] = F_NACK;
+        c += 1;
+        Id.toBytes(id, nack, c);
+        c += 32;
+        return nack;
+    }
+
+    static byte[] ack(Id id) {
+        // F_NACK [id]
+        byte[] ack = new byte[1 + 32];
+        int c = 0;
+        ack[c] = F_NACK;
+        c += 1;
+        Id.toBytes(id, ack, c);
+        c += 32;
+        return ack;
+    }
+
 
 
 
@@ -390,21 +550,30 @@ public class NextopNode extends AbstractMessageControlNode {
         //    even if a billing outage, getting these sent is an exception - they will always get sent even if the account is in bad standing etc.
         MessageControlState writePendingAck;
 
-        MessageControlState readPendingAck;
+        // TODO going to need something like this for #syncTransferState
+//        MessageControlState readPendingAck;
 
         /** single-thread */
         Map<Id, MessageWriteState> writeStates;
+
 
         /** single-thread */
         Map<Id, MessageReadState> readStates;
 
 
+        /** thread-safe */
+        Queue<byte[]> writeUrgentMessages;
+
+
+
         SharedTransferState(MessageContext context) {
             writePendingAck = new MessageControlState(context);
-            readPendingAck = new MessageControlState(context);
+//            readPendingAck = new MessageControlState(context);
 
             writeStates = new HashMap<Id, MessageWriteState>(32);
             readStates = new HashMap<Id, MessageReadState>(32);
+
+            writeUrgentMessages = new ConcurrentLinkedQueue<byte[]>();
         }
 
 
@@ -465,7 +634,7 @@ public class NextopNode extends AbstractMessageControlNode {
     public static final byte F_MESSAGE_START = 0x01;
     /** [chunk index][chunk offset][chunk length][data] */
     public static final byte F_MESSAGE_CHUNK = 0x02;
-    /** [id] */
+    /** */
     public static final byte F_MESSAGE_END = 0x03;
 
     // FIXME currently the server sends this immediately, but it should sent it on COMPLETE of a message
