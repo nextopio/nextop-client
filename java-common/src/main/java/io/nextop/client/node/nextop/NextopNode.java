@@ -2,11 +2,9 @@ package io.nextop.client.node.nextop;
 
 import io.nextop.Id;
 import io.nextop.Message;
+import io.nextop.WireValue;
 import io.nextop.client.*;
 import io.nextop.client.node.AbstractMessageControlNode;
-import io.nextop.client.node.Head;
-import io.nextop.client.node.http.HttpNode;
-import io.nextop.client.retry.SendStrategy;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -136,6 +134,8 @@ public class NextopNode extends AbstractMessageControlNode {
 
     final class ControlLooper extends Thread {
 
+        final byte[] controlBuffer = new byte[4 * 1024];
+
 
         @Override
         public void run() {
@@ -195,7 +195,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
 
         // FIXME see notes in SharedTransferState
-        void syncTransferState(Wire wire) throws IOException {
+        void syncTransferState(final Wire wire) throws IOException {
             sts.membar();
 
             // each side sends SharedTransferState (id->transferred chunks)
@@ -203,6 +203,132 @@ public class NextopNode extends AbstractMessageControlNode {
 
             // FIXME
 
+            // send write state header
+            // receive other side write state header
+            // loop where write and read interleave
+
+            // make changes to read state using other side write state
+            // make changes to write state using other side read state
+
+
+            // TODO what are the most important changes to make?
+            // TODO this only matters when ACK is moved to complete not receive (there is a "hanging" message that both sides acknowledge)
+            // - if any in pendingWrite that are not in pendingRead, move from pendingWrite to write
+            // - if any are in pendingRead that are not in pendingWrite,
+
+            // TODO for now, just remove any readState that is not in the other writeState. this frees up memory
+
+            // F_SYNC_WRITE_STATE [frame count] [frame+]
+            // frame := [id]
+
+            final int n = sts.writeStates.size();
+            final int m;
+            {
+                int c = 0;
+                {
+                    controlBuffer[c] = F_SYNC_WRITE_STATE;
+                    c += 1;
+                    WireValue.putint(controlBuffer, c, n);
+                    c += 4;
+                    wire.write(controlBuffer, 0, c, 0);
+                }
+                wire.read(controlBuffer, 0, c, 0);
+
+                c = 0;
+                if (F_SYNC_WRITE_STATE != controlBuffer[c]) {
+                    // FIXME log
+                    throw new IOException("Bad sync header.");
+                }
+                c += 1;
+                m = WireValue.getint(controlBuffer, c);
+            }
+
+
+            final int bytesPerFrame = 32;
+
+            // write
+            class Writer extends Thread {
+                int i = 0;
+                Iterator<MessageWriteState> itr = sts.writeStates.values().iterator();
+
+                @Nullable IOException e = null;
+
+                @Override
+                public void run() {
+                    try {
+                        for (int writeCount; 0 < (writeCount = Math.min(n - i, controlBuffer.length / bytesPerFrame)); ) {
+                            for (int k = 0; k < writeCount; ++k) {
+                                MessageWriteState writeState = itr.next();
+                                Id.toBytes(writeState.id, controlBuffer, k * bytesPerFrame);
+                            }
+                            wire.write(controlBuffer, 0, writeCount * bytesPerFrame, 0);
+                            i += writeCount;
+                        }
+                    } catch (IOException e) {
+                        this.e = e;
+                    }
+                }
+            };
+            Writer writer = new Writer();
+            writer.start();
+
+            // read
+            int j = 0;
+            Id[] pairs = new Id[m];
+
+            for (int readCount; 0 < (readCount = Math.min(m - j, controlBuffer.length / bytesPerFrame)); ) {
+                wire.read(controlBuffer, 0, readCount * bytesPerFrame, 0);
+
+                for (int k = 0; k < readCount; ++k) {
+                    Id id = Id.fromBytes(controlBuffer, k * bytesPerFrame);
+                    pairs[j + k] = id;
+                }
+
+                j += readCount;
+            }
+
+            // process read pairs
+            // remove any read state that does not have a pair id
+            sts.readStates.keySet().retainAll(Arrays.asList(pairs));
+
+
+            while (true) {
+                try {
+                    writer.join();
+                    break;
+                } catch (InterruptedException e) {
+                    // can't interrupt io
+                    continue;
+                }
+            }
+            if (null != writer.e) {
+                throw writer.e;
+            }
+
+
+            // end
+            {
+                int c = 0;
+                {
+                    controlBuffer[c] = F_SYNC_END;
+                    c += 1;
+                    controlBuffer[c] = SYNC_STATUS_OK;
+                    wire.write(controlBuffer, 0, c, 0);
+                }
+                wire.read(controlBuffer, 0, c, 0);
+                c = 0;
+                if (F_MESSAGE_END != controlBuffer[c]) {
+                    // FIXME log
+                    throw new IOException("Bad sync end.");
+                }
+                c += 1;
+                if (SYNC_STATUS_OK != controlBuffer[c]) {
+                    // FIXME log
+                    throw new IOException("Bad sync status.");
+                }
+            }
+
+            sts.membar();
         }
     }
 
@@ -294,9 +420,9 @@ public class NextopNode extends AbstractMessageControlNode {
                         c += 1;
                         Id.toBytes(entry.id, controlBuffer, c);
                         c += 32;
-                        putint(controlBuffer, c, writeState.bytes.length);
+                        WireValue.putint(controlBuffer, c, writeState.bytes.length);
                         c += 4;
-                        putint(controlBuffer, c, n);
+                        WireValue.putint(controlBuffer, c, n);
                         c += 4;
                         sws.wire.write(controlBuffer, 0, c, 0);
                     }
@@ -324,11 +450,11 @@ public class NextopNode extends AbstractMessageControlNode {
                                 int c = 0;
                                 controlBuffer[c] = F_MESSAGE_CHUNK;
                                 c += 1;
-                                putint(controlBuffer, c, i);
+                                WireValue.putint(controlBuffer, c, i);
                                 c += 4;
-                                putint(controlBuffer, c, start);
+                                WireValue.putint(controlBuffer, c, start);
                                 c += 4;
-                                putint(controlBuffer, c, end - start);
+                                WireValue.putint(controlBuffer, c, end - start);
                                 c += 4;
                                 sws.wire.write(controlBuffer, 0, c, 0);
                             }
@@ -338,7 +464,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             writeState.chunkWrites[i] = true;
 
 
-                            @Nullable MessageControlState.Entry preemptEntry = mcs.takeFirstAvailable(entry.id, NextopNode.id);
+                            @Nullable MessageControlState.Entry preemptEntry = mcs.takeFirstAvailable(entry.id, NextopNode.this);
                             if (null != preemptEntry) {
                                 mcs.release(entry.id, NextopNode.this);
                                 entry = preemptEntry;
@@ -413,43 +539,103 @@ public class NextopNode extends AbstractMessageControlNode {
                             c = 0;
                             id = Id.fromBytes(controlBuffer, c);
                             c += 32;
-                            int length = getint(controlBuffer, c);
+                            int length = WireValue.getint(controlBuffer, c);
                             c += 4;
-                            int chunkCount = getint(controlBuffer, c);
-                            c += 4;
+                            int chunkCount = WireValue.getint(controlBuffer, c);
 
-                            // FIXME create read state
+                            readState = sts.readStates.get(id);
+                            if (null == readState) {
+                                readState = new MessageReadState(id, length, chunkCount);
+                                sts.readStates.put(id, readState);
+                            }
 
                             break;
                         }
                         case F_MESSAGE_CHUNK: {
+                            if (null == readState) {
+                                // FIXME log this
+                                sts.writeUrgentMessages.add(nack(id));
+                                sws.writeLooper.interrupt();
+                                continue top;
+                            }
+
                             // F_MESSAGE_CHUNK [chunk index][chunk offset][chunk length][data]
                             int c = 4 + 4 + 4;
                             sws.wire.read(controlBuffer, 0, c, 0);
                             c = 0;
-                            int chunkIndex = getint(controlBuffer, c);
+                            int chunkIndex = WireValue.getint(controlBuffer, c);
                             c += 4;
-                            int chunkOffset = getint(controlBuffer, c);
+                            int start = WireValue.getint(controlBuffer, c);
                             c += 4;
-                            int chunkLength = getint(controlBuffer, c);
-                            c += 4;
-                            sws.wire.read(readState.bytes, chunkOffset, chunkLength, 0);
+                            int chunkLength = WireValue.getint(controlBuffer, c);
 
+                            int end = start + chunkLength;
 
-                            // FIXME verify readState - do the values conflict with existing?
-                            if (confict) {
+                            // verify that the values do not conflict with existing values
+                            // designed so that each index passing verification implies that the entire read state is valid
+                            boolean conflict = false;
+                            try {
+                                if (readState.chunkReads[chunkIndex]) {
+                                    // already read
+                                    conflict = false;
+                                } else {
+                                    if (0 <= chunkIndex - 1 && readState.chunkReads[chunkIndex - 1]) {
+                                        // the previous chunk was read and set the index of the current chunk
+                                        if (start != readState.chunkOffsets[chunkIndex]) {
+                                            // index does not match value set in previous chunk
+                                            conflict = true;
+                                        }
+                                    }
+
+                                    if (chunkIndex + 1 < readState.chunkOffsets.length) {
+                                        if (readState.chunkReads[chunkIndex] && end != readState.chunkOffsets[chunkIndex + 1]) {
+                                            // end does not match known
+                                            conflict = true;
+                                        }
+                                    } else {
+                                        if (end != readState.bytes.length) {
+                                            // end does not match known
+                                            conflict = true;
+                                        }
+                                    }
+                                }
+                            } catch (Exception e) {
+                                // index out of bounds, etc
+                                conflict = true;
+                            }
+
+                            if (conflict) {
+                                // discard chunk content
+                                sws.wire.skip(chunkLength, 0);
+
+                                // FIXME log this
                                 sts.writeUrgentMessages.add(nack(id));
                                 sws.writeLooper.interrupt();
-                                // FIXME discard readState
+                                // discard the read state
+                                sts.readStates.remove(id);
                                 continue top;
                             }
 
-                            // FIXME update readState
+                            // read chunk content
+                            sws.wire.read(readState.bytes, start, chunkLength, 0);
 
+                            readState.chunkReads[chunkIndex] = true;
+                            readState.chunkOffsets[chunkIndex] = start;
+                            if (chunkIndex + 1 < readState.chunkOffsets.length) {
+                                // set the next start, used for conflict detection (see above)
+                                readState.chunkOffsets[chunkIndex + 1] = end;
+                            }
 
                             break;
                         }
                         case F_MESSAGE_END: {
+                            if (null == readState) {
+                                // FIXME log this
+                                sts.writeUrgentMessages.add(nack(id));
+                                sws.writeLooper.interrupt();
+                                continue top;
+                            }
+
                             // F_MESSAGE_END
                             // nothing to read
 
@@ -457,15 +643,18 @@ public class NextopNode extends AbstractMessageControlNode {
                                 if (!readState.chunkReads[i]) {
                                     sts.writeUrgentMessages.add(nack(id));
                                     sws.writeLooper.interrupt();
-                                    // FIXME discard read state
+                                    // discard the read state
+                                    sts.readStates.remove(id);
                                     continue top;
                                 }
                             }
 
                             // received
-                            // TODO move this to where the message is actually completed
+                            // TODO move this to where the message is actually completed (ack on complete not receive)
                             sts.writeUrgentMessages.add(ack(id));
                             sws.writeLooper.interrupt();
+
+                            sts.readStates.remove(id);
 
                             break;
                         }
@@ -494,7 +683,10 @@ public class NextopNode extends AbstractMessageControlNode {
                             @Nullable Message message = sts.writePendingAck.remove(uid, MessageControlState.End.ERROR);
                             if (null != message) {
                                 mcs.add(message);
-                            } // TODO else something wrong
+                            } else {
+                                // this would be a bug in sync state - one node thought the other had something it doesn't
+                                assert false;
+                            }
 
                             break;
                         }
@@ -522,7 +714,6 @@ public class NextopNode extends AbstractMessageControlNode {
         nack[c] = F_NACK;
         c += 1;
         Id.toBytes(id, nack, c);
-        c += 32;
         return nack;
     }
 
@@ -533,7 +724,6 @@ public class NextopNode extends AbstractMessageControlNode {
         ack[c] = F_NACK;
         c += 1;
         Id.toBytes(id, ack, c);
-        c += 32;
         return ack;
     }
 
@@ -550,7 +740,8 @@ public class NextopNode extends AbstractMessageControlNode {
         //    even if a billing outage, getting these sent is an exception - they will always get sent even if the account is in bad standing etc.
         MessageControlState writePendingAck;
 
-        // TODO going to need something like this for #syncTransferState
+        // TODO this matters when the node reads and dispatches, waiting for a complete back
+        // TODO store here until the complete/ack (so the message isn't lost)
 //        MessageControlState readPendingAck;
 
         /** single-thread */
@@ -630,18 +821,30 @@ public class NextopNode extends AbstractMessageControlNode {
     /////// NEXTOP PROTOCOL ///////
 
     // FIXME be able to transfer MessageControl not just message
+
     /** [id][total length][total chunks] */
     public static final byte F_MESSAGE_START = 0x01;
     /** [chunk index][chunk offset][chunk length][data] */
     public static final byte F_MESSAGE_CHUNK = 0x02;
-    /** */
+    /** TODO checksum */
     public static final byte F_MESSAGE_END = 0x03;
 
-    // FIXME currently the server sends this immediately, but it should sent it on COMPLETE of a message
-    /** [id] */
+    /** [id]
+     * ack indicates the node can remove its copy of the message. */
     static final byte F_ACK = 0x04;
-    /** [id] */
+    /** [id]
+     * nack indicates the node should resend its copy of the message */
     static final byte F_NACK = 0x05;
+
+    /** [frame count][frame+]
+     * frame := [id] */
+    static final byte F_SYNC_WRITE_STATE = 0x70;
+
+    /** [status]
+     * status is a single byte, SYNC_STATUS_OK, SYNC_STATUS_ERROR */
+    static final byte F_SYNC_END = 0x70;
+    static final byte SYNC_STATUS_OK = 0x00;
+    static final byte SYNC_STATUS_ERROR = 0x01;
 
 
 

@@ -19,7 +19,10 @@ public interface Wire {
 
     // return the termination future
     Future<IOException> open() throws IOException;
-    int read(byte[] buffer, int offset, int length, int messageBoundary) throws IOException;
+
+    void read(byte[] buffer, int offset, int length, int messageBoundary) throws IOException;
+    void skip(long n, int messageBoundary) throws IOException;
+
     // messageBoundary indicates the read is up to a message boundary
     // this helps testing count messages, e.g. pass one message, fail at the nth message, etc
     void write(byte[] buffer, int offset, int length, int messageBoundary) throws IOException;

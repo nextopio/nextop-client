@@ -21,8 +21,8 @@ import java.util.*;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-// must be called from a single thread
-// FIXME rename NextopClientWireFactory
+// FIXME(security) client TLS certificate. the certificate is used to verify the client ID
+// FIXME node implementation
 public class NextopClientWireFactoryNode implements Wire.Factory, MessageControlNode {
 
     public static final class Config {
@@ -87,6 +87,10 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
 
 
     // FIXME
+    boolean active;
+
+    Id clientId;
+    // FIXME
     Id accessKey = Id.create();
     Set<Id> grantKeys = Collections.emptySet();
 
@@ -145,14 +149,19 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
         }
 
 
-        while (nextopNode.active) {
+        top:
+        while (active) {
             @Nullable Authority upAuthority;
             try {
                 mostRecentDnsRetakeStrategy = dnsRetakeStrategy;
                 if (null == mostRecentDnsSendStrategy) {
                     mostRecentDnsSendStrategy = dnsSendStrategy;
                 }
-                while (null == (upAuthority = state.getFirstUpAuthority(config.allowedFailsPerAuthority)) && nextopNode.active) {
+                while (null == (upAuthority = state.getFirstUpAuthority(config.allowedFailsPerAuthority))) {
+                    if (!active) {
+                        continue top;
+                    }
+
                     doDnsSendDelay();
                     if (!doDnsReset()) {
                         // there was an error with dns
@@ -163,11 +172,7 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
                     mostRecentDnsSendNanos = System.nanoTime();
                 }
             } catch (Exception e) {
-                continue;
-            }
-
-            if (!nextopNode.active) {
-                continue;
+                continue top;
             }
 
             assert null != upAuthority;
@@ -184,7 +189,7 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
             } catch (Exception e) {
                 // FIXME work out the case where this was a network outage
                 state.fail(upAuthority);
-                continue;
+                continue top;
             }
         }
 
@@ -230,7 +235,7 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
         if (reportDownAuthorities.isEmpty()) {
             dnsRequest = Message.newBuilder()
                     .setRoute(Route.valueOf("GET http://" + dnsAuthority + "/$access-key/edge.json"))
-                    .set("access-key", nextopNode.accessKey)
+                    .set("access-key", accessKey)
                     .build();
         } else {
             // report the down authorities
@@ -241,12 +246,11 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
 
             dnsRequest = Message.newBuilder()
                     .setRoute(Route.valueOf("POST http://" + dnsAuthority + "/$access-key/edge.json"))
-                    .set("access-key", nextopNode.accessKey)
+                    .set("access-key", accessKey)
                     .set("bad-authorities", WireValue.of(reportDownAuthorityStrings))
                     .build();
         }
 
-        Head dnsHead = nextopNode.dnsHead;
         Message dnsResponse;
         try {
             dnsHead.send(dnsRequest);
@@ -292,8 +296,8 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
         // FIXME send the client ID (each client has a unique ID that is used for reconnects)
         // FIXME send the client certificate for TLS
         Message greeting = Message.newBuilder()
-                .set("accessKey", nextopNode.accessKey)
-                .set("grantKeys", WireValue.of(nextopNode.grantKeys))
+                .set("accessKey", accessKey)
+                .set("grantKeys", WireValue.of(grantKeys))
                 .set("clientId", clientId)
                 .build();
 
@@ -352,13 +356,6 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
     }
 
 
-    @Override
-    public Wire.Adapter createAdapter() {
-        // not an adapter
-        throw new UnsupportedOperationException();
-    }
-
-
     static final class NextopRemoteWire implements Wire {
         final Wire impl;
         final Authority authority;
@@ -376,8 +373,13 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
         }
 
         @Override
-        public int read(byte[] buffer, int offset, int n, int messageBoundary) throws IOException {
-            return impl.read(buffer, offset, n, messageBoundary);
+        public void read(byte[] buffer, int offset, int length, int messageBoundary) throws IOException {
+            impl.read(buffer, offset, length, messageBoundary);
+        }
+
+        @Override
+        public void skip(long n, int messageBoundary) throws IOException {
+            impl.skip(n, messageBoundary);
         }
 
         @Override

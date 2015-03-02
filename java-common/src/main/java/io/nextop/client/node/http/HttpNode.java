@@ -391,7 +391,6 @@ public final class HttpNode extends AbstractMessageControlNode {
                     });
                     break;
                 case ERROR:
-                case CANCELED:
                     post(new Runnable() {
                         @Override
                         public void run() {
@@ -954,7 +953,11 @@ public final class HttpNode extends AbstractMessageControlNode {
                 if (null != adapter) {
                     InputStream is = super.getSocketInputStream(socket);
                     OutputStream os = super.getSocketOutputStream(socket);
-                    wire = adapter.adapt(Wires.io(is, os));
+                    try {
+                        wire = adapter.adapt(Wires.io(is, os));
+                    } catch (InterruptedException e) {
+                        throw new IOException(e);
+                    }
                 }
             }
         }

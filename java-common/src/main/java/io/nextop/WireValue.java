@@ -82,22 +82,7 @@ public abstract class WireValue {
 //
 
 
-    static int intv(byte[] bytes, int offset) {
-        return ((0xFF & bytes[offset]) << 24)
-                | ((0xFF & bytes[offset + 1]) << 16)
-                | ((0xFF & bytes[offset + 2]) << 8)
-                | (0xFF & bytes[offset + 3]);
-    }
-    static long longv(byte[] bytes, int offset) {
-        return ((0xFFL & bytes[offset]) << 56)
-                | ((0xFFL & bytes[offset + 1]) << 48)
-                | ((0xFFL & bytes[offset + 2]) << 40)
-                | ((0xFFL & bytes[offset + 3]) << 32)
-                | ((0xFFL & bytes[offset + 4]) << 24)
-                | ((0xFFL & bytes[offset + 5]) << 16)
-                | ((0xFFL & bytes[offset + 6]) << 8)
-                | (0xFFL & bytes[offset + 7]);
-    }
+
 
 
     // FIXME rename to "fromBytes"
@@ -117,7 +102,7 @@ public abstract class WireValue {
         int h = 0xFF & bytes[offset];
         if ((h & H_COMPRESSED) == H_COMPRESSED) {
             int nb = h & ~H_COMPRESSED;
-            int size = intv(bytes, offset + 1);
+            int size = getint(bytes, offset + 1);
             // next 4 is size in bytes
             int[] offsets = new int[size + 1];
             offsets[0] = offset + 9;
@@ -219,7 +204,7 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            int length = intv(bytes, offset + 1);
+            int length = getint(bytes, offset + 1);
             return new String(bytes, offset + 5, length, Charsets.UTF_8);
         }
         @Override
@@ -303,7 +288,7 @@ public abstract class WireValue {
         }
         @Override
         public ByteBuffer asBlob() {
-            int length = intv(bytes, offset + 1);
+            int length = getint(bytes, offset + 1);
             return ByteBuffer.wrap(bytes, offset + 5, length);
         }
         @Override
@@ -438,7 +423,7 @@ public abstract class WireValue {
         @Override
         public List<WireValue> asList() {
             return new AbstractList<WireValue>() {
-                int n = intv(bytes, offset + 1);
+                int n = getint(bytes, offset + 1);
                 int[] offsets = null;
                 int offseti = 0;
 
@@ -504,7 +489,7 @@ public abstract class WireValue {
         }
         @Override
         public int asInt() {
-            return intv(bytes, offset + 1);
+            return getint(bytes, offset + 1);
         }
         @Override
         public long asLong() {
@@ -559,7 +544,7 @@ public abstract class WireValue {
         }
         @Override
         public long asLong() {
-            return longv(bytes, offset + 1);
+            return getlong(bytes, offset + 1);
         }
         @Override
         public float asFloat() {
@@ -614,7 +599,7 @@ public abstract class WireValue {
         }
         @Override
         public float asFloat() {
-            return Float.intBitsToFloat(intv(bytes, offset + 1));
+            return Float.intBitsToFloat(getint(bytes, offset + 1));
         }
         @Override
         public double asDouble() {
@@ -669,7 +654,7 @@ public abstract class WireValue {
         }
         @Override
         public double asDouble() {
-            return Double.longBitsToDouble(longv(bytes, offset + 1));
+            return Double.longBitsToDouble(getlong(bytes, offset + 1));
         }
         @Override
         public boolean asBoolean() {
@@ -1386,9 +1371,9 @@ public abstract class WireValue {
 //        System.out.printf("_byteSize %s\n", h);
         switch (h) {
             case H_UTF8:
-                return 5 + intv(bytes, offset + 1);
+                return 5 + getint(bytes, offset + 1);
             case H_BLOB:
-                return 5 + intv(bytes, offset + 1);
+                return 5 + getint(bytes, offset + 1);
             case H_INT32:
                 return 5;
             case H_INT64:
@@ -1402,9 +1387,9 @@ public abstract class WireValue {
             case H_FALSE_BOOLEAN:
                 return 1;
             case H_MAP:
-                return 5 + intv(bytes, offset + 1);
+                return 5 + getint(bytes, offset + 1);
             case H_LIST:
-                return 9 + intv(bytes, offset + 5);
+                return 9 + getint(bytes, offset + 5);
             case H_INT32_LIST:
                 // FIXME see listh
                 throw new IllegalArgumentException();
@@ -2507,7 +2492,7 @@ public abstract class WireValue {
 
         public static EncodedImage valueOf(byte[] bytes, int offset) {
             EncodedImage.Format format;
-            switch (intv(bytes, offset)) {
+            switch (getint(bytes, offset)) {
                 case H_F_WEBP:
                     format = EncodedImage.Format.WEBP;
                     break;
@@ -2521,7 +2506,7 @@ public abstract class WireValue {
                     throw new IllegalArgumentException();
             }
             EncodedImage.Orientation orientation;
-            switch (intv(bytes, offset + 4)) {
+            switch (getint(bytes, offset + 4)) {
                 case H_O_REAR_FACING:
                     orientation = EncodedImage.Orientation.REAR_FACING;
                     break;
@@ -2531,9 +2516,9 @@ public abstract class WireValue {
                 default:
                     throw new IllegalArgumentException();
             }
-            int width = intv(bytes, offset + 8);
-            int height = intv(bytes, offset + 12);
-            int length = intv(bytes, offset + 16);
+            int width = getint(bytes, offset + 8);
+            int height = getint(bytes, offset + 12);
+            int length = getint(bytes, offset + 16);
             return new EncodedImage(format, orientation, width, height, bytes, offset + 20, length);
         }
 
@@ -2577,12 +2562,12 @@ public abstract class WireValue {
             c += IdCodec.LENGTH;
             Id groupId = IdCodec.valueOf(bytes, c);
             c += IdCodec.LENGTH;
-            int groupPriority = intv(bytes, c);
+            int groupPriority = getint(bytes, c);
             c += 4;
             Route route = Route.valueOf(WireValue.valueOf(bytes, c, cs).asString());
-            c += 5 + intv(bytes, c + 1);
+            c += 5 + getint(bytes, c + 1);
             Map<WireValue, WireValue> headers = WireValue.valueOf(bytes, c, cs).asMap();
-            c += 5 + intv(bytes, c + 1);
+            c += 5 + getint(bytes, c + 1);
             Map<WireValue, WireValue> parameters = WireValue.valueOf(bytes, c, cs).asMap();
             return new Message(id, groupId, groupPriority, route, headers, parameters);
         }
@@ -2648,5 +2633,46 @@ public abstract class WireValue {
             }
         };
     }
+
+
+
+    // wire utils
+
+    public static int getint(byte[] bytes, int offset) {
+        return ((0xFF & bytes[offset]) << 24)
+                | ((0xFF & bytes[offset + 1]) << 16)
+                | ((0xFF & bytes[offset + 2]) << 8)
+                | (0xFF & bytes[offset + 3]);
+    }
+    public static long getlong(byte[] bytes, int offset) {
+        return ((0xFFL & bytes[offset]) << 56)
+                | ((0xFFL & bytes[offset + 1]) << 48)
+                | ((0xFFL & bytes[offset + 2]) << 40)
+                | ((0xFFL & bytes[offset + 3]) << 32)
+                | ((0xFFL & bytes[offset + 4]) << 24)
+                | ((0xFFL & bytes[offset + 5]) << 16)
+                | ((0xFFL & bytes[offset + 6]) << 8)
+                | (0xFFL & bytes[offset + 7]);
+    }
+
+    public static void putint(byte[] bytes, int offset, int value) {
+        bytes[offset] = (byte) (value >>> 24);
+        bytes[offset + 1] = (byte) (value >>> 16);
+        bytes[offset + 2] = (byte) (value >>> 8);
+        bytes[offset + 3] = (byte) value;
+    }
+    public static void putlong(byte[] bytes, int offset, long value) {
+        bytes[offset] = (byte) (value >>> 56);
+        bytes[offset + 1] = (byte) (value >>> 48);
+        bytes[offset + 2] = (byte) (value >>> 40);
+        bytes[offset + 3] = (byte) (value >>> 32);
+        bytes[offset + 4] = (byte) (value >>> 24);
+        bytes[offset + 5] = (byte) (value >>> 16);
+        bytes[offset + 6] = (byte) (value >>> 8);
+        bytes[offset + 7] = (byte) value;
+    }
+
+
+
 
 }

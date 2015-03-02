@@ -613,7 +613,7 @@ public final class MessageControlState {
             if (null != id) {
                 if (MessageControl.Type.ERROR.equals(mc.type) && Message.outboxRoute(id).equals(route)) {
                     // cancel
-                    if (remove(id, End.CANCELED)) {
+                    if (null != remove(id, End.ERROR)) {
                         upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, Message.inboxRoute(id)));
                     }
                 } else if (MessageControl.Type.MESSAGE.equals(mc.type) && Message.echoRoute(id).equals(route)) {

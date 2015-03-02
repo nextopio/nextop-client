@@ -27,6 +27,7 @@ public interface MessageControlChannel extends MessageContext {
     /** thread-safe */
     MessageControlState getMessageControlState();
 
+    // FIXME getLog - take Log interface from service
 
 
 

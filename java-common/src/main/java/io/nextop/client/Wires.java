@@ -24,6 +24,8 @@ public final class Wires {
     }
 
 
+
+
     private Wires() {
     }
 
@@ -83,13 +85,19 @@ public final class Wires {
         }
 
         @Override
-        public int read(byte[] buffer, int offset, int n, int messageBoundary) throws IOException {
+        public void read(byte[] buffer, int offset, int length, int messageBoundary) throws IOException {
             if (closed) {
                 throw new IOException();
             }
             try {
                 if (null != is) {
-                    return is.read(buffer, offset, n);
+                    int i = 0;
+                    for (int r; 0 < (r = is.read(buffer, offset + i, length - i)); ) {
+                        i += r;
+                    }
+                    if (i != length) {
+                        throw new IOException();
+                    }
                 } else {
                     throw new IOException("No input.");
                 }
@@ -100,13 +108,36 @@ public final class Wires {
         }
 
         @Override
-        public void write(byte[] buffer, int offset, int n, int messageBoundary) throws IOException {
+        public void skip(long n, int messageBoundary) throws IOException {
+            if (closed) {
+                throw new IOException();
+            }
+            try {
+                if (null != is) {
+                    long i = 0;
+                    for (long r; 0 < (r = is.skip(n - i)); ) {
+                        i += r;
+                    }
+                    if (i != n) {
+                        throw new IOException();
+                    }
+                } else {
+                    throw new IOException("No input.");
+                }
+            } catch (IOException e) {
+                close(e);
+                throw e;
+            }
+        }
+
+        @Override
+        public void write(byte[] buffer, int offset, int length, int messageBoundary) throws IOException {
             if (closed) {
                 throw new IOException();
             }
             try {
                 if (null != os) {
-                    os.write(buffer, offset, n);
+                    os.write(buffer, offset, length);
                 } else {
                     throw new IOException("No output.");
                 }
@@ -159,8 +190,15 @@ public final class Wires {
         }
 
         @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            return wire.read(b, off, len, 0);
+        public int read(byte[] b, int off, int length) throws IOException {
+            wire.read(b, off, length, 0);
+            return length;
+        }
+
+        @Override
+        public long skip(long n) throws IOException {
+            wire.skip(n, 0);
+            return n;
         }
 
         @Override
