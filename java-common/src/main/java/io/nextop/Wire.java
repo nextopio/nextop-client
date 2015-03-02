@@ -1,11 +1,8 @@
-package io.nextop.client;
-
-import io.nextop.Id;
+package io.nextop;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.NoSuchElementException;
-import java.util.concurrent.Future;
 
 // the foundation of
 // - data shaping

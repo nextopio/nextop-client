@@ -5,8 +5,8 @@ import io.nextop.Message;
 import io.nextop.Route;
 import io.nextop.client.MessageControl;
 import io.nextop.client.MessageControlState;
-import io.nextop.client.Wire;
-import io.nextop.client.Wires;
+import io.nextop.Wire;
+import io.nextop.Wires;
 import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.client.retry.SendStrategy;
 import io.nextop.org.apache.http.*;
@@ -24,7 +24,6 @@ import io.nextop.org.apache.http.conn.routing.HttpRoute;
 import io.nextop.org.apache.http.entity.ContentLengthStrategy;
 import io.nextop.org.apache.http.impl.DefaultConnectionReuseStrategy;
 import io.nextop.org.apache.http.impl.client.DefaultConnectionKeepAliveStrategy;
-import io.nextop.org.apache.http.impl.client.SystemDefaultCredentialsProvider;
 import io.nextop.org.apache.http.impl.conn.ConnectionShutdownException;
 import io.nextop.org.apache.http.impl.conn.DefaultHttpResponseParserFactory;
 import io.nextop.org.apache.http.impl.conn.DefaultManagedHttpClientConnection;
@@ -222,6 +221,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                 }
             }
         }
+        // TODO else send back upstream?
     }
 
 

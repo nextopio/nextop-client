@@ -1,4 +1,4 @@
-package io.nextop.client;
+package io.nextop;
 
 import javax.annotation.Nullable;
 import java.io.IOException;

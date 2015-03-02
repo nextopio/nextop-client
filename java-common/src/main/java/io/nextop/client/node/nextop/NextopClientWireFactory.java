@@ -2,8 +2,8 @@ package io.nextop.client.node.nextop;
 
 import io.nextop.*;
 import io.nextop.client.MessageControl;
-import io.nextop.client.Wire;
-import io.nextop.client.Wires;
+import io.nextop.Wire;
+import io.nextop.Wires;
 import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.client.node.Head;
 import io.nextop.client.node.http.HttpNode;
@@ -23,18 +23,19 @@ import java.util.concurrent.TimeUnit;
 
 // FIXME(security) client TLS certificate. the certificate is used to verify the client ID
 // FIXME node implementation
-public class NextopClientWireFactoryNode extends AbstractMessageControlNode implements Wire.Factory {
+public class NextopClientWireFactory extends AbstractMessageControlNode implements Wire.Factory {
 
     public static final class Config {
-        final int allowedFailsPerAuthority;
+        public final Authority dnsAuthority;
+        public final int allowedFailsPerAuthority;
 
-
-        Config(int allowedFailsPerAuthority) {
+        public Config(Authority dnsAuthority, int allowedFailsPerAuthority) {
+            this.dnsAuthority = dnsAuthority;
             this.allowedFailsPerAuthority = allowedFailsPerAuthority;
         }
     }
 
-    static final Config DEFAULT_CONFIG = new Config(2);
+    static final Config DEFAULT_CONFIG = new Config(Authority.valueOf("dns.nextop.io"), 2);
 
 
 
@@ -59,7 +60,7 @@ public class NextopClientWireFactoryNode extends AbstractMessageControlNode impl
 
     // FIXME want to save this state, so that when the node comes back,
     // FIXME it doesn't have to hit DNS to get active
-    final State state;
+    State state;
 
 //    NextopNode nextopNode;
 
@@ -96,18 +97,26 @@ public class NextopClientWireFactoryNode extends AbstractMessageControlNode impl
 
 
 
-    public NextopClientWireFactoryNode() {
-        this(DEFAULT_CONFIG, new State());
+    public NextopClientWireFactory() {
+        this(DEFAULT_CONFIG);
     }
-    public NextopClientWireFactoryNode(Config config, State state) {
+    public NextopClientWireFactory(Config config) {
         this.config = config;
-        this.state = state;
-
 
         dnsHttpNode = new HttpNode();
         dnsHead = Head.create(this, getMessageControlState(), dnsHttpNode, getScheduler());
     }
 
+
+    @Override
+    protected void initSelf(Bundle savedState) {
+        state = new State();
+    }
+
+    @Override
+    public void onSaveState(Bundle savedState) {
+        // FIXME save state
+    }
 
     @Override
     public void onActive(boolean active) {
@@ -229,14 +238,11 @@ public class NextopClientWireFactoryNode extends AbstractMessageControlNode impl
     }
 
     boolean doDnsReset() {
-        Authority dnsAuthority = Authority.valueOf("54.149.233.13:2778");
-        // FIXME "dns.nextop.io" in prod
-
         List<Authority> reportDownAuthorities = state.getUnreportedDownAuthorities(config.allowedFailsPerAuthority);
         Message dnsRequest;
         if (reportDownAuthorities.isEmpty()) {
             dnsRequest = Message.newBuilder()
-                    .setRoute(Route.valueOf("GET http://" + dnsAuthority + "/$access-key/edge.json"))
+                    .setRoute(Route.valueOf("GET http://" + config.dnsAuthority + "/$access-key/edge.json"))
                     .set("access-key", accessKey)
                     .build();
         } else {
@@ -247,7 +253,7 @@ public class NextopClientWireFactoryNode extends AbstractMessageControlNode impl
             }
 
             dnsRequest = Message.newBuilder()
-                    .setRoute(Route.valueOf("POST http://" + dnsAuthority + "/$access-key/edge.json"))
+                    .setRoute(Route.valueOf("POST http://" + config.dnsAuthority + "/$access-key/edge.json"))
                     .set("access-key", accessKey)
                     .set("bad-authorities", WireValue.of(reportDownAuthorityStrings))
                     .build();
@@ -279,7 +285,7 @@ public class NextopClientWireFactoryNode extends AbstractMessageControlNode impl
                         List<WireValue> dnsAuthorityValues = authoritiesValue.asList();
                         List<Authority> dnsAuthorities = new ArrayList<Authority>(dnsAuthorityValues.size());
                         for (WireValue dnsAuthorityValue : dnsAuthorityValues) {
-                            dnsAuthorities.add(Authority.valueOf(dnsAuthority.toString()));
+                            dnsAuthorities.add(Authority.valueOf(config.dnsAuthority.toString()));
                         }
 
                         state.resetDnsAuthorities(dnsAuthorities);

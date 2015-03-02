@@ -329,6 +329,26 @@ public class Message {
                 && route.equals(b.route)
                 && headers.equals(b.headers)
                 && parameters.equals(b.parameters);
+
+//        if (!id.equals(b.id)) {
+//            return false;
+//        }
+//        if (!groupId.equals(b.groupId)) {
+//            return false;
+//        }
+//        if (groupPriority != b.groupPriority) {
+//            return false;
+//        }
+//        if (!route.equals(b.route)) {
+//            return false;
+//        }
+//        if (!headers.equals(b.headers)) {
+//            return false;
+//        }
+//        if (!parameters.equals(b.parameters)) {
+//            return false;
+//        }
+//        return true;
     }
 
 

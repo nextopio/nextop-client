@@ -2,6 +2,7 @@ package io.nextop.client.node.nextop;
 
 import io.nextop.Id;
 import io.nextop.Message;
+import io.nextop.Wire;
 import io.nextop.WireValue;
 import io.nextop.client.*;
 import io.nextop.client.node.AbstractMessageControlNode;
@@ -140,6 +141,7 @@ public class NextopNode extends AbstractMessageControlNode {
                 }
             }
         }
+        // TODO else send back upstream?
     }
 
 
@@ -466,8 +468,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             chunkOffsets[i] = chunkOffsets[i - 1] + config.chunkBytes;
                         }
 
-                        // FIXME do a full message.equals when message equals is implemented
-                        assert WireValue.Type.MESSAGE.equals(WireValue.valueOf(bytes).getType());
+                        assert WireValue.of(entry.message).equals(WireValue.valueOf(bytes));
 
                         writeState = new MessageWriteState(entry.id, bytes, chunkOffsets);
                     }
@@ -889,9 +890,6 @@ public class NextopNode extends AbstractMessageControlNode {
             chunkOffsets = new int[chunkCount];
             chunkReads = new boolean[chunkCount];
         }
-
-        // FIXME on insert a chunk, mark the index of the following
-        // FIXME if an insert conflicts with a previous known, NACK the message
     }
 
 

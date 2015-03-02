@@ -21,7 +21,7 @@ public final class MessageContexts {
     }
 
     public static MessageContext create() {
-        return SchedulerMessageContext.create(Schedulers.from(Executors.newSingleThreadExecutor()));
+        return SchedulerMessageContext.create(MoreSchedulers.serial());
     }
 
 

@@ -5,7 +5,7 @@ import io.nextop.Message;
 import io.nextop.client.MessageContext;
 import io.nextop.client.MessageContexts;
 import io.nextop.client.MessageControlState;
-import io.nextop.client.WireFactoryPair;
+import io.nextop.wire.WireFactoryPair;
 import io.nextop.client.node.Head;
 import io.nextop.rx.MoreSchedulers;
 import junit.framework.TestCase;
@@ -13,14 +13,12 @@ import rx.Scheduler;
 import rx.Subscription;
 import rx.functions.Action0;
 import rx.functions.Action1;
-import rx.schedulers.Schedulers;
 
 import javax.annotation.Nullable;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -187,15 +185,14 @@ public class NextopNodeTest extends TestCase {
 
             int groupPriority = groupDist.minPriority + r.nextInt(groupDist.maxPriority - groupDist.minPriority);
 
-            // FIXME more diversity here
-
-            Message message = Message.newBuilder()
-                    .setRoute("GET http://nextop.io")
+            Message.Builder builder = Message.newBuilder()
                     .setGroupId(groupDist.groupId)
-                    .setGroupPriority(groupPriority)
-                    .build();
+                    .setGroupPriority(groupPriority);
 
-            return message;
+            // FIXME set more properties here
+            builder.setRoute("GET http://nextop.io");
+
+            return builder.build();
         }
 
 

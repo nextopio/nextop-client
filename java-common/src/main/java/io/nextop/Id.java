@@ -40,11 +40,11 @@ public final class Id implements Comparable<Id> {
     }
 
     public static Id valueOf(String s) throws IllegalArgumentException {
-        if (64 != s.length()) {
+        if (2 * LENGTH != s.length()) {
             throw new IllegalArgumentException();
         }
         byte[] bytes = HexBytes.valueOf(s);
-        if (32 != bytes.length) {
+        if (LENGTH != bytes.length) {
             throw new IllegalArgumentException();
         }
 
@@ -56,17 +56,17 @@ public final class Id implements Comparable<Id> {
 
 
     public static void toBytes(Id id, byte[] buffer, int offset) {
-        if (offset < 0 || buffer.length < offset + 32) {
+        if (offset < 0 || buffer.length < offset + LENGTH) {
             throw new IllegalArgumentException();
         }
-        System.arraycopy(id.bytes, id.offset, buffer, offset, 32);
+        System.arraycopy(id.bytes, id.offset, buffer, offset, LENGTH);
     }
 
     public static Id fromBytes(byte[] buffer, int offset) {
-        if (offset < 0 || buffer.length < offset + 32) {
+        if (offset < 0 || buffer.length < offset + LENGTH) {
             throw new IllegalArgumentException();
         }
-        byte[] bytes = Arrays.copyOfRange(buffer, offset, offset + 32);
+        byte[] bytes = Arrays.copyOfRange(buffer, offset, offset + LENGTH);
         return new Id(bytes, 0);
     }
 
@@ -112,13 +112,21 @@ public final class Id implements Comparable<Id> {
             return false;
         }
         Id b = (Id) obj;
-        return hashCode == b.hashCode && Arrays.equals(bytes, b.bytes);
+        if (hashCode != b.hashCode) {
+            return false;
+        }
+        for (int i = 0; i < LENGTH; ++i) {
+            if (bytes[offset + i] != b.bytes[b.offset + i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
 
     @Override
     public int compareTo(Id b) {
-        for (int i = 0; i < 32; ++i) {
+        for (int i = 0; i < LENGTH; ++i) {
             int d = (0xFF & bytes[offset + i]) - (0xFF & b.bytes[b.offset + i]);
             if (0 != d) {
                 return d;

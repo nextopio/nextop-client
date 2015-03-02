@@ -2626,8 +2626,7 @@ public abstract class WireValue {
             IdCodec.toBytes(message.id, bb);
             IdCodec.toBytes(message.groupId, bb);
             bb.putInt(message.groupPriority);
-            // FIXME support serialID when it comes in
-            // TODO (?) NURL codec to avoid string conversion
+            // TODO (?) Route codec to avoid string conversion
             WireValue._toBytes(WireValue.of(message.route.toString()), lb, bb);
             WireValue._toBytes(WireValue.of(message.headers), lb, bb);
             WireValue._toBytes(WireValue.of(message.parameters), lb, bb);

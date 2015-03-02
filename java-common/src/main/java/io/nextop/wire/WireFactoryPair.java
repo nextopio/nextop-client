@@ -1,4 +1,9 @@
-package io.nextop.client;
+package io.nextop.wire;
+
+import io.nextop.Wire;
+import io.nextop.Wires;
+import rx.Observable;
+import rx.subjects.PublishSubject;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -8,18 +13,27 @@ import java.util.Queue;
 
 // provides two wire factories, a and b, such that a wire created in a produces an available wire in b (and vice-versa)
 // the pair of wires write to each other, via a buffer of similar size to a tcp window (65k)
+// FIXME call this is a Pipe or something
 public final class WireFactoryPair {
 
     final Object mutex = new Object();
     final PairedWireFactory a;
     final PairedWireFactory b;
 
+    final PublishSubject<Wire.Factory> aSubject;
+    final PublishSubject<Wire.Factory> bSubject;
+
 
     public WireFactoryPair() {
+        aSubject = PublishSubject.create();
+        bSubject = PublishSubject.create();
+
         a = new PairedWireFactory(mutex);
         b = new PairedWireFactory(mutex);
         a.pair = b;
+        a.pairSubject = bSubject;
         b.pair = a;
+        b.pairSubject = aSubject;
     }
 
 
@@ -31,12 +45,23 @@ public final class WireFactoryPair {
         return b;
     }
 
+    // published whenever a wire is available on A
+    // create() is not guaranteed to return; but with careful planning it will
+    public Observable<Wire.Factory> observeA() {
+        return aSubject;
+    }
+
+    public Observable<Wire.Factory> observeB() {
+        return bSubject;
+    }
+
 
     static final class PairedWireFactory implements Wire.Factory {
         final Object mutex;
         final Queue<Wire> wireQueue = new LinkedList<Wire>();
 
         PairedWireFactory pair;
+        PublishSubject<Wire.Factory> pairSubject;
 
 
         PairedWireFactory(Object mutex) {
@@ -46,9 +71,10 @@ public final class WireFactoryPair {
 
         @Override
         public Wire create(@Nullable Wire replace) throws InterruptedException, NoSuchElementException {
+            Wire wire;
             synchronized (mutex) {
                 // 1. check if the pair created one
-                @Nullable Wire wire = wireQueue.poll();
+                wire = wireQueue.poll();
                 if (null != wire) {
                     return wire;
                 }
@@ -59,9 +85,9 @@ public final class WireFactoryPair {
 
                 wire = new PairWire(a, b);
                 pair.wireQueue.add(new PairWire(b, a));
-
-                return wire;
             }
+            pairSubject.onNext(pair);
+            return wire;
         }
     }
 

@@ -140,6 +140,7 @@ public class WireValueTest extends TestCase {
         bb.flip();
         Message da = WireValue.valueOf(bb).asMessage();
 
+        assertEquals(a.hashCode(), da.hashCode());
         assertEquals(a, da);
     }
 

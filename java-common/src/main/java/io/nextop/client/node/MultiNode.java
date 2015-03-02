@@ -150,28 +150,18 @@ public class MultiNode extends AbstractMessageControlNode {
     public void onActive(boolean active) {
         this.active = active;
         setActiveDownstream();
+        // TODO on inactive with pending, should pending be sent back upstream?
     }
 
     @Override
     public void onMessageControl(MessageControl mc) {
-//        switch (mc.type) {
-//            case COMPLETE:
-//            case ERROR:
-//                // always send control messages regardless of upActive and downActive
-//                for (DownstreamState state : downstreamStates) {
-//                    state.downstream.onMessageControl(mc);
-//                }
-//                break;
-//            case MESSAGE:
-                @Nullable MessageControlNode activeDownstream = getActiveDownstream();
-                if (null != activeDownstream) {
-                    activeDownstream.onMessageControl(mc);
-                } else {
-                    // append to the queue for when the active state flips, see #setActiveDownstream
-                    pendingMessageControls.add(mc);
-                }
-//                break;
-//        }
+        @Nullable MessageControlNode activeDownstream = getActiveDownstream();
+        if (null != activeDownstream) {
+            activeDownstream.onMessageControl(mc);
+        } else {
+            // append to the queue for when the active state flips, see #setActiveDownstream
+            pendingMessageControls.add(mc);
+        }
     }
 
 
