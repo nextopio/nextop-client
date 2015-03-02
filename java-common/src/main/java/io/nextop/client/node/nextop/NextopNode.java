@@ -8,6 +8,7 @@ import io.nextop.client.node.AbstractMessageControlNode;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
@@ -21,8 +22,16 @@ import java.util.concurrent.TimeUnit;
 public class NextopNode extends AbstractMessageControlNode {
 
     public static final class Config {
+        public final int chunkBytes;
 
+        public Config(int chunkBytes) {
+            this.chunkBytes = chunkBytes;
+        }
     }
+
+
+    public static final Config DEFAULT_CONFIG = new Config(/* aim for one packet per chunk */ 4 * 1024);
+
 
 
     final Config config;
@@ -33,7 +42,7 @@ public class NextopNode extends AbstractMessageControlNode {
     @Nullable
     volatile Wire.Adapter wireAdapter = null;
 
-    boolean active;
+    boolean active = false;
 
     @Nullable
     ControlLooper controlLooper = null;
@@ -43,6 +52,9 @@ public class NextopNode extends AbstractMessageControlNode {
 
 
 
+    public NextopNode() {
+        this(DEFAULT_CONFIG);
+    }
     public NextopNode(Config config) {
         this.config = config;
 
@@ -50,7 +62,10 @@ public class NextopNode extends AbstractMessageControlNode {
 
     }
 
-    /** @param wireFactory can be an instance of MessageControlNode */
+    /** Call before #init.
+     * @param wireFactory can be an instance of MessageControlNode.
+     *                     in that case, it will be attached as a sub-node ({@link #initDownstream}).
+     *                     this is useful if the wire factory needs to maintain its own network stack. */
     public void setWireFactory(Wire.Factory wireFactory) {
         this.wireFactory = wireFactory;
     }
@@ -143,6 +158,7 @@ public class NextopNode extends AbstractMessageControlNode {
             @Nullable SharedWireState sws = null;
 
 
+            top:
             while (active) {
                 try {
                     if (null == sws || !sws.active) {
@@ -151,7 +167,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             wire = wireFactory.create(null != sws ? sws.wire : null);
                         } catch (NoSuchElementException e) {
                             sws = null;
-                            continue;
+                            continue top;
                         }
 
                         Wire.Adapter wireAdapter = NextopNode.this.wireAdapter;
@@ -163,7 +179,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             syncTransferState(wire);
                         } catch (IOException e) {
                             // FIXME log
-                            continue;
+                            continue top;
                         }
 
                         sws = new SharedWireState(wire);
@@ -171,6 +187,7 @@ public class NextopNode extends AbstractMessageControlNode {
                         ReadLooper readLooper = new ReadLooper(sws);
                         sws.writeLooper = writeLooper;
                         sws.readLooper = readLooper;
+
                         writeLooper.start();
                         readLooper.start();
 
@@ -179,17 +196,25 @@ public class NextopNode extends AbstractMessageControlNode {
                     try {
                         sws.awaitEnd();
                     } catch (InterruptedException e) {
-                        continue;
+                        continue top;
                     }
 
                 } catch (Exception e) {
                     // FIXME log
-                    continue;
+                    continue top;
                 }
             }
 
             if (null != sws) {
                 sws.end();
+                while (true) {
+                    try {
+                        sws.awaitEnd();
+                        break;
+                    } catch (InterruptedException e) {
+                        continue;
+                    }
+                }
             }
         }
 
@@ -244,7 +269,7 @@ public class NextopNode extends AbstractMessageControlNode {
             }
 
 
-            final int bytesPerFrame = 32;
+            final int bytesPerFrame = Id.LENGTH;
 
             // write
             class Writer extends Thread {
@@ -313,11 +338,13 @@ public class NextopNode extends AbstractMessageControlNode {
                     controlBuffer[c] = F_SYNC_END;
                     c += 1;
                     controlBuffer[c] = SYNC_STATUS_OK;
+                    c += 1;
                     wire.write(controlBuffer, 0, c, 0);
                 }
                 wire.read(controlBuffer, 0, c, 0);
+
                 c = 0;
-                if (F_MESSAGE_END != controlBuffer[c]) {
+                if (F_SYNC_END != controlBuffer[c]) {
                     // FIXME log
                     throw new IOException("Bad sync end.");
                 }
@@ -335,28 +362,36 @@ public class NextopNode extends AbstractMessageControlNode {
     /* nextop framed format:
      * [byte type][next bytes depend on type] */
 
+    // FIXME finish
     static final class SharedWireState {
         final Wire wire;
-        volatile boolean active;
+        volatile boolean active = true;
 
         WriteLooper writeLooper;
         ReadLooper readLooper;
+
 
         SharedWireState(Wire wire) {
             this.wire = wire;
         }
 
-
         void end() {
-            // interrupt writer, reader
-            active = false;
+            synchronized (this) {
+                active = false;
+                notifyAll();
+            }
             writeLooper.interrupt();
             readLooper.interrupt();
-
         }
 
         void awaitEnd() throws InterruptedException {
-
+            synchronized (this) {
+                while (active) {
+                    wait();
+                }
+            }
+            writeLooper.join();
+            readLooper.join();
         }
     }
 
@@ -365,6 +400,9 @@ public class NextopNode extends AbstractMessageControlNode {
         final MessageControlState mcs = getMessageControlState();
 
         final byte[] controlBuffer = new byte[1024];
+
+        // FIXME need to work more on memory footprint.
+        final ByteBuffer serBuffer = ByteBuffer.allocate(8 * 1024);
 
         WriteLooper(SharedWireState sws) {
             this.sws = sws;
@@ -408,7 +446,30 @@ public class NextopNode extends AbstractMessageControlNode {
 
                     @Nullable MessageWriteState writeState = sts.writeStates.get(entry.id);
                     if (null == writeState) {
-                        // FIXME create it
+                        // create it
+                        byte[] bytes;
+                        try {
+                            WireValue.of(entry.message).toBytes(serBuffer);
+                            serBuffer.flip();
+                            bytes = new byte[serBuffer.remaining()];
+                            serBuffer.get(bytes);
+                        } finally {
+                            serBuffer.clear();
+                        }
+
+                        assert 0 < bytes.length;
+
+                        int chunkCount = (bytes.length + config.chunkBytes - 1) / config.chunkBytes;
+                        int[] chunkOffsets = new int[chunkCount];
+                        chunkOffsets[0] = 0;
+                        for (int i = 1; i < chunkCount; ++i) {
+                            chunkOffsets[i] = chunkOffsets[i - 1] + config.chunkBytes;
+                        }
+
+                        // FIXME do a full message.equals when message equals is implemented
+                        assert WireValue.Type.MESSAGE.equals(WireValue.valueOf(bytes).getType());
+
+                        writeState = new MessageWriteState(entry.id, bytes, chunkOffsets);
                     }
 
                     final int n = writeState.chunkOffsets.length;
@@ -419,7 +480,7 @@ public class NextopNode extends AbstractMessageControlNode {
                         controlBuffer[c] = F_MESSAGE_START;
                         c += 1;
                         Id.toBytes(entry.id, controlBuffer, c);
-                        c += 32;
+                        c += Id.LENGTH;
                         WireValue.putint(controlBuffer, c, writeState.bytes.length);
                         c += 4;
                         WireValue.putint(controlBuffer, c, n);
@@ -534,17 +595,18 @@ public class NextopNode extends AbstractMessageControlNode {
                     switch (controlBuffer[0]) {
                         case F_MESSAGE_START: {
                             // F_MESSAGE_START [id][total length][total chunks]
-                            int c = 32 + 4 + 4;
+                            int c = Id.LENGTH + 4 + 4;
                             sws.wire.read(controlBuffer, 0, c, 0);
                             c = 0;
                             id = Id.fromBytes(controlBuffer, c);
-                            c += 32;
+                            c += Id.LENGTH;
                             int length = WireValue.getint(controlBuffer, c);
                             c += 4;
                             int chunkCount = WireValue.getint(controlBuffer, c);
 
                             readState = sts.readStates.get(id);
                             if (null == readState) {
+                                // create it
                                 readState = new MessageReadState(id, length, chunkCount);
                                 sts.readStates.put(id, readState);
                             }
@@ -651,20 +713,39 @@ public class NextopNode extends AbstractMessageControlNode {
 
                             // received
                             // TODO move this to where the message is actually completed (ack on complete not receive)
-                            sts.writeUrgentMessages.add(ack(id));
+                            // TODO when ack changed, move message to readPending
+                            sts.writeUrgentMessages.offer(ack(id));
                             sws.writeLooper.interrupt();
 
                             sts.readStates.remove(id);
+
+                            // decode
+                            final WireValue messageValue = WireValue.valueOf(readState.bytes);
+                            // defer the parsing to the context thread TODO better?
+                            switch (messageValue.getType()) {
+                                case MESSAGE:
+                                    post(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Message message = messageValue.asMessage();
+                                            upstream.onMessageControl(MessageControl.receive(message));
+                                        }
+                                    });
+                                    break;
+                                default:
+                                    // FIXME log
+                                    break;
+                            }
+
 
                             break;
                         }
                         case F_ACK: {
                             // F_ACK [id]
-                            int c = 32;
+                            int c = Id.LENGTH;
                             sws.wire.read(controlBuffer, 0, c, 0);
                             c = 0;
                             Id uid = Id.fromBytes(controlBuffer, c);
-                            c += 32;
 
                             // remove from pending
                             sts.writePendingAck.remove(uid, MessageControlState.End.COMPLETED);
@@ -673,11 +754,10 @@ public class NextopNode extends AbstractMessageControlNode {
                         }
                         case F_NACK: {
                             // F_NACK [id]
-                            int c = 32;
+                            int c = Id.LENGTH;
                             sws.wire.read(controlBuffer, 0, c, 0);
                             c = 0;
                             Id uid = Id.fromBytes(controlBuffer, c);
-                            c += 32;
 
                             // move from pending to active
                             @Nullable Message message = sts.writePendingAck.remove(uid, MessageControlState.End.ERROR);
@@ -709,7 +789,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
     static byte[] nack(Id id) {
         // F_NACK [id]
-        byte[] nack = new byte[1 + 32];
+        byte[] nack = new byte[1 + Id.LENGTH];
         int c = 0;
         nack[c] = F_NACK;
         c += 1;
@@ -719,9 +799,9 @@ public class NextopNode extends AbstractMessageControlNode {
 
     static byte[] ack(Id id) {
         // F_NACK [id]
-        byte[] ack = new byte[1 + 32];
+        byte[] ack = new byte[1 + Id.LENGTH];
         int c = 0;
-        ack[c] = F_NACK;
+        ack[c] = F_ACK;
         c += 1;
         Id.toBytes(id, ack, c);
         return ack;

@@ -128,6 +128,22 @@ public class WireValueTest extends TestCase {
     }
 
 
+    public void testBasicMessage() {
+        ByteBuffer bb = ByteBuffer.allocate(1024);
+
+        Message a = Message.newBuilder()
+                .setRoute("GET http://nextop.io")
+                .build();
+
+        bb.clear();
+        WireValue.of(a).toBytes(bb);
+        bb.flip();
+        Message da = WireValue.valueOf(bb).asMessage();
+
+        // FIXME assert equals
+    }
+
+
     /** from WireValueTest */
     private static JsonElement randomJson(Random r, int d) {
         return randomJson(r, d, 0);

@@ -725,7 +725,8 @@ public abstract class WireValue {
         }
         @Override
         public Message asMessage() {
-            return MessageCodec.valueOf(bytes, offset, cs);
+            // [0] is the header
+            return MessageCodec.valueOf(bytes, offset + 1, cs);
         }
         @Override
         public EncodedImage asImage() {
@@ -780,7 +781,8 @@ public abstract class WireValue {
         }
         @Override
         public EncodedImage asImage() {
-            return ImageCodec.valueOf(bytes, offset);
+            // [0] is the header
+            return ImageCodec.valueOf(bytes, offset + 1);
         }
     }
 
@@ -1110,8 +1112,14 @@ public abstract class WireValue {
                 }
                 return c;
             }
+            case MESSAGE:
+                return value.asMessage().hashCode();
+            case IMAGE:
+                return value.asImage().hashCode();
+            case NULL:
+                return 0;
             default:
-                throw new IllegalArgumentException();
+                throw new IllegalArgumentException("" + value.type);
         }
     }
 
@@ -1146,6 +1154,12 @@ public abstract class WireValue {
                 return a.asMap().equals(b.asMap());
             case LIST:
                 return a.asList().equals(b.asList());
+            case MESSAGE:
+                return a.asMessage().equals(b.asMessage());
+            case IMAGE:
+                return a.asImage().equals(b.asImage());
+            case NULL:
+                return true;
             default:
                 throw new IllegalArgumentException();
         }
@@ -1554,14 +1568,16 @@ public abstract class WireValue {
             case BOOLEAN:
                 bb.put((byte) (value.asBoolean() ? H_TRUE_BOOLEAN : H_FALSE_BOOLEAN));
                 break;
-            case NULL:
-                bb.put((byte) H_NULL);
-                break;
             case MESSAGE:
+                bb.put((byte) H_MESSAGE);
                 MessageCodec.toBytes(value.asMessage(), lb, bb);
                 break;
             case IMAGE:
-                // FIXME
+                bb.put((byte) H_IMAGE);
+                ImageCodec.toBytes(value.asImage(), lb, bb);
+                break;
+            case NULL:
+                bb.put((byte) H_NULL);
                 break;
             default:
                 throw new IllegalArgumentException();
@@ -1594,8 +1610,12 @@ public abstract class WireValue {
 
         int luti(WireValue value) {
             S s = stats.get(value);
-            assert null != s;
-            return s.luti;
+            if (null != s) {
+                return s.luti;
+            } else {
+                // not in the lut
+                return -1;
+            }
         }
 
 
@@ -1799,6 +1819,14 @@ public abstract class WireValue {
                     return 8;
                 case BOOLEAN:
                     return 1;
+                case MESSAGE:
+                    // FIXME
+                    return 1;
+                case IMAGE:
+                    // FIXME
+                    return 1;
+                case NULL:
+                    return 1;
                 default:
                     throw new IllegalArgumentException();
             }
@@ -1911,6 +1939,28 @@ public abstract class WireValue {
                     return Float.compare(a.asFloat(), b.asFloat());
                 case FLOAT64:
                     return Double.compare(a.asDouble(), b.asDouble());
+                case MESSAGE:
+                    return a.asMessage().id.compareTo(b.asMessage().id);
+                case IMAGE: {
+                    // compare blobs
+                    ByteBuffer abytes = a.asImage().toBuffer();
+                    ByteBuffer bbytes = b.asImage().toBuffer();
+                    int n = abytes.remaining();
+                    int m = bbytes.remaining();
+                    d = n - m;
+                    if (0 != d) {
+                        return d;
+                    }
+                    for (int i = 0; i < n; ++i) {
+                        d = (0xFF & abytes.get(i)) - (0xFF & bbytes.get(i));
+                        if (0 != d) {
+                            return d;
+                        }
+                    }
+                    return 0;
+                }
+                case NULL:
+                    return 0;
                 default:
                     throw new IllegalArgumentException();
             }
@@ -2522,7 +2572,7 @@ public abstract class WireValue {
             return new EncodedImage(format, orientation, width, height, bytes, offset + 20, length);
         }
 
-        public static void toBytes(EncodedImage image, ByteBuffer bb) {
+        public static void toBytes(EncodedImage image, Lb lb, ByteBuffer bb) {
             switch (image.format) {
                 case WEBP:
                     bb.put((byte) H_F_WEBP);
@@ -2578,9 +2628,9 @@ public abstract class WireValue {
             bb.putInt(message.groupPriority);
             // FIXME support serialID when it comes in
             // TODO (?) NURL codec to avoid string conversion
-            WireValue.toBytes(WireValue.of(message.route.toString()), lb, bb);
-            WireValue.toBytes(WireValue.of(message.headers), lb, bb);
-            WireValue.toBytes(WireValue.of(message.parameters), lb, bb);
+            WireValue._toBytes(WireValue.of(message.route.toString()), lb, bb);
+            WireValue._toBytes(WireValue.of(message.headers), lb, bb);
+            WireValue._toBytes(WireValue.of(message.parameters), lb, bb);
         }
 
 

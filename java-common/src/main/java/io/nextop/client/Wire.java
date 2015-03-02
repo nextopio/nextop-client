@@ -18,7 +18,8 @@ public interface Wire {
     int BOUNDARY_END = 0x02;
 
     // return the termination future
-    Future<IOException> open() throws IOException;
+//    Future<IOException> open() throws IOException;
+    void close() throws IOException;
 
     void read(byte[] buffer, int offset, int length, int messageBoundary) throws IOException;
     void skip(long n, int messageBoundary) throws IOException;

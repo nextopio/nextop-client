@@ -1,13 +1,9 @@
 package io.nextop.client;
 
-import rx.functions.Action0;
-import rx.subjects.BehaviorSubject;
-
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.concurrent.Future;
 
 public final class Wires {
 
@@ -23,6 +19,13 @@ public final class Wires {
         return new WireOutputStream(wire);
     }
 
+    public static Wire transfer() {
+        return transfer(/* default tcp window */ 64 * 1024);
+    }
+    public static Wire transfer(int size) {
+        return new TransferBuffer(size);
+    }
+
 
 
 
@@ -36,52 +39,27 @@ public final class Wires {
         @Nullable
         private final OutputStream os;
 
-        private final BehaviorSubject<IOException> exSubject;
-        private final Future<IOException> exFuture;
-
         private boolean closed = false;
 
 
         IoWire(@Nullable InputStream is, @Nullable OutputStream os) {
             this.is = is;
             this.os = os;
-
-            exSubject = BehaviorSubject.create();
-            exFuture = exSubject.doOnUnsubscribe(new Action0() {
-                @Override
-                public void call() {
-                    close();
-                }
-            }).toBlocking().toFuture();
-        }
-
-
-        private void close() {
-            if (!closed) {
-                try {
-                    is.close();
-                } catch (IOException e) {
-                    // continue
-                }
-                try {
-                    os.close();
-                } catch (IOException e) {
-                    // continue
-                }
-                closed = true;
-            }
-        }
-
-        private void close(IOException cause) {
-            exSubject.onNext(cause);
-            assert closed;
         }
 
 
         @Override
-        public Future<IOException> open() throws IOException {
-            // already open
-            return exFuture;
+        public void close() throws IOException {
+            if (closed) {
+                throw new IOException();
+            }
+
+            closed = true;
+            try {
+                is.close();
+            } finally {
+                os.close();
+            }
         }
 
         @Override
@@ -102,7 +80,7 @@ public final class Wires {
                     throw new IOException("No input.");
                 }
             } catch (IOException e) {
-                close(e);
+                close();
                 throw e;
             }
         }
@@ -125,7 +103,7 @@ public final class Wires {
                     throw new IOException("No input.");
                 }
             } catch (IOException e) {
-                close(e);
+                close();
                 throw e;
             }
         }
@@ -142,7 +120,7 @@ public final class Wires {
                     throw new IOException("No output.");
                 }
             } catch (IOException e) {
-                close(e);
+                close();
                 throw e;
             }
         }
@@ -156,7 +134,7 @@ public final class Wires {
                     throw new IOException("No output.");
                 }
             } catch (IOException e) {
-                close(e);
+                close();
                 throw e;
             }
         }
@@ -203,7 +181,7 @@ public final class Wires {
 
         @Override
         public void close() throws IOException {
-            wire.open().cancel(true);
+            wire.close();
         }
     }
 
@@ -241,45 +219,135 @@ public final class Wires {
 
         @Override
         public void close() throws IOException {
-            wire.open().cancel(true);
+            wire.close();
         }
     }
 
-//    private static class WireSingleMessageInputStream extends WireInputStream {
-//        int flags;
-//
-//        WireSingleMessageInputStream(Wire wire, int initialFlags) {
-//            super(wire);
-//            flags = initialFlags;
-//        }
-//
-//        @Override
-//        public int read(byte[] b, int off, int len) throws IOException {
-//            try {
-//                return wire.read(b, off, len, flags);
-//            } finally {
-//                flags = 0;
-//            }
-//        }
-//    }
-//
-//
-//    private static class WireSingleMessageOutputStream extends WireOutputStream {
-//        int flags;
-//
-//        WireSingleMessageOutputStream(Wire wire, int initialFlags) {
-//            super(wire);
-//            flags = initialFlags;
-//        }
-//
-//        @Override
-//        public void write(byte[] b, int off, int len) throws IOException {
-//            try {
-//                wire.write(b, off, len, flags);
-//            } finally {
-//                flags = 0;
-//            }
-//        }
-//    }
+
+
+    // circular buffer
+    private static final class TransferBuffer implements Wire {
+
+        private final byte[] tb;
+        private int writeIndex = 0;
+        // read index trails the write index
+        // available = (writeIndex - readIndex) % n = (writeIndex - readIndex + n) % n
+        private int readIndex = 0;
+        private int available = 0;
+
+        private boolean closed = false;
+
+
+        TransferBuffer(int size) {
+            this.tb = new byte[size];
+        }
+
+
+        @Override
+        public synchronized void close() throws IOException {
+            if (closed) {
+                throw new IOException();
+            }
+            closed = true;
+        }
+
+        @Override
+        public synchronized void read(byte[] buffer, int offset, int length, int messageBoundary) throws IOException {
+            int i = 0;
+            while (!closed && i < length) {
+                int a = Math.min(length - i, available);
+
+                if (0 < a) {
+                    for (int j = 0; j < a; ++j) {
+                        buffer[offset + i + j] = tb[(readIndex + j) % tb.length];
+                    }
+                    i += a;
+                    readIndex += a;
+                    available -= a;
+
+                    notifyAll();
+
+                    if (length <= i) {
+                        break;
+                    }
+                }
+
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    // can't interrupt io
+                }
+            }
+            if (closed) {
+                throw new IOException();
+            }
+        }
+
+        @Override
+        public synchronized void skip(long n, int messageBoundary) throws IOException {
+            long i = 0;
+            while (!closed && i < n) {
+                long a = Math.min(n - i, available);
+
+                if (0 < a) {
+                    i += a;
+                    readIndex += a;
+                    available -= a;
+
+                    notifyAll();
+
+                    if (n <= i) {
+                        break;
+                    }
+                }
+
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    // can't interrupt io
+                }
+            }
+            if (closed) {
+                throw new IOException();
+            }
+        }
+
+        @Override
+        public synchronized void write(byte[] buffer, int offset, int length, int messageBoundary) throws IOException {
+            int i = 0;
+            while (!closed && i < length) {
+                int a = Math.min(length - i, tb.length - available);
+
+                if (0 < a) {
+                    for (int j = 0; j < a; ++j) {
+                        tb[(writeIndex + j) % tb.length] = buffer[offset + i + j];
+                    }
+                    i += a;
+                    writeIndex += a;
+                    available += a;
+
+                    notifyAll();
+
+                    if (length <= i) {
+                        break;
+                    }
+                }
+
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    // can't interrupt io
+                }
+            }
+            if (closed) {
+                throw new IOException();
+            }
+        }
+
+        @Override
+        public synchronized void flush() throws IOException {
+            // already flushed
+        }
+    }
 
 }

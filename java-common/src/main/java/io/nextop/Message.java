@@ -29,6 +29,7 @@ import static io.nextop.Route.Method;
 import static io.nextop.Route.Target;
 
 // goals: fast to parse, minimal object creation on parse or each operation
+// FIXME implement hashCode, equals
 public class Message {
     public static final WireValue P_CONTENT = WireValue.of("$content");
     public static final WireValue P_FRAGMENT = WireValue.of("$fragment");
@@ -905,4 +906,170 @@ public class Message {
         }
         ALL_HTTP_HEADERS = ImmutableSet.copyOf(httpHeaders);
     }
+
+
+
+    // FIXME in general, be able to set the response group and priority for any message
+
+
+    /////// LAYERS ///////
+
+    public static final class LayerInfo {
+        public static enum Quality {
+            HIGH,
+            LOW
+        }
+
+
+        public final Quality quality;
+        public final EncodedImage.Format format;
+
+        // size: <= 0 means "original" or "aspect-aware scaled" if the other dim is pinned
+        public final int width;
+        public final int height;
+        // TODO can attach other transform params here: scale type, crop, etc
+
+        public final @Nullable Id groupId;
+        public final int groupPriority;
+
+
+        LayerInfo(Quality quality, EncodedImage.Format format, int width, int height,
+                  @Nullable Id groupId, int groupPriority) {
+            this.quality = quality;
+            this.format = format;
+            this.width = width;
+            this.height = height;
+            this.groupId = groupId;
+            this.groupPriority = groupPriority;
+        }
+
+
+        public boolean isScale() {
+            return 0 < width || 0 < height;
+        }
+        public int scaleWidth(int w, int h) {
+            if (0 < width) {
+                // pinned
+                return width;
+            }
+            if (0 < height) {
+                // aspect scale
+                return w * height / h ;
+            }
+            // track
+            return w;
+        }
+        public int scaleHeight(int w, int h) {
+            if (0 < height) {
+                // pinned
+                return height;
+            }
+            if (0 < width) {
+                // aspect scale
+                return h * width / w;
+            }
+            // track
+            return h;
+        }
+
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder(128);
+            sb.append(quality.toString().toLowerCase())
+                .append(" ")
+                .append(format.toString().toLowerCase())
+                .append(" ")
+                .append(0 < width ? width : 0)
+                .append(":")
+                .append(0 < height ? height : 0);
+            if (null != groupId) {
+                sb.append(" ")
+                    .append(groupId)
+                    .append(":")
+                    .append(groupPriority);
+            }
+            return sb.toString();
+        }
+
+        public static LayerInfo valueOf(String s) {
+            String[] parts = s.split(" ");
+            if (parts.length < 3) {
+                throw new IllegalArgumentException();
+            }
+
+            Quality quality = Quality.valueOf(parts[0].toUpperCase());
+            EncodedImage.Format format = EncodedImage.Format.valueOf(parts[1].toUpperCase());
+
+            String[] sizeParts = parts[2].split(":");
+            if (2 != sizeParts.length) {
+                throw new IllegalArgumentException();
+            }
+            int width = Integer.parseInt(sizeParts[0]);
+            int height = Integer.parseInt(sizeParts[1]);
+
+            @Nullable Id groupId;
+            int groupPriority;
+            if (4 <= parts.length) {
+                // group
+                String[] groupParts = parts[3].split(":");
+                if (2 != groupParts.length) {
+                    throw new IllegalArgumentException();
+                }
+                groupId = Id.valueOf(groupParts[0]);
+                groupPriority = Integer.parseInt(groupParts[1]);
+            } else {
+                groupId = null;
+                groupPriority = 0;
+            }
+
+            return new LayerInfo(quality, format, width, height,
+                    groupId, groupPriority);
+        }
+
+    }
+
+
+    //
+
+    public static final WireValue H_LAYERS = WireValue.of("$layers");
+
+
+    @Nullable
+    public static LayerInfo[] getLayers(Message message) {
+        @Nullable WireValue layersValue = message.headers.get(H_LAYERS);
+        if (null == layersValue) {
+            return null;
+        }
+
+        switch (layersValue.getType()) {
+            case UTF8:
+                String s = layersValue.asString();
+                String[] parts = s.split(";");
+                int n = parts.length;
+                LayerInfo[] layers = new LayerInfo[n];
+                for (int i = 0; i < n; ++i) {
+                    layers[i] = LayerInfo.valueOf(parts[i]);
+                }
+                return layers;
+            default:
+                throw new IllegalArgumentException();
+        }
+    }
+
+    public static void setLayers(Message.Builder builder, LayerInfo ... layers) {
+        int n = layers.length;
+        if (n <= 0) {
+            builder.setHeader(H_LAYERS, null);
+        } else {
+            StringBuilder sb = new StringBuilder(128);
+            sb.append(layers[0].toString());
+            for (int i = 1; i < n; ++i) {
+                sb.append(" ").append(layers[i].toString());
+            }
+            builder.setHeader(H_LAYERS, WireValue.of(sb.toString()));
+        }
+    }
+
+
 }

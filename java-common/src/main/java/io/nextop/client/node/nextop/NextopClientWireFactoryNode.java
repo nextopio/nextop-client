@@ -1,9 +1,10 @@
 package io.nextop.client.node.nextop;
 
 import io.nextop.*;
-import io.nextop.client.MessageControlNode;
+import io.nextop.client.MessageControl;
 import io.nextop.client.Wire;
 import io.nextop.client.Wires;
+import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.client.node.Head;
 import io.nextop.client.node.http.HttpNode;
 import io.nextop.client.retry.SendStrategy;
@@ -18,12 +19,11 @@ import java.io.Serializable;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 // FIXME(security) client TLS certificate. the certificate is used to verify the client ID
 // FIXME node implementation
-public class NextopClientWireFactoryNode implements Wire.Factory, MessageControlNode {
+public class NextopClientWireFactoryNode extends AbstractMessageControlNode implements Wire.Factory {
 
     public static final class Config {
         final int allowedFailsPerAuthority;
@@ -109,13 +109,15 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
     }
 
 
-//
-//    public State snapshotState() {
-//        // FIXME
-//        return state;
-//    }
+    @Override
+    public void onActive(boolean active) {
+        // FIXME
+    }
 
-
+    @Override
+    public void onMessageControl(MessageControl mc) {
+        // FIXME
+    }
 
 
     // if state has all failed endpoints,
@@ -366,10 +368,9 @@ public class NextopClientWireFactoryNode implements Wire.Factory, MessageControl
             this.authority = authority;
         }
 
-
         @Override
-        public Future<IOException> open() throws IOException {
-            return impl.open();
+        public void close() throws IOException {
+            impl.close();
         }
 
         @Override

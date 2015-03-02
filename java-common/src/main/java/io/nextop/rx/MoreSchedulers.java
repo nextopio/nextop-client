@@ -5,8 +5,12 @@ import rx.Scheduler;
 import rx.schedulers.Schedulers;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class MoreSchedulers {
+    public static Scheduler serial() {
+        return Schedulers.from(Executors.newSingleThreadExecutor());
+    }
 
     public static Scheduler serial(Executor executor) {
         return Schedulers.from(MoreExecutors.serial(executor));

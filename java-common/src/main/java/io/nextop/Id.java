@@ -14,7 +14,7 @@ import java.util.UUID;
 public final class Id implements Comparable<Id> {
     private static final SecureRandom sr = new SecureRandom();
 
-    static final int LENGTH = 32;
+    public static final int LENGTH = 32;
 
     /** generate a 256-bit UUID as a 128-bit UUID + 128 bits of randomness
      * @see <a href="http://www.ietf.org/rfc/rfc4122.txt">RFC4122</a>
@@ -56,14 +56,14 @@ public final class Id implements Comparable<Id> {
 
 
     public static void toBytes(Id id, byte[] buffer, int offset) {
-        if (offset < 0 || buffer.length <= offset + 32) {
+        if (offset < 0 || buffer.length < offset + 32) {
             throw new IllegalArgumentException();
         }
         System.arraycopy(id.bytes, id.offset, buffer, offset, 32);
     }
 
     public static Id fromBytes(byte[] buffer, int offset) {
-        if (offset < 0 || buffer.length <= offset + 32) {
+        if (offset < 0 || buffer.length < offset + 32) {
             throw new IllegalArgumentException();
         }
         byte[] bytes = Arrays.copyOfRange(buffer, offset, offset + 32);
