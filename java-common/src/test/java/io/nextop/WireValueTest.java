@@ -140,7 +140,7 @@ public class WireValueTest extends TestCase {
         bb.flip();
         Message da = WireValue.valueOf(bb).asMessage();
 
-        // FIXME assert equals
+        assertEquals(a, da);
     }
 
 

@@ -1,5 +1,6 @@
 package io.nextop.client.node.nextop;
 
+import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.client.MessageContext;
 import io.nextop.client.MessageContexts;
@@ -15,8 +16,10 @@ import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 
 import javax.annotation.Nullable;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -42,9 +45,20 @@ public class NextopNodeTest extends TestCase {
         final Semaphore end = new Semaphore(0);
 
 
+        Random r = new Random();
+
         // FIXME more thorough stream
         // FIXME list of send messages for each. then just verify send==received
+        // FIXME random messages: from a fixed number of groups, set different priorities
         int n = 1000;
+        RandomMessageGenerator rmg = new RandomMessageGenerator(r,
+                new RandomMessageGenerator.GroupDist(Id.create(), 0, 4),
+                new RandomMessageGenerator.GroupDist(Id.create(), 0, 10),
+                new RandomMessageGenerator.GroupDist(Id.create(), 10, 20),
+                new RandomMessageGenerator.GroupDist(Id.create(), 4, 10));
+
+        final List<Message> aSend = new LinkedList<Message>();
+        final List<Message> bSend = new LinkedList<Message>();
         final List<Message> aReceive = new LinkedList<Message>();
         final List<Message> bReceive = new LinkedList<Message>();
 
@@ -134,29 +148,72 @@ public class NextopNodeTest extends TestCase {
             });
 
 
-
-            // FIXME send messages with priorities, and measure when each receives the message
-
-
             for (int i = 0; i < n; ++i) {
-                aHead.send(Message.newBuilder().setRoute("GET http://nextop.io").build());
+                Message message = rmg.next();
+                aSend.add(message);
+                aHead.send(message);
             }
             for (int i = 0; i < n; ++i) {
-                bHead.send(Message.newBuilder().setRoute("GET http://nextop.io").build());
+                Message message = rmg.next();
+                bSend.add(message);
+                bHead.send(message);
             }
-
-
-
-
         }
 
         void check() throws Exception {
+            assertEquals(aSend.size(), bReceive.size());
+            assertEquals(bSend.size(), aReceive.size());
 
-            assertEquals(n, bReceive.size());
-            assertEquals(n, aReceive.size());
-
+            assertEquals(new HashSet<Message>(aSend), new HashSet<Message>(bReceive));
+            assertEquals(new HashSet<Message>(bSend), new HashSet<Message>(aReceive));
         }
     }
+
+
+
+    static final class RandomMessageGenerator {
+        final Random r;
+        final GroupDist[] groupDists;
+
+
+        RandomMessageGenerator(Random r, GroupDist ... groupDists) {
+            this.r = r;
+            this.groupDists = groupDists;
+        }
+
+
+        Message next() {
+            GroupDist groupDist = groupDists[r.nextInt(groupDists.length)];
+
+            int groupPriority = groupDist.minPriority + r.nextInt(groupDist.maxPriority - groupDist.minPriority);
+
+            // FIXME more diversity here
+
+            Message message = Message.newBuilder()
+                    .setRoute("GET http://nextop.io")
+                    .setGroupId(groupDist.groupId)
+                    .setGroupPriority(groupPriority)
+                    .build();
+
+            return message;
+        }
+
+
+
+        static final class GroupDist {
+            final Id groupId;
+            final int minPriority;
+            final int maxPriority;
+
+            GroupDist(Id groupId, int minPriority, int maxPriority) {
+                this.groupId = groupId;
+                this.minPriority = minPriority;
+                this.maxPriority = maxPriority;
+            }
+        }
+    }
+
+
 
 
     // FIXME tests around sync, reconnect, disconnect behavior

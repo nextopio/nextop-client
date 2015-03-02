@@ -306,6 +306,31 @@ public class Message {
     }
 
 
+    @Override
+    public int hashCode() {
+        int c = id.hashCode();
+        c = 31 * c + groupId.hashCode();
+        c = 31 * c + groupPriority;
+        c = 31 * c + route.hashCode();
+        c = 31 * c + headers.hashCode();
+        c = 31 * c + parameters.hashCode();
+        return c;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof Message)) {
+            return false;
+        }
+
+        Message b = (Message) obj;
+        return id.equals(b.id)
+                && groupId.equals(b.groupId) && groupPriority == b.groupPriority
+                && route.equals(b.route)
+                && headers.equals(b.headers)
+                && parameters.equals(b.parameters);
+    }
+
 
     public static final class Builder {
         private final Id id;
