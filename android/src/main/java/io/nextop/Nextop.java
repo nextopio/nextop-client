@@ -21,19 +21,26 @@ import io.nextop.client.MessageContexts;
 import io.nextop.client.MessageControlNode;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.node.Head;
+import io.nextop.client.node.MultiNode;
 import io.nextop.client.node.http.HttpNode;
+import io.nextop.client.node.nextop.NextopClientWireFactory;
+import io.nextop.client.node.nextop.NextopNode;
 import io.nextop.com.crittercism.app.Crittercism;
 import rx.Observable;
+import rx.Scheduler;
 import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
 import rx.functions.Func1;
+import rx.schedulers.Schedulers;
 import rx.subjects.BehaviorSubject;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -514,7 +521,7 @@ public class Nextop {
 
             this.node = node;
 
-            MessageContext messageContext = MessageContexts.create(/* FIXME don't use main, fix scheduler issues in general */ AndroidSchedulers.mainThread());
+            MessageContext messageContext = MessageContexts.create();
             mcs = new MessageControlState(messageContext);
             head = Head.create(messageContext, mcs, node, /* FIXME */ AndroidSchedulers.mainThread());
             head.init(null);
@@ -562,7 +569,9 @@ public class Nextop {
         public void cancelSend(Id id) {
             head.cancelSend(id);
             // FIXME
-            inFlight.inverse().remove(id);
+            synchronized (cacheMutex) {
+                inFlight.inverse().remove(id);
+            }
         }
 
 
@@ -571,6 +580,7 @@ public class Nextop {
 
         // FIXME
         // FIXME if these are GETs, do request piggybacking and decoding on multiple threads
+        Object cacheMutex = new Object();
 
         Cache<String, Bitmap> layerCache = CacheBuilder.newBuilder()
                 .maximumWeight(100)
@@ -622,7 +632,10 @@ public class Nextop {
             // FIXME start at the last bounds and go down for a cache hit
             final String uri = layer.message.toUriString();
             final String cacheKey = LayersConfig.toCacheKey(uri, sendBounds.get(0));
-            @Nullable Bitmap cachedBitmap = layerCache.getIfPresent(cacheKey);
+            @Nullable Bitmap cachedBitmap;
+            synchronized (cacheMutex) {
+                cachedBitmap = layerCache.getIfPresent(cacheKey);
+            }
             if (cacheable && null != cachedBitmap) {
                 return Receiver.create(this, layer.message.inboxRoute(), Observable.just(Layer.bitmap(
                         // FIXME set cache headers
@@ -635,7 +648,10 @@ public class Nextop {
             // FIXME option to attach
             Route route;
             Receiver.UnsubscribeBehavior defaultUnsubscribeBehavior;
-            @Nullable final Id inFlightId = inFlight.get(uri);
+            @Nullable final Id inFlightId;
+            synchronized (cacheMutex) {
+                inFlightId = inFlight.get(uri);
+            }
             if (null != inFlightId) {
                 route = Message.inboxRoute(inFlightId);
                 // FIXME attach flow and receiver flow needs to be reworked
@@ -653,9 +669,12 @@ public class Nextop {
                             bitmap.getWidth(), bitmap.getHeight(),
                             bytes, 0, bytes.length);
 
-                    tmessage = layer.message.buildOn()
-                            .setContent(WireValue.of(image))
-                            .build();
+                    Message.Builder builder = layer.message.buildOn()
+                            .setContent(WireValue.of(image));
+
+                    Message.setLayers(builder, new Message.LayerInfo(Message.LayerInfo.Quality.LOW, EncodedImage.Format.JPEG, 32, 32, null, 0));
+
+                    tmessage = builder.build();
                 } else {
                     tmessage = layer.message;
                 }
@@ -663,7 +682,9 @@ public class Nextop {
 
                 head.send(tmessage);
                 route = tmessage.inboxRoute();
-                inFlight.put(uri, tmessage.id);
+                synchronized (cacheMutex) {
+                    inFlight.put(uri, tmessage.id);
+                }
 
                 defaultUnsubscribeBehavior = defaultUnsubscribeBehavior(tmessage);
             }
@@ -671,9 +692,11 @@ public class Nextop {
             // FIXME parallel
 //            tmessage = tmessage.buildOn().setGroupId(Id.create()).build();
 
+
             // FIXME subject node needs to put dispatch on the MAIN thread. get scheduling everywhere fixed
             // FIXME (otherwise could miss the receive)
-            return Receiver.create(this, route, head.receive(route).map(new Func1<Message, Layer>() {
+
+            Observable<Layer> s = head.receive(route).observeOn(decodeScheduler).map(new Func1<Message, Layer>() {
                 @Override
                 public Layer call(Message message) {
                     WireValue content = message.getContent();
@@ -688,9 +711,11 @@ public class Nextop {
 
                             Bitmap bitmap = BitmapFactory.decodeByteArray(image.bytes, image.offset, image.length, opts);
 
-                            // FIXME correct cache key
-                            layerCache.put(cacheKey, bitmap);
-                            inFlight.remove(uri);
+                            synchronized (cacheMutex) {
+                                // FIXME correct cache key
+                                layerCache.put(cacheKey, bitmap);
+                                inFlight.remove(uri);
+                            }
 
 
                             return Layer.bitmap(message.buildOn().setContent(null).build(),
@@ -699,13 +724,29 @@ public class Nextop {
                             return Layer.message(message);
                     }
                 }
-            }),
+            }).observeOn(AndroidSchedulers.mainThread());
+
+
+            // FIXME for the cache
+            defaultUnsubscribeBehavior = Receiver.UnsubscribeBehavior.DETACH;
+            // FIXME for the cache
+            s = s.share();
+            s.subscribe();
+
+
+            Receiver<Layer> r = Receiver.create(this, route, s,
 
                     // FIXME can't cancel send on an in-flight attach
                     // FIXME this whole flow needs to be reworked
                     defaultUnsubscribeBehavior
             );
+
+
+            return r;
         }
+
+        Executor decodeExecutor = Executors.newFixedThreadPool(4);
+        Scheduler decodeScheduler = Schedulers.from(decodeExecutor);
 
         // FIXME distinct within 1%
         // FIXME timeout if no first emit after 15s
@@ -845,8 +886,18 @@ public class Nextop {
 
         private static MessageControlNode createLimitedNode() {
             // FIXME 0.2 see ClientDemo for where we want to be
-            MessageControlNode node = new HttpNode();
-            return node;
+            NextopNode nextopNode = new NextopNode();
+            nextopNode.setWireFactory(new NextopClientWireFactory(
+                    new NextopClientWireFactory.Config(Authority.valueOf("dns.nextop.io"), 2,
+                            /* FIXME */ Collections.singletonList(Authority.valueOf(/*"127.0.0.1:27780"*/"54.149.233.13:27780")))));
+
+            return nextopNode;
+
+//            HttpNode httpNode = new HttpNode();
+
+//            MultiNode multiNode = new MultiNode(nextopNode, httpNode);
+
+//            return httpNode;
         }
 
         private Limited(Context context, @Nullable Auth auth) {

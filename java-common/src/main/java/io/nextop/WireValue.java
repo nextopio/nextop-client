@@ -485,7 +485,7 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            throw new UnsupportedOperationException();
+            return String.valueOf(asInt());
         }
         @Override
         public int asInt() {
@@ -493,19 +493,19 @@ public abstract class WireValue {
         }
         @Override
         public long asLong() {
-            throw new UnsupportedOperationException();
+            return asInt();
         }
         @Override
         public float asFloat() {
-            throw new UnsupportedOperationException();
+            return (float) asInt();
         }
         @Override
         public double asDouble() {
-            throw new UnsupportedOperationException();
+            return (double) asInt();
         }
         @Override
         public boolean asBoolean() {
-            throw new UnsupportedOperationException();
+            return 0 != asInt();
         }
         @Override
         public List<WireValue> asList() {
@@ -536,11 +536,11 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            throw new UnsupportedOperationException();
+            return String.valueOf(asLong());
         }
         @Override
         public int asInt() {
-            throw new UnsupportedOperationException();
+            return (int) asLong();
         }
         @Override
         public long asLong() {
@@ -548,15 +548,15 @@ public abstract class WireValue {
         }
         @Override
         public float asFloat() {
-            throw new UnsupportedOperationException();
+            return (float) asLong();
         }
         @Override
         public double asDouble() {
-            throw new UnsupportedOperationException();
+            return (double) asLong();
         }
         @Override
         public boolean asBoolean() {
-            throw new UnsupportedOperationException();
+            return 0 != asLong();
         }
         @Override
         public List<WireValue> asList() {
@@ -587,15 +587,15 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            throw new UnsupportedOperationException();
+            return String.valueOf(asFloat());
         }
         @Override
         public int asInt() {
-            throw new UnsupportedOperationException();
+            return (int) asFloat();
         }
         @Override
         public long asLong() {
-            throw new UnsupportedOperationException();
+            return (long) asFloat();
         }
         @Override
         public float asFloat() {
@@ -603,11 +603,11 @@ public abstract class WireValue {
         }
         @Override
         public double asDouble() {
-            throw new UnsupportedOperationException();
+            return (double) asFloat();
         }
         @Override
         public boolean asBoolean() {
-            throw new UnsupportedOperationException();
+            return 0.f != asFloat();
         }
         @Override
         public List<WireValue> asList() {
@@ -638,19 +638,19 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            throw new UnsupportedOperationException();
+            return String.valueOf(asDouble());
         }
         @Override
         public int asInt() {
-            throw new UnsupportedOperationException();
+            return (int) asDouble();
         }
         @Override
         public long asLong() {
-            throw new UnsupportedOperationException();
+            return (long) asDouble();
         }
         @Override
         public float asFloat() {
-            throw new UnsupportedOperationException();
+            return (float) asDouble();
         }
         @Override
         public double asDouble() {
@@ -658,7 +658,7 @@ public abstract class WireValue {
         }
         @Override
         public boolean asBoolean() {
-            throw new UnsupportedOperationException();
+            return 0.0 != asDouble();
         }
         @Override
         public List<WireValue> asList() {

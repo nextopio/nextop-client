@@ -813,6 +813,10 @@ public class NextopNode extends AbstractMessageControlNode {
                                             public void run() {
                                                 Message message = messageValue.asMessage();
                                                 upstream.onMessageControl(MessageControl.receive(message));
+                                                // FIXME mcs needs to transmit message controls.
+                                                // FIXME the hard part is how to handle that on channels that don't do controls (but this might not matter because message controls are only on the down for a multi client)
+                                                // FIXME actually, yes, this won't matter for a multi client. so adding it for a full client is fine
+                                                upstream.onMessageControl(MessageControl.receive(MessageControl.Type.COMPLETE, message.route));
                                             }
                                         });
                                         break;
