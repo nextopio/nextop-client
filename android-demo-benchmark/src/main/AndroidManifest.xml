@@ -3,10 +3,11 @@
     package="io.nextop.demo.benchmark" >
 
     <application
+        android:name="io.nextop.NextopApplication"
         android:allowBackup="true"
         android:label="@string/app_name" >
         <activity
-            android:name=".MainActivity"
+            android:name=".MainAcitivity"
             android:label="@string/app_name" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

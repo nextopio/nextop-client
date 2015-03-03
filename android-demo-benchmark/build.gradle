@@ -1,4 +1,18 @@
+
 apply plugin: 'com.android.application'
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'com.android.tools.build', name: 'gradle', version: '1.0.1'
+    }
+}
+
+repositories {
+    mavenCentral()
+}
 
 android {
     compileSdkVersion 21
@@ -19,5 +33,6 @@ android {
 }
 
 dependencies {
+    compile project(':android-v15')
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }
