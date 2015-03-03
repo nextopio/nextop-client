@@ -8,13 +8,8 @@ public final class Wires {
 
 
     public static Wire io(Socket socket) throws IOException {
-        socket.setTcpNoDelay(true);
-        int sendBufferSize = 4 * 1024;
-        OutputStream os = socket.getOutputStream();
-        if (0 < sendBufferSize) {
-            os = new BufferedOutputStream(os, sendBufferSize);
-        }
-        return io(socket.getInputStream(), os);
+        socket.setTcpNoDelay(false);
+        return io(socket.getInputStream(), socket.getOutputStream());
     }
 
     public static Wire io(@Nullable InputStream is, @Nullable OutputStream os) {

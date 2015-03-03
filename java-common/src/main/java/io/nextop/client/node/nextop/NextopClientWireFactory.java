@@ -18,17 +18,25 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+// FIXME(broken) DNS http stack is totally messed up
 // FIXME(security) client TLS certificate. the certificate is used to verify the client ID
-// FIXME node implementation
 public class NextopClientWireFactory extends AbstractMessageControlNode implements Wire.Factory {
 
     public static final class Config {
         public final Authority dnsAuthority;
         public final int allowedFailsPerAuthority;
 
+        @Nullable
+        public List<Authority> fixedAuthorities;
+
+
         public Config(Authority dnsAuthority, int allowedFailsPerAuthority) {
+            this(dnsAuthority, allowedFailsPerAuthority, Collections.<Authority>emptyList());
+        }
+        public Config(Authority dnsAuthority, int allowedFailsPerAuthority, @Nullable List<Authority> fixedAuthorities) {
             this.dnsAuthority = dnsAuthority;
             this.allowedFailsPerAuthority = allowedFailsPerAuthority;
+            this.fixedAuthorities = fixedAuthorities;
         }
     }
 
@@ -261,8 +269,8 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
 
     boolean doDnsReset() {
         // FIXME
-        if (true) {
-            state.resetDnsAuthorities(Collections.singletonList(Authority.valueOf("127.0.0.1:27780")));
+        if (!config.fixedAuthorities.isEmpty()) {
+            state.resetDnsAuthorities(config.fixedAuthorities);
             return true;
         }
 

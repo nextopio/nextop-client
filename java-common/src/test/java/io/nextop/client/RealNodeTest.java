@@ -15,6 +15,7 @@ import rx.functions.Action0;
 import rx.functions.Action1;
 
 import javax.annotation.Nullable;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -51,7 +52,8 @@ public class RealNodeTest extends TestCase {
         protected void run() throws Exception {
             NextopNode nextopNode = new NextopNode();
             nextopNode.setWireFactory(new NextopClientWireFactory(
-                    new NextopClientWireFactory.Config(Authority.valueOf("127.0.0.1:2778"), 2)));
+                    new NextopClientWireFactory.Config(Authority.valueOf("127.0.0.1:2778"), 2,
+                            /* FIXME */ Collections.singletonList(Authority.valueOf("127.0.0.1:27780")))));
 
 //            HttpNode httpNode = new HttpNode();
 //
@@ -101,10 +103,9 @@ public class RealNodeTest extends TestCase {
 
             // send one then give the cache time to fill
             // TODO won't have to do this with the in-flight module in place!
-//            sendOne.call();
+            sendOne.call();
             for (int i = 0; i < n; ++i) {
-                sendOne.call();
-//                scheduler.createWorker().schedule(sendOne, 14000, TimeUnit.MILLISECONDS);
+                scheduler.createWorker().schedule(sendOne, 4000, TimeUnit.MILLISECONDS);
             }
         }
 

@@ -186,6 +186,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                 syncTransferState(wire);
                             } catch (IOException e) {
                                 // FIXME log
+                                e.printStackTrace();
                                 continue top;
                             }
                             System.out.printf("Transfer state sync took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
@@ -210,6 +211,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
                 } catch (Exception e) {
                     // FIXME log
+                    e.printStackTrace();
                     continue top;
                 }
             }
@@ -301,6 +303,8 @@ public class NextopNode extends AbstractMessageControlNode {
                         }
                         wire.flush();
                     } catch (IOException e) {
+                        // FIXME log
+                        e.printStackTrace();
                         this.e = e;
                     }
                 }
@@ -454,7 +458,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             }
                             try {
                                 entry = mcs.takeFirstAvailable(NextopNode.this, Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
-//                                assert null != entry;
+                                assert null != entry;
                                 if (null == entry) {
                                     continue;
                                 }
@@ -579,7 +583,7 @@ public class NextopNode extends AbstractMessageControlNode {
                     }
 
                     messageWriteCount += 1;
-                    System.out.printf("Wrote %d messages in %.3fms\n", messageWriteCount, ((System.nanoTime() - startWriteLoopNanos) / 1000) / 1000.f);
+//                    System.out.printf("Wrote %d messages in %.3fms\n", messageWriteCount, ((System.nanoTime() - startWriteLoopNanos) / 1000) / 1000.f);
 
                     // done with entry, transfer to pending ack
                     mcs.remove(entry.id, MessageControlState.End.COMPLETED);
@@ -593,6 +597,8 @@ public class NextopNode extends AbstractMessageControlNode {
 //                    System.out.printf("Flush took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
                 }
             } catch (IOException e) {
+                // FIXME log
+                e.printStackTrace();
                 // fatal
                 sws.end();
             }
@@ -734,6 +740,8 @@ public class NextopNode extends AbstractMessageControlNode {
                                         }
                                     }
                                 } catch (Exception e) {
+                                    // FIXME log
+                                    e.printStackTrace();
                                     // index out of bounds, etc
                                     conflict = true;
                                 }
@@ -793,7 +801,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
 
                                 messageReadCount += 1;
-                                System.out.printf("Read %d messages in %.3fms\n", messageReadCount, ((System.nanoTime() - startReadLoopNanos) / 1000) / 1000.f);
+//                                System.out.printf("Read %d messages in %.3fms\n", messageReadCount, ((System.nanoTime() - startReadLoopNanos) / 1000) / 1000.f);
 
                                 // decode
                                 final WireValue messageValue = WireValue.valueOf(readState.bytes);
@@ -859,6 +867,8 @@ public class NextopNode extends AbstractMessageControlNode {
 
                 }
             } catch (IOException e) {
+                // FIXME log
+                e.printStackTrace();
                 // fatal
                 sws.end();
             }
