@@ -82,7 +82,7 @@ http://search.maven.org/remotecontent?filepath=io/nextop/java-common/${CURRENT_V
 
 | Date       | Post                                                                                                                                              |
 |------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| 03.02.15   | [Faster Image Loading on Android is now a one-liner](03.02.2015_FAST_IMAGE_LOADING_EASY_INTEGRATION.md)                                           |
+| 03.02.15   | [Faster Image Loading on Android is now a one-liner](docs/03.02.2015_FAST_IMAGE_LOADING_EASY_INTEGRATION.md)                                      |
 | 02.23.15   | [![profile](docs/assets/profile_32.png) How do mobile app teams QA test poor cellphone connections?](http://qr.ae/EMeBB)                          |
 | 02.13.15   | [Binding Rx subscriptions to view lifecycles, and using them to optimize your network traffic](docs/02.13.15_SUBSCRIPTIONS_NETWORKING_VIEWS.md)   |
 
