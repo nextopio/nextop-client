@@ -5,6 +5,7 @@ include 'java-common'
 include 'android'
 
 include 'android-demo-flip'
+include 'android-demo-benchmark'
 
 include 'cordova'
 include 'org.apache-jarjar'
@@ -12,8 +13,6 @@ include 'org.apache-jarjar'
 include 'com.crittercism-jarjar'
 
 include 'org.apache-android-jarjar'
-
-
 
 include ':volley'
 //project(':volley').projectDir = new File("$System.env.HOME/android-src/frameworks/volley")

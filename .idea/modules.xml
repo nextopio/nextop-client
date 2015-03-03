@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/android/android.iml" filepath="$PROJECT_DIR$/android/android.iml" />
+      <module fileurl="file://$PROJECT_DIR$/android-demo-benchmark/android-demo-benchmark.iml" filepath="$PROJECT_DIR$/android-demo-benchmark/android-demo-benchmark.iml" />
       <module fileurl="file://$PROJECT_DIR$/android-demo-flip/android-demo-flip.iml" filepath="$PROJECT_DIR$/android-demo-flip/android-demo-flip.iml" />
       <module fileurl="file://$PROJECT_DIR$/android-demo-globaleye/android-demo-globaleye.iml" filepath="$PROJECT_DIR$/android-demo-globaleye/android-demo-globaleye.iml" />
       <module fileurl="file://$PROJECT_DIR$/android-v15/android-v15.iml" filepath="$PROJECT_DIR$/android-v15/android-v15.iml" />
