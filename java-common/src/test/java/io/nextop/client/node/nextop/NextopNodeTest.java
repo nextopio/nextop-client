@@ -5,6 +5,7 @@ import io.nextop.Message;
 import io.nextop.client.MessageContext;
 import io.nextop.client.MessageContexts;
 import io.nextop.client.MessageControlState;
+import io.nextop.client.test.WorkloadRunner;
 import io.nextop.wire.Pipe;
 import io.nextop.client.node.Head;
 import io.nextop.rx.MoreSchedulers;
@@ -31,18 +32,11 @@ public class NextopNodeTest extends TestCase {
 
         // run the test on the correct scheduler
         RandomStreamingTest test = new RandomStreamingTest(testScheduler);
-        testScheduler.createWorker().schedule(test);
+        test.start();
 
         test.join();
     }
-    static final class RandomStreamingTest implements Action0 {
-        final Scheduler scheduler;
-
-        @Nullable
-        volatile Exception e = null;
-        final Semaphore end = new Semaphore(0);
-
-
+    static final class RandomStreamingTest extends WorkloadRunner {
         Random r = new Random();
 
         // FIXME more thorough stream
@@ -61,48 +55,13 @@ public class NextopNodeTest extends TestCase {
         final List<Message> bReceive = new LinkedList<Message>();
 
 
-
-
         RandomStreamingTest(Scheduler scheduler) {
-            this.scheduler = scheduler;
-        }
-
-
-        void join() throws Exception {
-            end.acquire();
-            if (null != e) {
-                throw e;
-            }
-        }
-
-        void end(@Nullable Exception e) {
-            this.e = e;
-            end.release();
+            super(scheduler);
         }
 
 
         @Override
-        public void call() {
-            try {
-                run();
-                scheduler.createWorker().schedule(new Action0() {
-                    @Override
-                    public void call() {
-                        try {
-                            check();
-                        } catch (Exception e) {
-                            end(e);
-                        }
-
-                        end(null);
-                    }
-                }, 5, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                end(e);
-            }
-        }
-
-        private void run() throws Exception {
+        protected void run() throws Exception {
             NextopNode a = new NextopNode();
 
             NextopNode b = new NextopNode();
@@ -158,7 +117,8 @@ public class NextopNodeTest extends TestCase {
             }
         }
 
-        void check() throws Exception {
+        @Override
+        protected void check() throws Exception {
             assertEquals(aSend.size(), bReceive.size());
             assertEquals(bSend.size(), aReceive.size());
 

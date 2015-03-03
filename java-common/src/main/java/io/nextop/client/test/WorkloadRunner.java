@@ -95,10 +95,10 @@ public abstract class WorkloadRunner implements Action0 {
 
 
     // run on scheduler
-    public abstract void run() throws Exception;
+    protected abstract void run() throws Exception;
     // run on scheduler
-    public abstract void check() throws Exception;
+    protected abstract void check() throws Exception;
 
-    public void cleanup() throws Exception {
+    protected void cleanup() throws Exception {
     }
 }

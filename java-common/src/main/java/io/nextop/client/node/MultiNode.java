@@ -70,6 +70,7 @@ public class MultiNode extends AbstractMessageControlNode {
 
                 // set
                 DownstreamState activeDownstreamState = downstreamStates[firstUpActiveIndex];
+                activeDownstreamState.downActive = true;
                 activeDownstreamState.downstream.onActive(true);
                 for (@Nullable MessageControl mc; null != (mc = pendingMessageControls.poll()); ) {
                     activeDownstreamState.downstream.onMessageControl(mc);

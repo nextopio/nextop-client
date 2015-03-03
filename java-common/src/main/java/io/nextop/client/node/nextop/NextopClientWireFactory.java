@@ -12,10 +12,7 @@ import io.nextop.org.apache.http.HttpStatus;
 
 import javax.annotation.Nullable;
 import javax.net.SocketFactory;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.Serializable;
+import java.io.*;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -41,6 +38,7 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
 
     static final SendStrategy DEFAULT_DNS_SEND_STRATEGY = new SendStrategy.Builder()
             .withUniformRandom(2000, TimeUnit.MILLISECONDS)
+            .repeatIndefinitely()
             .build();
     static final SendStrategy FAILSAFE_DNS_SEND_STRATEGY = DEFAULT_DNS_SEND_STRATEGY;
 
@@ -51,6 +49,7 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
             // FIXME really want a repeatUntil(200s)
             .repeat(50)
             .withUniformRandom(300, TimeUnit.SECONDS)
+            .repeatIndefinitely()
             .build();
     static final SendStrategy FAILSAFE_DNS_RETAKE_STRATEGY = DEFAULT_DNS_RETAKE_STRATEGY;
 
@@ -58,17 +57,25 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
 
     final Config config;
 
+    final SocketFactory socketFactory;
+
+    final byte[] greetingBuffer = new byte[1024];
+
+
+    // set in #init
+    HttpNode dnsHttpNode;
+    Head dnsHead;
+
     // FIXME want to save this state, so that when the node comes back,
     // FIXME it doesn't have to hit DNS to get active
+    // set in init
     State state;
-
-//    NextopNode nextopNode;
 
 
     // this should be an aggressive uniform poll
-    SendStrategy dnsSendStrategy;
+    SendStrategy dnsSendStrategy = DEFAULT_DNS_SEND_STRATEGY;
     // this should be an exponential backoff up to a long poll
-    SendStrategy dnsRetakeStrategy;
+    SendStrategy dnsRetakeStrategy = DEFAULT_DNS_RETAKE_STRATEGY;
 
 
     SendStrategy mostRecentDnsSendStrategy = null;
@@ -76,21 +83,12 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
     SendStrategy mostRecentDnsRetakeStrategy = null;
 
 
-    SocketFactory socketFactory;
-
-
-    byte[] greetingBuffer = new byte[1024];
-
-
-
-    final HttpNode dnsHttpNode;
-    final Head dnsHead;
-
+    // FIXME
+    boolean active = false;
 
     // FIXME
-    boolean active;
-
-    Id clientId;
+    // FIXME
+    final Id clientId = Id.create();
     // FIXME
     Id accessKey = Id.create();
     Set<Id> grantKeys = Collections.emptySet();
@@ -103,29 +101,47 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
     public NextopClientWireFactory(Config config) {
         this.config = config;
 
-        dnsHttpNode = new HttpNode();
-        dnsHead = Head.create(this, getMessageControlState(), dnsHttpNode, getScheduler());
+        socketFactory = SocketFactory.getDefault();
+
     }
 
 
     @Override
     protected void initSelf(Bundle savedState) {
         state = new State();
+
+        // FIXME HOLY CRAP THIS IS TAKING ENTRIES
+        // at this point the upstream is set
+//        dnsHttpNode = new HttpNode();
+//        dnsHead = Head.create(this, getMessageControlState(), dnsHttpNode, getScheduler());
+//
+//        dnsHead.init(savedState);
+
     }
 
     @Override
     public void onSaveState(Bundle savedState) {
-        // FIXME save state
+        // FIXME
     }
 
     @Override
     public void onActive(boolean active) {
         // FIXME
+        if (active != this.active) {
+            this.active = active;
+//            if (active) {
+//                dnsHead.start();
+//            } else {
+//                dnsHead.stop();
+//            }
+        }
     }
 
     @Override
     public void onMessageControl(MessageControl mc) {
-        // FIXME
+        // this node attaches to the upstream lifecycle
+        // but does not accept messages from the upstream
+        assert false;
     }
 
 
@@ -188,15 +204,21 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
 
             assert null != upAuthority;
             try {
+                System.out.printf("Connecting to %s\n", upAuthority);
                 Socket socket = socketFactory.createSocket(Authority.toInetAddress(upAuthority), upAuthority.port);
+//                socket.setTcpNoDelay(false);
 
-                writeGreeting(socket.getOutputStream());
-                readGreetingResponse(socket.getInputStream());
+                {
+                    long startNanos = System.nanoTime();
+                    writeGreeting(socket.getOutputStream());
+                    readGreetingResponse(socket.getInputStream());
+                    System.out.printf("Greeting took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                }
 
                 Socket tlsSocket = startTls(socket);
 
                 state.success(upAuthority);
-                return Wires.io(tlsSocket.getInputStream(), tlsSocket.getOutputStream());
+                return Wires.io(tlsSocket);
             } catch (Exception e) {
                 // FIXME work out the case where this was a network outage
                 state.fail(upAuthority);
@@ -238,6 +260,13 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
     }
 
     boolean doDnsReset() {
+        // FIXME
+        if (true) {
+            state.resetDnsAuthorities(Collections.singletonList(Authority.valueOf("127.0.0.1:27780")));
+            return true;
+        }
+
+
         List<Authority> reportDownAuthorities = state.getUnreportedDownAuthorities(config.allowedFailsPerAuthority);
         Message dnsRequest;
         if (reportDownAuthorities.isEmpty()) {
@@ -262,6 +291,7 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
         Message dnsResponse;
         try {
             dnsHead.send(dnsRequest);
+            // FIXME there is a timing bug here - not calling on the head scheduler is a bug
             dnsResponse = dnsHead.receive(dnsRequest.inboxRoute()).toBlocking().single();
         } catch (Exception e) {
             // FIXME log
@@ -285,7 +315,7 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
                         List<WireValue> dnsAuthorityValues = authoritiesValue.asList();
                         List<Authority> dnsAuthorities = new ArrayList<Authority>(dnsAuthorityValues.size());
                         for (WireValue dnsAuthorityValue : dnsAuthorityValues) {
-                            dnsAuthorities.add(Authority.valueOf(config.dnsAuthority.toString()));
+                            dnsAuthorities.add(Authority.valueOf(dnsAuthorityValue.toString()));
                         }
 
                         state.resetDnsAuthorities(dnsAuthorities);
@@ -304,6 +334,7 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
         // FIXME send the client ID (each client has a unique ID that is used for reconnects)
         // FIXME send the client certificate for TLS
         Message greeting = Message.newBuilder()
+                .setRoute(Route.create(Route.Target.valueOf("PUT /greeting"), Route.LOCAL))
                 .set("accessKey", accessKey)
                 .set("grantKeys", WireValue.of(grantKeys))
                 .set("clientId", clientId)

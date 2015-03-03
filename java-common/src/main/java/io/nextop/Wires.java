@@ -1,11 +1,21 @@
 package io.nextop;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
+import java.net.Socket;
 
 public final class Wires {
+
+
+    public static Wire io(Socket socket) throws IOException {
+        socket.setTcpNoDelay(true);
+        int sendBufferSize = 4 * 1024;
+        OutputStream os = socket.getOutputStream();
+        if (0 < sendBufferSize) {
+            os = new BufferedOutputStream(os, sendBufferSize);
+        }
+        return io(socket.getInputStream(), os);
+    }
 
     public static Wire io(@Nullable InputStream is, @Nullable OutputStream os) {
         return new IoWire(is, os);
@@ -70,7 +80,7 @@ public final class Wires {
             try {
                 if (null != is) {
                     int i = 0;
-                    for (int r; 0 < (r = is.read(buffer, offset + i, length - i)); ) {
+                    for (int r; i < length && 0 < (r = is.read(buffer, offset + i, length - i)); ) {
                         i += r;
                     }
                     if (i != length) {
@@ -93,7 +103,7 @@ public final class Wires {
             try {
                 if (null != is) {
                     long i = 0;
-                    for (long r; 0 < (r = is.skip(n - i)); ) {
+                    for (long r; i < n && 0 < (r = is.skip(n - i)); ) {
                         i += r;
                     }
                     if (i != n) {

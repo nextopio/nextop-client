@@ -1,13 +1,12 @@
 package io.nextop.client;
 
-import io.nextop.Authority;
-import io.nextop.Message;
-import io.nextop.Route;
+import io.nextop.*;
 import io.nextop.client.node.Head;
 import io.nextop.client.node.MultiNode;
 import io.nextop.client.node.http.HttpNode;
 import io.nextop.client.node.nextop.NextopClientWireFactory;
 import io.nextop.client.node.nextop.NextopNode;
+import io.nextop.client.test.WorkloadRunner;
 import io.nextop.rx.MoreSchedulers;
 import junit.framework.TestCase;
 import rx.Scheduler;
@@ -25,80 +24,46 @@ import java.util.concurrent.TimeUnit;
 public class RealNodeTest extends TestCase {
 
 
-    public void testProxy() throws Exception {
+    public void testRealProxy() throws Exception {
         Scheduler testScheduler = MoreSchedulers.serial();
 
         // run the test on the correct scheduler
-        ProxyTest test = new ProxyTest(testScheduler);
-        testScheduler.createWorker().schedule(test);
+        RealProxyTest test = new RealProxyTest(testScheduler);
+        test.start();
 
         test.join();
     }
 
-    static final class ProxyTest implements Action0 {
-        final Scheduler scheduler;
-
-        @Nullable
-        volatile Exception e = null;
-        final Semaphore end = new Semaphore(0);
-
+    // test images via the real proxy
+    static final class RealProxyTest extends WorkloadRunner {
         int n = 1000;
 
         final List<Message> send = new LinkedList<Message>();
         final List<Message> receive = new LinkedList<Message>();
 
 
-        ProxyTest(Scheduler scheduler) {
-            this.scheduler = scheduler;
-        }
-
-
-        void join() throws Exception {
-            end.acquire();
-            if (null != e) {
-                throw e;
-            }
-        }
-
-        void end(@Nullable Exception e) {
-            this.e = e;
-            end.release();
+        RealProxyTest(Scheduler scheduler) {
+            super(scheduler);
         }
 
 
         @Override
-        public void call() {
-            try {
-                run();
-                scheduler.createWorker().schedule(new Action0() {
-                    @Override
-                    public void call() {
-                        try {
-                            check();
-                        } catch (Exception e) {
-                            end(e);
-                        }
-
-                        end(null);
-                    }
-                }, 10, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                end(e);
-            }
-        }
-
-        private void run() throws Exception {
+        protected void run() throws Exception {
             NextopNode nextopNode = new NextopNode();
             nextopNode.setWireFactory(new NextopClientWireFactory(
-                    new NextopClientWireFactory.Config(Authority.valueOf("54.149.233.13:2778"), 2)));
+                    new NextopClientWireFactory.Config(Authority.valueOf("127.0.0.1:2778"), 2)));
 
-            HttpNode httpNode = new HttpNode();
-
-            MultiNode multi = new MultiNode(nextopNode, httpNode);
+//            HttpNode httpNode = new HttpNode();
+//
+//            MultiNode multi = new MultiNode(nextopNode, httpNode);
 
             MessageContext context = MessageContexts.create();
             MessageControlState mcs = new MessageControlState(context);
-            Head head = Head.create(context, mcs, multi, scheduler);
+//            final Head head = Head.create(context, mcs, multi, scheduler);
+            final Head head = Head.create(context, mcs, nextopNode, scheduler);
+
+            head.init(null);
+            head.start();
 
 
             Subscription a = head.defaultReceive().subscribe(new Action1<Message>() {
@@ -108,17 +73,44 @@ public class RealNodeTest extends TestCase {
                 }
             });
 
+
+            final Id lowPriorityGroupId = Id.create();
+            final Id highPriorityGroupId = Id.create();
+
+            Action0 sendOne = new Action0() {
+                @Override
+                public void call() {
+                    Message.Builder builder  = Message.newBuilder()
+                            .setRoute(Route.valueOf("GET http://s3-us-west-2.amazonaws.com/nextop-demo-flip-frames/b5bacea252864f938d851be98fdb1a3900af0ad183bf63b9a9bb321f2e063596-5090de8538ea489c94dc362f20c0cc67ea98dfc67437a990b57ab4ff7ee005d1.jpeg"));
+
+                    Message.setLayers(builder,
+                            new Message.LayerInfo(Message.LayerInfo.Quality.LOW, EncodedImage.Format.JPEG, 32, 0,
+                                    highPriorityGroupId, 10),
+                            new Message.LayerInfo(Message.LayerInfo.Quality.HIGH, EncodedImage.Format.JPEG, 0, 0,
+                                    lowPriorityGroupId, 0)
+                    );
+
+                    Message message = builder.build();
+
+                    head.send(message);
+
+                    send.add(message);
+                }
+            };
+
+
+            // send one then give the cache time to fill
+            // TODO won't have to do this with the in-flight module in place!
+//            sendOne.call();
             for (int i = 0; i < n; ++i) {
-                Message message = Message.newBuilder()
-                        .setRoute(Route.valueOf("POST http://tests.nextop.io"))
-                        .build();
-                send.add(message);
-                head.send(message);
+                sendOne.call();
+//                scheduler.createWorker().schedule(sendOne, 14000, TimeUnit.MILLISECONDS);
             }
         }
 
-        void check() throws Exception {
-            assertEquals(send.size(), receive.size());
+        @Override
+        protected void check() throws Exception {
+            assertEquals(2 * send.size(), receive.size());
             // FIXME test content
         }
     }
