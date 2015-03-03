@@ -104,50 +104,50 @@ artifacts {
 
 // properties defined in $HOME/gradle.properties
 // @see http://central.sonatype.org/pages/gradle.html
-
-signing {
-    sign configurations.archives
-}
-
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            beforeDeployment {
-                MavenDeployment deployment -> signing.signPom(deployment)
-            }
-
-            repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
-            snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
-
-            pom.project {
-                groupId project.group
-                artifactId project.name
-                name 'Nextop Java Common'
-                description 'Platform-agnostic Java core for Nextop'
-                url 'http://nextop.io'
-                scm {
-                    url 'https://github.com/nextopio/nextop-client/tree/master/java-common'
-                }
-                developers {
-                    developer {
-                        name 'nextop.io'
-                        email 'support@nextop.io'
-                        organizationUrl 'http://nextop.io'
-                    }
-                }
-
-                licenses {
-                    license {
-                        name 'The Apache Software License, Version 2.0'
-                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                        distribution 'repo'
-                    }
-                }
-            }
-        }
-    }
-}
+//
+//signing {
+//    sign configurations.archives
+//}
+//
+//uploadArchives {
+//    repositories {
+//        mavenDeployer {
+//            beforeDeployment {
+//                MavenDeployment deployment -> signing.signPom(deployment)
+//            }
+//
+//            repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
+//                authentication(userName: ossrhUsername, password: ossrhPassword)
+//            }
+//            snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
+//                authentication(userName: ossrhUsername, password: ossrhPassword)
+//            }
+//
+//            pom.project {
+//                groupId project.group
+//                artifactId project.name
+//                name 'Nextop Java Common'
+//                description 'Platform-agnostic Java core for Nextop'
+//                url 'http://nextop.io'
+//                scm {
+//                    url 'https://github.com/nextopio/nextop-client/tree/master/java-common'
+//                }
+//                developers {
+//                    developer {
+//                        name 'nextop.io'
+//                        email 'support@nextop.io'
+//                        organizationUrl 'http://nextop.io'
+//                    }
+//                }
+//
+//                licenses {
+//                    license {
+//                        name 'The Apache Software License, Version 2.0'
+//                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+//                        distribution 'repo'
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}

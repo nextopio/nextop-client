@@ -7,7 +7,6 @@
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="modules">
           <set>
-            <option value="$USER_HOME$/android-src/frameworks/volley" />
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/android" />
             <option value="$PROJECT_DIR$/android-demo-flip" />
@@ -18,9 +17,11 @@
             <option value="$PROJECT_DIR$/java-common" />
             <option value="$PROJECT_DIR$/org.apache-android-jarjar" />
             <option value="$PROJECT_DIR$/org.apache-jarjar" />
+            <option value="$PROJECT_DIR$/../volley" />
           </set>
         </option>
       </GradleProjectSettings>
     </option>
   </component>
 </project>
+

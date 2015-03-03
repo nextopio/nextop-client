@@ -92,50 +92,50 @@ android.libraryVariants.all { variant ->
 
 // properties defined in $HOME/gradle.properties
 // @see http://central.sonatype.org/pages/gradle.html
-
-signing {
-    sign configurations.archives
-}
-
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            beforeDeployment {
-                MavenDeployment deployment -> signing.signPom(deployment)
-            }
-
-            repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
-            snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
-
-            pom.project {
-                groupId project.group
-                artifactId project.name
-                name 'Nextop for Android 15+'
-                description 'Nextop client for Android 15+'
-                url 'http://nextop.io/android-v15'
-                scm {
-                    url 'https://github.com/nextopio/nextop-client/tree/master/android-v15'
-                }
-                developers {
-                    developer {
-                        name 'nextop.io'
-                        email 'support@nextop.io'
-                        organizationUrl 'http://nextop.io'
-                    }
-                }
-
-                licenses {
-                    license {
-                        name 'The Apache Software License, Version 2.0'
-                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                        distribution 'repo'
-                    }
-                }
-            }
-        }
-    }
-}
+//
+//signing {
+//    sign configurations.archives
+//}
+//
+//uploadArchives {
+//    repositories {
+//        mavenDeployer {
+//            beforeDeployment {
+//                MavenDeployment deployment -> signing.signPom(deployment)
+//            }
+//
+//            repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
+//                authentication(userName: ossrhUsername, password: ossrhPassword)
+//            }
+//            snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
+//                authentication(userName: ossrhUsername, password: ossrhPassword)
+//            }
+//
+//            pom.project {
+//                groupId project.group
+//                artifactId project.name
+//                name 'Nextop for Android 15+'
+//                description 'Nextop client for Android 15+'
+//                url 'http://nextop.io/android-v15'
+//                scm {
+//                    url 'https://github.com/nextopio/nextop-client/tree/master/android-v15'
+//                }
+//                developers {
+//                    developer {
+//                        name 'nextop.io'
+//                        email 'support@nextop.io'
+//                        organizationUrl 'http://nextop.io'
+//                    }
+//                }
+//
+//                licenses {
+//                    license {
+//                        name 'The Apache Software License, Version 2.0'
+//                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+//                        distribution 'repo'
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}

@@ -16,4 +16,5 @@ include 'org.apache-android-jarjar'
 
 
 include ':volley'
-project(':volley').projectDir = new File("$System.env.HOME/android-src/frameworks/volley")
+//project(':volley').projectDir = new File("$System.env.HOME/android-src/frameworks/volley")
+project(':volley').projectDir = new File("/Users/andy/Code/android/volley")

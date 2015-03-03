@@ -25,21 +25,21 @@ android {
         versionName project.version
         versionCode androidVersionCode()
     }
-    signingConfigs {
-        release {
-            storeFile file(androidDemoKeystore)
-            storePassword androidDemoKeystorePassword
-            keyAlias androidDemoKeyAlias
-            keyPassword androidDemoKeyPassword
-        }
-    }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
-        }
-    }
+//    signingConfigs {
+//        release {
+//            storeFile file(androidDemoKeystore)
+//            storePassword androidDemoKeystorePassword
+//            keyAlias androidDemoKeyAlias
+//            keyPassword androidDemoKeyPassword
+//        }
+//    }
+//    buildTypes {
+//        release {
+//            minifyEnabled false
+//            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+//            signingConfig signingConfigs.release
+//        }
+//    }
 }
 
 dependencies {
