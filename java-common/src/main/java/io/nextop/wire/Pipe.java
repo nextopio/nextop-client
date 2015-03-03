@@ -3,7 +3,7 @@ package io.nextop.wire;
 import io.nextop.Wire;
 import io.nextop.Wires;
 import rx.Observable;
-import rx.subjects.PublishSubject;
+import rx.subjects.BehaviorSubject;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -13,20 +13,19 @@ import java.util.Queue;
 
 // provides two wire factories, a and b, such that a wire created in a produces an available wire in b (and vice-versa)
 // the pair of wires write to each other, via a buffer of similar size to a tcp window (65k)
-// FIXME call this is a Pipe or something
-public final class WireFactoryPair {
+public final class Pipe {
 
     final Object mutex = new Object();
     final PairedWireFactory a;
     final PairedWireFactory b;
 
-    final PublishSubject<Wire.Factory> aSubject;
-    final PublishSubject<Wire.Factory> bSubject;
+    final BehaviorSubject<Wire.Factory> aSubject;
+    final BehaviorSubject<Wire.Factory> bSubject;
 
 
-    public WireFactoryPair() {
-        aSubject = PublishSubject.create();
-        bSubject = PublishSubject.create();
+    public Pipe() {
+        aSubject = BehaviorSubject.create();
+        bSubject = BehaviorSubject.create();
 
         a = new PairedWireFactory(mutex);
         b = new PairedWireFactory(mutex);
@@ -61,7 +60,7 @@ public final class WireFactoryPair {
         final Queue<Wire> wireQueue = new LinkedList<Wire>();
 
         PairedWireFactory pair;
-        PublishSubject<Wire.Factory> pairSubject;
+        BehaviorSubject<Wire.Factory> pairSubject;
 
 
         PairedWireFactory(Object mutex) {

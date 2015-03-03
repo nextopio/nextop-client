@@ -404,7 +404,7 @@ public class NextopNode extends AbstractMessageControlNode {
         final byte[] controlBuffer = new byte[1024];
 
         // FIXME need to work more on memory footprint.
-        final ByteBuffer serBuffer = ByteBuffer.allocate(8 * 1024);
+        final ByteBuffer serBuffer = ByteBuffer.allocate(8 * 1024 * 1024);
 
         WriteLooper(SharedWireState sws) {
             this.sws = sws;
@@ -505,7 +505,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             // write it
                             int start = writeState.chunkOffsets[i];
                             int end = i + 1 < n ? writeState.chunkOffsets[i + 1] : writeState.bytes.length;
-
+                            assert start < end;
 
                             // F_MESSAGE_CHUNK [chunk index][chunk offset][chunk length][data]
                             {
@@ -520,7 +520,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                 c += 4;
                                 sws.wire.write(controlBuffer, 0, c, 0);
                             }
-                            sws.wire.write(writeState.bytes, start, end, 0);
+                            sws.wire.write(writeState.bytes, start, end - start, 0);
 
 
                             writeState.chunkWrites[i] = true;

@@ -1416,6 +1416,12 @@ public abstract class WireValue {
             case H_FLOAT64_LIST:
                 // FIXME see listh
                 throw new IllegalArgumentException();
+            case H_MESSAGE:
+                return 5 + getint(bytes, offset + 1);
+            case H_IMAGE:
+                return 5 + getint(bytes, offset + 1);
+            case H_NULL:
+                return 1;
             default:
                 throw new IllegalArgumentException("" + h);
         }
@@ -2542,7 +2548,10 @@ public abstract class WireValue {
 
         public static EncodedImage valueOf(byte[] bytes, int offset) {
             EncodedImage.Format format;
-            switch (getint(bytes, offset)) {
+            int c = offset;
+            // skip bytes
+            c += 4;
+            switch (0xFF & bytes[c]) {
                 case H_F_WEBP:
                     format = EncodedImage.Format.WEBP;
                     break;
@@ -2555,8 +2564,9 @@ public abstract class WireValue {
                 default:
                     throw new IllegalArgumentException();
             }
+            c += 1;
             EncodedImage.Orientation orientation;
-            switch (getint(bytes, offset + 4)) {
+            switch (0xFF & bytes[c]) {
                 case H_O_REAR_FACING:
                     orientation = EncodedImage.Orientation.REAR_FACING;
                     break;
@@ -2566,13 +2576,20 @@ public abstract class WireValue {
                 default:
                     throw new IllegalArgumentException();
             }
-            int width = getint(bytes, offset + 8);
-            int height = getint(bytes, offset + 12);
-            int length = getint(bytes, offset + 16);
-            return new EncodedImage(format, orientation, width, height, bytes, offset + 20, length);
+            c += 1;
+            int width = getint(bytes, c);
+            c += 4;
+            int height = getint(bytes, c);
+            c += 4;
+            int length = getint(bytes, c);
+            c += 4;
+            return new EncodedImage(format, orientation, width, height, bytes, c, length);
         }
 
         public static void toBytes(EncodedImage image, Lb lb, ByteBuffer bb) {
+            bb.putInt(0);
+            int i = bb.position();
+
             switch (image.format) {
                 case WEBP:
                     bb.put((byte) H_F_WEBP);
@@ -2600,6 +2617,9 @@ public abstract class WireValue {
             bb.putInt(image.height);
             bb.putInt(image.length);
             bb.put(image.bytes, image.offset, image.length);
+
+            int bytes = bb.position() - i;
+            bb.putInt(i - 4, bytes);
         }
     }
 
@@ -2608,6 +2628,9 @@ public abstract class WireValue {
 
         public static Message valueOf(byte[] bytes, int offset, CompressionState cs) {
             int c = offset;
+            // skip bytes
+            c += 4;
+
             Id id = IdCodec.valueOf(bytes, c);
             c += IdCodec.LENGTH;
             Id groupId = IdCodec.valueOf(bytes, c);
@@ -2623,6 +2646,9 @@ public abstract class WireValue {
         }
 
         public static void toBytes(Message message, Lb lb, ByteBuffer bb) {
+            bb.putInt(0);
+            int i = bb.position();
+
             IdCodec.toBytes(message.id, bb);
             IdCodec.toBytes(message.groupId, bb);
             bb.putInt(message.groupPriority);
@@ -2630,6 +2656,9 @@ public abstract class WireValue {
             WireValue._toBytes(WireValue.of(message.route.toString()), lb, bb);
             WireValue._toBytes(WireValue.of(message.headers), lb, bb);
             WireValue._toBytes(WireValue.of(message.parameters), lb, bb);
+
+            int bytes = bb.position() - i;
+            bb.putInt(i - 4, bytes);
         }
 
 

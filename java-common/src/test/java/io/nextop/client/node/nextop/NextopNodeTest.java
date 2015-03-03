@@ -5,7 +5,7 @@ import io.nextop.Message;
 import io.nextop.client.MessageContext;
 import io.nextop.client.MessageContexts;
 import io.nextop.client.MessageControlState;
-import io.nextop.wire.WireFactoryPair;
+import io.nextop.wire.Pipe;
 import io.nextop.client.node.Head;
 import io.nextop.rx.MoreSchedulers;
 import junit.framework.TestCase;
@@ -108,7 +108,7 @@ public class NextopNodeTest extends TestCase {
             NextopNode b = new NextopNode();
 
 
-            WireFactoryPair wfp = new WireFactoryPair();
+            Pipe wfp = new Pipe();
             a.setWireFactory(wfp.getA());
             b.setWireFactory(wfp.getB());
 

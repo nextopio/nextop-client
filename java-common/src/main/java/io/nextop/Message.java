@@ -964,6 +964,9 @@ public class Message {
             HIGH,
             LOW
         }
+        // the default quality of an image is HIGH
+        // TODO
+        // if LOW and no scale, this will force a recode to a smaller, lower quality image
 
 
         public final Quality quality;
@@ -978,7 +981,7 @@ public class Message {
         public final int groupPriority;
 
 
-        LayerInfo(Quality quality, EncodedImage.Format format, int width, int height,
+        public LayerInfo(Quality quality, EncodedImage.Format format, int width, int height,
                   @Nullable Id groupId, int groupPriority) {
             this.quality = quality;
             this.format = format;
@@ -989,8 +992,10 @@ public class Message {
         }
 
 
-        public boolean isScale() {
-            return 0 < width || 0 < height;
+        // scale or quality change
+        public boolean isTransform() {
+            return 0 < width || 0 < height
+                    || !Quality.HIGH.equals(quality);
         }
         public int scaleWidth(int w, int h) {
             if (0 < width) {
@@ -1110,7 +1115,7 @@ public class Message {
             StringBuilder sb = new StringBuilder(128);
             sb.append(layers[0].toString());
             for (int i = 1; i < n; ++i) {
-                sb.append(" ").append(layers[i].toString());
+                sb.append(";").append(layers[i].toString());
             }
             builder.setHeader(H_LAYERS, WireValue.of(sb.toString()));
         }
