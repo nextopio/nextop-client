@@ -18,14 +18,14 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Volley"
-            android:onClick="volley" />
+            android:onClick="onVolley" />
 
         <Button
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Nextop"
-            android:onClick="nextop" />
+            android:onClick="onNextop" />
 
     </LinearLayout>
 
