@@ -27,7 +27,7 @@ improving transfer of all requests in all network conditions.
 
 | Current Version |
 |-----------------|
-| 0.1.3           |
+| 0.1.4           |
 
 | Module              | Android Versions Supported   | Notes                                                             |
 |---------------------|------------------------------|-------------------------------------------------------------------|
