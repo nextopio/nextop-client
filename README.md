@@ -7,6 +7,8 @@ Nextop is rethinking a CDN for mobile from the ground up. Mobile devices operate
 The core technology is a client SDK that replaces or plugs into your existing network library,
 and a proxy server that translates between the SDK and your existing HTTP backend.
 
+![break through the region of pain](docs/assets/region_of_pain-512.png)
+
 With this setup, for example, Nextop can load image previews and
 blocking API calls before loading everything else for a view. As a developer you
  write network code and server code as you normally would, and Nextop takes care
