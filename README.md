@@ -5,7 +5,8 @@ Nextop is rethinking a CDN for mobile from the ground up. Mobile devices operate
  users >2x faster than leading CDNs, while never losing a transaction.
 
 The core technology is a client SDK that replaces or plugs into your existing network library,
-and a proxy server that translates between the SDK and your existing HTTP backend.
+and a proxy server that translates between the SDK and your existing HTTP backend. Nextop optimizes your traffic
+through the region of pain - between the cloud and device - without you doing any work.
 
 ![break through the region of pain](docs/assets/region_of_pain-512.png)
 
