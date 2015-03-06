@@ -35,7 +35,7 @@ public class VolleyBenchmark extends Benchmark {
 	}
 
 	public Benchmark.Result result() {
-		Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.MINUTES);
+		Uninterruptibles.awaitUninterruptibly(latch, 10, TimeUnit.SECONDS);
 		return result;
 	}
 
@@ -61,7 +61,7 @@ public class VolleyBenchmark extends Benchmark {
 									result.addTiming(urlStr,
 													ImmutableMap.of(
 																	"start", startTime,
-																	"elasped", watch.elapsed(TimeUnit.MILLISECONDS)));
+																	"elapsed", watch.elapsed(TimeUnit.MILLISECONDS)));
 								}
 							};
 

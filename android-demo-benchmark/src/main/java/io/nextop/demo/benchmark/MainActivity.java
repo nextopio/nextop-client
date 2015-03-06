@@ -10,8 +10,10 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ListView;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.io.CharStreams;
@@ -34,10 +36,13 @@ import java.util.UUID;
 public class MainActivity extends Activity {
 	public static final String DEBUG = MainActivity.class.getSimpleName();
 
-	List<String> benchmarkUrls = Collections.EMPTY_LIST;
 	String signalStrengh = "Unknown";
+	List<String> benchmarkUrls = Collections.EMPTY_LIST;
 
-	public void onVolley(View view) {
+	ListView timingsList;
+	TimingAdapter timingsAdapter;
+
+	public void volley(View view) {
 
 		final Benchmark benchmark = VolleyBenchmark.using(this, benchmarkUrls);
 
@@ -55,13 +60,14 @@ public class MainActivity extends Activity {
 
 			@Override
 			protected void onPostExecute(Benchmark.Result result) {
-				send(result);
+				send("volley", result);
+				show(result);
 			}
 
 		}.execute();
 	}
 
-	public void onNextop(View view) throws InterruptedException {
+	public void nextop(View view) throws InterruptedException {
 		final Benchmark benchmark = NextopBenchmark.using(this, benchmarkUrls);
 
 		new AsyncTask<Void, Void, Benchmark.Result>() {
@@ -79,7 +85,8 @@ public class MainActivity extends Activity {
 
 			@Override
 			protected void onPostExecute(Benchmark.Result result) {
-				send(result);
+				send("nextop", result);
+				show(result);
 			}
 
 		}.execute();
@@ -112,6 +119,12 @@ public class MainActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
+		timingsList = (ListView) findViewById(R.id.timings);
+		timingsAdapter = new TimingAdapter(this);
+		timingsList.setAdapter(timingsAdapter);
+
+		loadBenchmarkUrls();
+
 		TelephonyManager telephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
 		telephonyManager.listen(
 						new PhoneStateListener() {
@@ -122,9 +135,6 @@ public class MainActivity extends Activity {
 							}
 
 						}, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
-
-
-		loadBenchmarkUrls();
 	}
 
 	private void loadBenchmarkUrls() {
@@ -147,16 +157,20 @@ public class MainActivity extends Activity {
 		}
 	}
 
-	private void send(Benchmark.Result result) {
+	private void send(final String name, final Benchmark.Result result) {
 
 		new AsyncTask<Benchmark.Result, Void, Void>() {
 			@Override
 			protected Void doInBackground(Benchmark.Result... results) {
+				String resultUrl = Joiner
+								.on('/')
+								.skipNulls()
+								.join("http://10.1.10.10:9091/result", name);
 
 				try {
 					JSONObject json = results[0].toJSON();
 					DefaultHttpClient resultClient = new DefaultHttpClient();
-					HttpPost post = new HttpPost("http://10.1.10.10:9091/result");
+					HttpPost post = new HttpPost(resultUrl);
 					StringEntity entity = new StringEntity(json.toString());
 
 					post.setEntity(entity);
@@ -174,4 +188,21 @@ public class MainActivity extends Activity {
 		}.execute(result);
 
 	}
+
+	private void send(final Benchmark.Result result) {
+		send(null, result);
+	}
+
+	private void show(Benchmark.Result result) {
+		Log.d(DEBUG, result.toJSON().toString());
+		timingsAdapter.clear();
+
+		for (Benchmark.Result.Timing timing: result.getTimings()) {
+			timingsAdapter.add(timing);
+		}
+
+//		timingsAdapter.addAll(result.getTimings());
+		timingsAdapter.notifyDataSetChanged();
+	}
+
 }

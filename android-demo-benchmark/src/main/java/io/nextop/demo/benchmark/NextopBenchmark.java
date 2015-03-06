@@ -36,7 +36,7 @@ public class NextopBenchmark extends Benchmark {
 	}
 
 	public Benchmark.Result result() {
-		Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.MINUTES);
+		Uninterruptibles.awaitUninterruptibly(latch, 10, TimeUnit.SECONDS);
 		return result;
 	}
 
@@ -60,7 +60,7 @@ public class NextopBenchmark extends Benchmark {
 					result.addTiming(url.toString(),
 									ImmutableMap.of(
 													"start", startTime,
-													"elasped", watch.elapsed(TimeUnit.MILLISECONDS)));
+													"elapsed", watch.elapsed(TimeUnit.MILLISECONDS)));
 				}
 			};
 

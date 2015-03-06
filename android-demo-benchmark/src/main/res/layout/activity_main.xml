@@ -18,22 +18,39 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Volley"
-            android:onClick="onVolley" />
+            android:onClick="volley"
+            />
 
         <Button
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Nextop"
-            android:onClick="onNextop" />
+            android:onClick="nextop"
+            />
 
     </LinearLayout>
 
+    <RelativeLayout
+        android:id="@+id/context"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/controls">
 
-    <TextView
-        android:text="@string/hello_world"
-        android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/context_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="context"
+            />
+
+    </RelativeLayout>
+
+    <ListView
+        android:id="@+id/timings"
+        android:layout_width="match_parent"
         android:layout_height="fill_parent"
-        android:layout_below="@+id/controls"/>
+        android:layout_below="@id/context"
+        />
 
 </RelativeLayout>
