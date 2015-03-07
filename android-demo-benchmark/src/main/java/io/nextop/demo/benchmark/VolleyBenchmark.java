@@ -35,7 +35,7 @@ public class VolleyBenchmark extends Benchmark {
 	}
 
 	public Benchmark.Result result() {
-		Uninterruptibles.awaitUninterruptibly(latch, 10, TimeUnit.SECONDS);
+		Uninterruptibles.awaitUninterruptibly(latch, 30, TimeUnit.SECONDS);
 		return result;
 	}
 
@@ -45,7 +45,8 @@ public class VolleyBenchmark extends Benchmark {
 		result.addContext("timestamp", String.valueOf(System.currentTimeMillis()));
 		result.addContext(runContext);
 
-		RequestQueue queue = Volley.newRequestQueue(context);
+		RequestQueue queue = SingletonVolleyQueue.getInstance(context);
+
 		for (URL url : urls) {
 			final String urlStr = url.toString();
 			final Stopwatch watch = Stopwatch.createUnstarted();
@@ -100,6 +101,18 @@ public class VolleyBenchmark extends Benchmark {
 		});
 
 		return new VolleyBenchmark(context, urls);
+	}
+
+	static class SingletonVolleyQueue {
+		private static RequestQueue INSTANCE =  null;
+
+		public static RequestQueue getInstance(Context context) {
+			if (INSTANCE == null) {
+				INSTANCE = Volley.newRequestQueue(context);
+			}
+
+			return INSTANCE;
+		}
 	}
 
 }

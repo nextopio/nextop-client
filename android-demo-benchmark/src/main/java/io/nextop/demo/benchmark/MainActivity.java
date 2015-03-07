@@ -1,6 +1,11 @@
 package io.nextop.demo.benchmark;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.telephony.PhoneStateListener;
@@ -14,6 +19,7 @@ import android.widget.ListView;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.io.CharStreams;
@@ -30,7 +36,14 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Collections;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import rx.android.schedulers.AndroidSchedulers;
 
 
 public class MainActivity extends Activity {
@@ -41,6 +54,26 @@ public class MainActivity extends Activity {
 
 	ListView timingsList;
 	TimingAdapter timingsAdapter;
+
+
+//	public void xvolley(View view) {
+//		final AtomicInteger count = new AtomicInteger(0);
+//		final Timer timer = new Timer();
+//
+//		timer.schedule(new TimerTask() {
+//			@Override
+//			public void run() {
+//				Log.d(DEBUG, String.format("Run %d", count.get()));
+//				volleyBenchmark();
+//
+//				if (count.incrementAndGet() >= 100) {
+//					timer.cancel();
+//				}
+//			}
+//		}, 0, 10000);
+//
+//	}
+
 
 	public void volley(View view) {
 
@@ -54,7 +87,6 @@ public class MainActivity extends Activity {
 				runContext.put("signal", signalStrengh);
 
 				benchmark.run(runId, runContext.build());
-
 				return benchmark.result();
 			}
 
@@ -67,13 +99,31 @@ public class MainActivity extends Activity {
 		}.execute();
 	}
 
-	public void nextop(View view) throws InterruptedException {
-		final Benchmark benchmark = NextopBenchmark.using(this, benchmarkUrls);
+//	public void xnextop(View view) {
+//		final AtomicInteger count = new AtomicInteger(0);
+//		final Timer timer = new Timer();
+//
+//		timer.schedule(new TimerTask() {
+//			@Override
+//			public void run() {
+//				Log.d(DEBUG, String.format("Run %d", count.get()));
+//				nextopBenchmark();
+//
+//				if (count.incrementAndGet() >= 100) {
+//					timer.cancel();
+//				}
+//			}
+//		}, 0, 10000);
+//	}
 
-		new AsyncTask<Void, Void, Benchmark.Result>() {
+	public void nextop(View view) {
+
+		new AsyncTask<Context, Void, Benchmark.Result>() {
 
 			@Override
-			protected Benchmark.Result doInBackground(Void... params) {
+			protected Benchmark.Result doInBackground(Context... params) {
+				Benchmark benchmark = NextopBenchmark.using(params[0], benchmarkUrls);
+
 				String runId = UUID.randomUUID().toString();
 				ImmutableMap.Builder<String, String> runContext = ImmutableMap.builder();
 				runContext.put("signal", signalStrengh);
@@ -89,8 +139,10 @@ public class MainActivity extends Activity {
 				show(result);
 			}
 
-		}.execute();
+		}.execute(this);
+
 	}
+
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -135,6 +187,16 @@ public class MainActivity extends Activity {
 							}
 
 						}, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+
+		final WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+		registerReceiver(new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				Log.d(DEBUG, Strings.repeat("-", 80));
+				Log.d(DEBUG, wifiManager.getConnectionInfo().toString());
+			}
+		}, new IntentFilter(WifiManager.RSSI_CHANGED_ACTION));
+
 	}
 
 	private void loadBenchmarkUrls() {
@@ -194,14 +256,12 @@ public class MainActivity extends Activity {
 	}
 
 	private void show(Benchmark.Result result) {
-		Log.d(DEBUG, result.toJSON().toString());
 		timingsAdapter.clear();
 
 		for (Benchmark.Result.Timing timing: result.getTimings()) {
 			timingsAdapter.add(timing);
 		}
 
-//		timingsAdapter.addAll(result.getTimings());
 		timingsAdapter.notifyDataSetChanged();
 	}
 

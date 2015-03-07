@@ -64,7 +64,7 @@ public class NextopBenchmark extends Benchmark {
 				}
 			};
 
-			final Action1<Throwable> errorHandler = new Action1<Throwable>() {
+			Action1<Throwable> errorHandler = new Action1<Throwable>() {
 				@Override
 				public void call(Throwable err) {
 					Log.d(DEBUG, "error", err);
