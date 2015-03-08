@@ -1,5 +1,7 @@
 package io.nextop.log;
 
+import rx.Scheduler;
+
 import javax.annotation.Nullable;
 
 // aggregates logged values and periodically dumps a summary
@@ -12,6 +14,12 @@ public final class AggregatorLog implements Log {
     //
     final int metricReservoirSize = 16;
     final int[] metricPercentiles = new int[]{5, 50, 95};
+    // a total count is also maintained
+    final int[] countWindowsMs = new int[]{5000, 60000};
+
+
+    Scheduler.Worker worker;
+
 
 
     // updated key set
@@ -20,12 +28,22 @@ public final class AggregatorLog implements Log {
 
 
 
+
+
     abstract static class Aggregator {
         String key;
         long mostRecentUpdateNanos;
     }
 
+
+
+    // FIXME count aggregation should be a rolling window, where there is a total and total in the last n updates
+    // FIXME if write upstream, output single metrics. e.g. p50 key is key.p50 for a single value
+
+
+
     static class Count extends Aggregator {
+
 
 
         void update(long count) {

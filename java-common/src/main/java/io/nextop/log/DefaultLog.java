@@ -9,6 +9,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
+// FIXME support upstream
 public final class DefaultLog implements Log {
     private final Out out;
 

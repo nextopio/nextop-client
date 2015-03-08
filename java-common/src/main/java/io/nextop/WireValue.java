@@ -1,7 +1,11 @@
 package io.nextop;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Function;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.ForwardingList;
 import com.google.common.collect.ForwardingMap;
+import com.google.common.collect.Lists;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -10,6 +14,8 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import io.nextop.org.apache.commons.codec.binary.Base64OutputStream;
+import org.apache.commons.collections.Transformer;
+import org.apache.commons.collections.map.TransformedMap;
 
 import javax.annotation.Nullable;
 import java.io.*;
@@ -422,7 +428,7 @@ public abstract class WireValue {
         }
         @Override
         public List<WireValue> asList() {
-            return new AbstractList<WireValue>() {
+            List<WireValue> list = new AbstractList<WireValue>() {
                 int n = getint(bytes, offset + 1);
                 int[] offsets = null;
                 int offseti = 0;
@@ -458,6 +464,7 @@ public abstract class WireValue {
                     }
                 }
             };
+            return duckList(list);
         }
         @Override
         public Map<WireValue, WireValue> asMap() {
@@ -964,13 +971,13 @@ public abstract class WireValue {
         }
         // FIXME bytebuffer
         if (value instanceof Map) {
-            return of((Map<WireValue, WireValue>) value);
+            return of(asWireValueMap((Map<?, ?>) value));
         }
         if (value instanceof Collection) {
             if (value instanceof List) {
-                return of((List<WireValue>) value);
+                return of(asWireValueList((List<?>) value));
             }
-            return of(new ArrayList<WireValue>(((Collection) value)));
+            return of(asWireValueList((Collection<?>) value));
         }
         if (value instanceof Message) {
             return of((Message) value);
@@ -2256,7 +2263,7 @@ public abstract class WireValue {
 
         ListWireValue(List<WireValue> value) {
             super(Type.LIST);
-            this.value = value;
+            this.value = duckList(value);
         }
 
         @Override
@@ -2660,14 +2667,57 @@ public abstract class WireValue {
             int bytes = bb.position() - i;
             bb.putInt(i - 4, bytes);
         }
+    }
 
 
-
+    private static Map<WireValue, WireValue> asWireValueMap(Map<?, ?> map) {
+        Transformer wireValueTransformer = new Transformer() {
+            @Override
+            public Object transform(Object input) {
+                return of(input);
+            }
+        };
+        // TODO have to make sure the transforms maintain the map contract
+        // TODO in this case, they do, since wire values are a bijection
+        // TODO wish Guava had something that could trust the user
+        return (Map<WireValue, WireValue>) TransformedMap.decorate(map, wireValueTransformer, wireValueTransformer);
+    }
+    private static List<WireValue> asWireValueList(List<?> list) {
+        return Lists.transform(list, new Function<Object, WireValue>() {
+            @Override
+            public WireValue apply(@Nullable Object input) {
+                return of(input);
+            }
+        });
+    }
+    private static List<WireValue> asWireValueList(Collection<?> collection) {
+        List<WireValue> wireValueList = new ArrayList<WireValue>(collection.size());
+        for (Object value : collection) {
+            wireValueList.add(of(value));
+        }
+        return wireValueList;
+    }
+    private static Collection<WireValue> asWireValueCollection(Collection<?> collection) {
+        return Collections2.transform(collection, new Function<Object, WireValue>() {
+            @Override
+            public WireValue apply(@Nullable Object input) {
+                return of(input);
+            }
+        });
     }
 
 
     // FIXME config
     private static final boolean WV_MAP_STRICT_TYPES = false;
+
+    private static WireValue duckCoerce(@Nullable Object arg) {
+        WireValue value = WireValue.of(arg);
+        if (value != arg && WV_MAP_STRICT_TYPES) {
+            throw new IllegalArgumentException();
+        }
+        return value;
+    }
+
 
     /** coerces arguments to {@link WireValue} where the {@link Map} interfaces
      * uses an object type (which won't trigger compile errors).
@@ -2681,33 +2731,63 @@ public abstract class WireValue {
             }
 
 
-            private WireValue coerce(@Nullable Object arg) {
-                WireValue value = WireValue.of(arg);
-                if (value != arg && WV_MAP_STRICT_TYPES) {
-                    throw new IllegalArgumentException();
-                }
-                return value;
-            }
-
-
             @Override
             public WireValue get(@Nullable Object key) {
-                return super.get(coerce(key));
+                return super.get(duckCoerce(key));
             }
 
             @Override
             public WireValue remove(Object object) {
-                return super.remove(coerce(object));
+                return super.remove(duckCoerce(object));
             }
 
             @Override
             public boolean containsKey(@Nullable Object key) {
-                return super.containsKey(coerce(key));
+                return super.containsKey(duckCoerce(key));
             }
 
             @Override
             public boolean containsValue(@Nullable Object value) {
-                return super.containsValue(coerce(value));
+                return super.containsValue(duckCoerce(value));
+            }
+        };
+    }
+
+    private static List<WireValue> duckList(final List<WireValue> list) {
+        return new ForwardingList<WireValue>() {
+            @Override
+            protected List<WireValue> delegate() {
+                return list;
+            }
+
+            @Override
+            public boolean remove(Object object) {
+                return super.remove(duckCoerce(object));
+            }
+
+            @Override
+            public boolean removeAll(Collection<?> collection) {
+                return super.removeAll(asWireValueCollection(collection));
+            }
+
+            @Override
+            public boolean contains(Object object) {
+                return super.contains(duckCoerce(object));
+            }
+
+            @Override
+            public boolean containsAll(Collection<?> collection) {
+                return super.containsAll(asWireValueCollection(collection));
+            }
+
+            @Override
+            public int indexOf(Object element) {
+                return super.indexOf(duckCoerce(element));
+            }
+
+            @Override
+            public int lastIndexOf(Object element) {
+                return super.lastIndexOf(duckCoerce(element));
             }
         };
     }

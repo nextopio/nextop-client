@@ -1,5 +1,6 @@
 package io.nextop.log;
 
+import io.nextop.WireValue;
 import rx.functions.Func0;
 
 import javax.annotation.Nullable;
@@ -23,6 +24,8 @@ public interface Log {
     void metric(String key, long value, Object unit);
     void metric(Level level, String key, long value, Object unit);
 
+
+    // duration* methods write as metrics. the metric is the time to run the callback
 
     <R> R duration(String key, Func0<R> eval);
     <R> R duration(Level level, String key, Func0<R> eval);
@@ -48,9 +51,27 @@ public interface Log {
 
 
     class Unit {
+        public static Unit create(String name) {
+            try {
+                return timeUnit(name);
+            } catch (IllegalArgumentException e) {
+                return new Unit(name);
+            }
+        }
+        public static Unit valueOf(Object unit) {
+            if (unit instanceof Unit) {
+                return (Unit) unit;
+            }
+            if (unit instanceof TimeUnit) {
+                return timeUnit((TimeUnit) unit);
+            }
+            return create(String.valueOf(unit));
+        }
+
+
         private final String name;
 
-        public Unit(String name) {
+        private Unit(String name) {
             this.name = name;
         }
 
@@ -71,12 +92,13 @@ public interface Log {
         }
 
 
-        public static Unit timeUnit(TimeUnit timeUnit) {
+
+        private static Unit timeUnit(TimeUnit timeUnit) {
             class T extends Unit {
                 final TimeUnit timeUnit;
 
                 T(TimeUnit timeUnit) {
-                    super(timeUnitName(timeUnit));
+                    super(timeUnitToName(timeUnit));
                     this.timeUnit = timeUnit;
                 }
 
@@ -90,26 +112,56 @@ public interface Log {
             }
             return new T(timeUnit);
         }
-        private static String timeUnitName(TimeUnit timeUnit) {
+        private static Unit timeUnit(String name) {
+            return timeUnit(timeUnitFromName(name));
+        }
+        private static String timeUnitToName(TimeUnit timeUnit) {
             switch (timeUnit) {
                 case NANOSECONDS:
-                    return "ns";
+                    return NAME_NANOSECONDS;
                 case MICROSECONDS:
-                    return "us";
+                    return NAME_MICROSECONDS;
                 case MILLISECONDS:
-                    return "ms";
+                    return NAME_MILLISECONDS;
                 case SECONDS:
-                    return "s";
+                    return NAME_SECONDS;
                 case MINUTES:
-                    return "m";
+                    return NAME_MINUTES;
                 case HOURS:
-                    return "h";
+                    return NAME_HOURS;
                 case DAYS:
-                    return "d";
+                    return NAME_DAYS;
                 default:
                     throw new IllegalArgumentException();
             }
         }
+        private static TimeUnit timeUnitFromName(String name) {
+            String n = name.toLowerCase();
+            if (NAME_NANOSECONDS.equals(n)) {
+                return TimeUnit.NANOSECONDS;
+            } else if (NAME_MICROSECONDS.equals(n)) {
+                return TimeUnit.MICROSECONDS;
+            } else if (NAME_MILLISECONDS.equals(n)) {
+                return TimeUnit.MILLISECONDS;
+            } else if (NAME_SECONDS.equals(n)) {
+                return TimeUnit.SECONDS;
+            } else if (NAME_MINUTES.equals(n)) {
+                return TimeUnit.MINUTES;
+            } else if (NAME_HOURS.equals(n)) {
+                return TimeUnit.HOURS;
+            } else if (NAME_DAYS.equals(n)) {
+                return TimeUnit.DAYS;
+            } else {
+                throw new IllegalArgumentException();
+            }
+        }
+        private static final String NAME_NANOSECONDS = "ns";
+        private static final String NAME_MICROSECONDS = "us";
+        private static final String NAME_MILLISECONDS = "ms";
+        private static final String NAME_SECONDS = "s";
+        private static final String NAME_MINUTES = "m";
+        private static final String NAME_HOURS = "h";
+        private static final String NAME_DAYS = "d";
     }
 
 
@@ -122,6 +174,9 @@ public interface Log {
         int valueWidth();
         int unitWidth();
         void write(Level level, String ... lines);
+        boolean isWriteUp(Level level);
+        // this can be used to write aggregate statistics or critical logs (e.g. crashes) to an upstream
+        void writeUp(LogEntry entry);
     }
 
 }
