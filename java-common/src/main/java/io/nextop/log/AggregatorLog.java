@@ -1,15 +1,22 @@
 package io.nextop.log;
 
 import rx.Scheduler;
+import rx.Subscription;
+import rx.functions.Action1;
+import rx.functions.Func0;
 
 import javax.annotation.Nullable;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.logging.Level;
 
 // aggregates logged values and periodically dumps a summary
 // each key stays active for some time, then is evicted and prints a summary at time of eviction
 // the state of all active keys can be dumped at any time
-public final class AggregatorLog implements Log {
-
-    private final Out out;
+public final class AggregatorLog extends DefaultLog {
 
     //
     final int metricReservoirSize = 16;
@@ -20,6 +27,10 @@ public final class AggregatorLog implements Log {
 
     Scheduler.Worker worker;
 
+    // "process" is vacuum + print modified aggregates since last process
+    @Nullable
+    Subscription processSubscription = null;
+    long mostRecentProcessNanos = 0L;
 
 
     // updated key set
@@ -27,6 +38,58 @@ public final class AggregatorLog implements Log {
     // linked set of items by update (oldest at front)
 
 
+    // front is most recently updated; back is least recently updated
+    NavigableSet<Aggregator> orderedAggregators;
+    Map<String, Aggregator> aggregators;
+
+
+    // FIXME scheduler
+    public AggregatorLog(Out out) {
+        super(out);
+    }
+
+    
+
+
+    /////// Log ///////
+
+    @Override
+    public void count(Level level, String key, long d) {
+        // FIXME update
+    }
+
+    @Override
+    public void metric(Level level, String key, long value, Object unit) {
+        // FIXME update
+    }
+
+
+    /////// Aggregators ///////
+
+    private void update(String key, Action1<Aggregator> updater) {
+        // FIXME lock
+        // FIXME set update nanos
+
+    }
+
+
+    static final Comparator<Aggregator> C_UPDATE_PRIORITY = new Comparator<Aggregator>() {
+        @Override
+        public int compare(Aggregator a, Aggregator b) {
+            if (a == b) {
+                return 0;
+            }
+
+            // descending by most recent update
+            if (a.mostRecentUpdateNanos < b.mostRecentUpdateNanos) {
+                return 1;
+            } else if (b.mostRecentUpdateNanos < a.mostRecentUpdateNanos) {
+                return -1;
+            }
+
+            return a.key.compareTo(b.key);
+        }
+    };
 
 
 

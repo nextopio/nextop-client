@@ -7,6 +7,7 @@ import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Route;
 import io.nextop.client.*;
+import io.nextop.log.Log;
 import rx.Observable;
 import rx.Scheduler;
 import rx.Subscriber;
@@ -18,7 +19,8 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Head implements MessageControlNode {
+
+public class Head implements MessageControlNode, Log.Out {
 
     public static Head create(MessageContext context, MessageControlState mcs, MessageControlNode downstream,
                                             Scheduler callbackScheduler) {

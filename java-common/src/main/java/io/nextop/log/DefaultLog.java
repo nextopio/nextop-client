@@ -10,13 +10,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 // FIXME support upstream
-public final class DefaultLog implements Log {
-    private final Out out;
+public class DefaultLog implements Log {
+    protected final Out out;
 
 
-    private final Level defaultLevel = Level.INFO;
-    private final Level defaultHandledLevel = Level.WARNING;
-    private final Level defaultUnhandledLevel = Level.SEVERE;
+    protected final Level defaultLevel = Level.INFO;
+    protected final Level defaultHandledLevel = Level.WARNING;
+    protected final Level defaultUnhandledLevel = Level.SEVERE;
 
 
     public DefaultLog(Out out) {

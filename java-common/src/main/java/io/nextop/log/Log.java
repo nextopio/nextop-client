@@ -174,6 +174,7 @@ public interface Log {
         int valueWidth();
         int unitWidth();
         void write(Level level, String ... lines);
+
         boolean isWriteUp(Level level);
         // this can be used to write aggregate statistics or critical logs (e.g. crashes) to an upstream
         void writeUp(LogEntry entry);
