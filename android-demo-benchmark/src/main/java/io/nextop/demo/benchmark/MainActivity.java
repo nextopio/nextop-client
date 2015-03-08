@@ -34,22 +34,17 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collections;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import rx.android.schedulers.AndroidSchedulers;
 
 
 public class MainActivity extends Activity {
 	public static final String DEBUG = MainActivity.class.getSimpleName();
 
-	String signalStrengh = "Unknown";
+	String signalStrength = "Unknown";
 	List<String> benchmarkUrls = Collections.EMPTY_LIST;
 
 	ListView timingsList;
@@ -74,8 +69,19 @@ public class MainActivity extends Activity {
 //
 //	}
 
-
 	public void volley(View view) {
+		URL resultUrl = null;
+		try {
+			resultUrl = new URL("http://10.1.10.10:9091/result");
+		} catch(MalformedURLException je) {}
+
+		UUID runId = UUID.randomUUID();
+		RequestBenchmark benchmark = VolleyRequestBenchmark.withURLStrings(this, benchmarkUrls);
+		benchmark.addCompletionListener(new BenchmarkReporter(resultUrl));
+		benchmark.run(runId.toString(), ImmutableMap.of("signal", signalStrength));
+	}
+
+	public void volley_old(View view) {
 
 		final Benchmark benchmark = VolleyBenchmark.using(this, benchmarkUrls);
 
@@ -84,7 +90,7 @@ public class MainActivity extends Activity {
 			protected Benchmark.Result doInBackground(Void... params) {
 				String runId = UUID.randomUUID().toString();
 				ImmutableMap.Builder<String, String> runContext = ImmutableMap.builder();
-				runContext.put("signal", signalStrengh);
+				runContext.put("signal", signalStrength);
 
 				benchmark.run(runId, runContext.build());
 				return benchmark.result();
@@ -126,7 +132,7 @@ public class MainActivity extends Activity {
 
 				String runId = UUID.randomUUID().toString();
 				ImmutableMap.Builder<String, String> runContext = ImmutableMap.builder();
-				runContext.put("signal", signalStrengh);
+				runContext.put("signal", signalStrength);
 
 				benchmark.run(runId, runContext.build());
 
@@ -183,7 +189,7 @@ public class MainActivity extends Activity {
 
 							public void onSignalStrengthsChanged(SignalStrength strength) {
 								super.onSignalStrengthsChanged(strength);
-								signalStrengh = strength.toString();
+								signalStrength = strength.toString();
 							}
 
 						}, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
