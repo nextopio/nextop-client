@@ -22,6 +22,11 @@ public final class Outs {
 
 
 
+    private Outs() {
+    }
+
+
+
     private static final class SplitOut implements Log.Out {
         @Nullable
         private final Log.Out console;
