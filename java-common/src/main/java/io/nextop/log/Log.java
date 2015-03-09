@@ -167,15 +167,16 @@ public interface Log {
 
     /** thread-safe */
     interface Out {
+        boolean isWrite(Level level, LogEntry.Type type);
         /** @return the line width of the log/console, so output can be properly formatted */
         int lineWidth();
         /** @return the width of keys in the log/console. Must be <= {@link #lineWidth} */
         int keyWidth();
         int valueWidth();
         int unitWidth();
-        void write(Level level, String ... lines);
+        void write(Level level, LogEntry.Type type, String ... lines);
 
-        boolean isWriteUp(Level level);
+        boolean isWriteUp(Level level, LogEntry.Type type);
         // this can be used to write aggregate statistics or critical logs (e.g. crashes) to an upstream
         void writeUp(LogEntry entry);
     }

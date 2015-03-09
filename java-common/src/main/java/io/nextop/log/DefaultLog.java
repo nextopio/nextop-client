@@ -26,6 +26,8 @@ public class DefaultLog implements Log {
 
     /////// Log ///////
 
+    // FIXME check isWrite on all these
+
     @Override
     public void count(String key) {
         count(key, 1);
@@ -39,7 +41,7 @@ public class DefaultLog implements Log {
     @Override
     public void count(Level level, String key, long d) {
         int r = out.lineWidth() - (Math.max(key.length(), out.keyWidth()) + 1);
-        out.write(level, String.format("%-" + out.keyWidth() + "s %" + r + "d",
+        out.write(level, LogEntry.Type.COUNT, String.format("%-" + out.keyWidth() + "s %" + r + "d",
                 key, d));
     }
 
@@ -51,7 +53,7 @@ public class DefaultLog implements Log {
     @Override
     public void metric(Level level, String key, long value, Object unit) {
         int r = out.lineWidth() - (Math.max(key.length(), out.keyWidth()) + 1);
-        out.write(level, String.format("%-" + out.keyWidth() + "s %" + r + "s",
+        out.write(level, LogEntry.Type.METRIC, String.format("%-" + out.keyWidth() + "s %" + r + "s",
                 key, String.format("%d %-" + out.unitWidth() + "s", value, unit)));
     }
 
@@ -95,10 +97,10 @@ public class DefaultLog implements Log {
     @Override
     public void message(Level level, String key, @Nullable String messageFormat, Object ... args) {
         if (null != messageFormat) {
-            out.write(level, String.format("%-" + out.keyWidth() + "s %s",
+            out.write(level, LogEntry.Type.MESSAGE, String.format("%-" + out.keyWidth() + "s %s",
                     key, String.format(messageFormat, args)));
         } else {
-            out.write(level, String.format("%-" + out.keyWidth() + "s", key));
+            out.write(level, LogEntry.Type.MESSAGE, String.format("%-" + out.keyWidth() + "s", key));
         }
     }
 
@@ -127,7 +129,7 @@ public class DefaultLog implements Log {
 
         String prefix = String.format("%-" + out.keyWidth() + "s ", key);
         // append the prefix to each line
-        out.write(level, prefix + s.replace("\n", "\n" + prefix));
+        out.write(level, LogEntry.Type.HANDLED, prefix + s.replace("\n", "\n" + prefix));
     }
 
     @Override
@@ -155,7 +157,7 @@ public class DefaultLog implements Log {
 
         String prefix = String.format("%-" + out.keyWidth() + "s ", key);
         // append the prefix to each line
-        out.write(level, prefix + s.replace("\n", "\n" + prefix));
+        out.write(level, LogEntry.Type.UNHANDLED, prefix + s.replace("\n", "\n" + prefix));
     }
 
 }
