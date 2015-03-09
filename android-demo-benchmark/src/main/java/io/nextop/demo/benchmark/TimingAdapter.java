@@ -1,23 +1,13 @@
 package io.nextop.demo.benchmark;
 
-import android.app.Activity;
 import android.content.Context;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
-import android.widget.BaseAdapter;
 import android.widget.TextView;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
-public class TimingAdapter extends ArrayAdapter<Benchmark.Result.Timing> {
+public class TimingAdapter extends ArrayAdapter<Benchmark.Measurement> {
 	static final int LAYOUT_RESOURCE = R.layout.timing_item;
 
 	public TimingAdapter(Context context) {
@@ -36,10 +26,10 @@ public class TimingAdapter extends ArrayAdapter<Benchmark.Result.Timing> {
 			timingItem.setTag(parts);
 		}
 
-		Benchmark.Result.Timing timing = getItem(position);
+		Benchmark.Measurement measurement = getItem(position);
 
-		long startTime = timing.measurements().get("start");
-		long elapsedTime = timing.measurements().get("elapsed");
+		long startTime = measurement.getValue("start");
+		long elapsedTime = measurement.getValue("elapsed");
 
 		parts = new TimingParts();
 		parts.startText = (TextView) timingItem.findViewById(R.id.startText);

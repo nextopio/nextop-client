@@ -1,105 +1,177 @@
 package io.nextop.demo.benchmark;
 
-import android.content.Context;
+
 import android.util.Log;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.gson.JsonObject;
+import com.google.common.collect.Ordering;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.net.URL;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-abstract class Benchmark {
-	public static final String DEBUG = Benchmark.class.getSimpleName();
+public abstract class Benchmark<T> {
+	static final String LOG_TAG = Benchmark.class.getSimpleName();
 
-	final Context context;
-	final ImmutableList<URL> urls;
+	final ImmutableList<T> inputs;
+	final Result result;
 
-	final Benchmark.Result result;
+	private final List<ResultListener> listeners;
 
-	public Benchmark(Context runContext, List<URL> benchmarkUrls) {
-		context = runContext;
-
-		urls = ImmutableList.copyOf(benchmarkUrls);
-		result = new Benchmark.Result();
+	Benchmark(List<T> benchmarkInputs) {
+		inputs = ImmutableList.copyOf(benchmarkInputs);
+		result = new Result();
+		listeners = Lists.newArrayList();
 	}
 
-	public Result result() {
-		return result;
+	public void addListener(ResultListener listener) {
+		listeners.add(listener);
 	}
 
-	abstract void run(String runId, Map<String, String> context);
+	public void removeListener(ResultListener listener) {
+		listeners.remove(listener);
+	}
+
+	public void run(Map<String, String> runContext) {
+		before(runContext);
+		execute(inputs);
+		after(runContext);
+	}
+
+	abstract void execute(ImmutableList<T> inputs);
+
+	void before(Map<String, String> runContext) {}
+
+	void after(Map<String, String> runContext) {}
+
+	void record(Measurement first, Measurement ...rest) {
+		result.addMeasurement(first, rest);
+
+		if (result.numMeasurements() >= inputs.size()) {
+			fireCompleted(result);
+		}
+	}
+
+	private void fireCompleted(Result result) {
+		for (ResultListener listener: listeners) {
+			listener.onResult(result);
+		}
+	}
+
+	interface ResultListener {
+		void onResult(Result result);
+	}
 
 	static class Result {
-		private final List<Timing> timings;
 		private final Map<String, String> context;
+		private final List<Measurement> measurements;
 
 		Result() {
-			timings = Lists.newArrayList();
-			context = Maps.newTreeMap();
+			context = Maps.newTreeMap(Ordering.natural());
+			measurements = Lists.newArrayList();
 		}
 
-		public void addTiming(String id, Map<String, Long> measurements) {
-			timings.add(new Timing(id, measurements));
-		}
-
-		public void addContext(String name, String value) {
+		public void addValue(String name, String value) {
 			context.put(name, value);
 		}
 
-		public void addContext(Map<String, String> data) {
-			context.putAll(data);
+		public void addValues(Map<String, String> values) {
+			context.putAll(values);
 		}
 
-		public List<Timing> getTimings() {
-			return timings;
+		public void addMeasurement(Measurement first, Measurement ...rest) {
+			measurements.addAll(Lists.asList(first, rest));
 		}
 
-		public JSONObject toJSON() {
-			JSONObject result = new JSONObject(context);
+		public List<Measurement> getMeasurements() {
+			return measurements;
+		}
+
+		public int numMeasurements() {
+			return measurements.size();
+		}
+
+		public JSONObject toJSONObject() {
+			JSONObject json = new JSONObject(context);
+
+			JSONArray measurementJsonArr = new JSONArray();
+			for (Measurement measurement : measurements) {
+				measurementJsonArr.put(measurement.toJSONObject());
+			}
 
 			try {
-				JSONArray timingArr = new JSONArray();
-				for (Timing timing: timings) {
-					JSONObject timingObj = new JSONObject(timing.measurements());
-					timingObj.put("id", timing.id());
-					timingArr.put(timingObj);
-				}
-
-				result.put("timings", timingArr);
+				json.put("measurements", measurementJsonArr);
 
 			} catch (JSONException je) {
-				Log.d(DEBUG, "result error", je);
+				Log.e(LOG_TAG, "", je);
 
 			}
 
-			return result;
+			return json;
 		}
 
-		static class Timing {
-			private final String id;
-			private final Map<String, Long> measurements;
-
-			Timing(String timingId, Map<String, Long> timingMeasurements) {
-				id = timingId;
-				measurements = timingMeasurements;
-			}
-
-			public String id() {
-				return id;
-			}
-
-			public Map<String, Long> measurements() {
-				return measurements;
-			}
-		}
 	}
+
+	static class Measurement {
+		enum Status {
+			SUCCESSFUL,
+			FAILED,
+			UNKNOWN
+		}
+
+		private final String id;
+		private final Status status;
+		private final Map<String, Long> measurements;
+
+		// TODO(andy) refactor for builder
+		Measurement(String measurementId, Status measurementStatus, Map<String, Long> measured) {
+			id = measurementId;
+			status = measurementStatus;
+			measurements = measured;
+		}
+
+		public void setValue(String name, Long value) {
+			measurements.put(name, value);
+		}
+
+		public Long getValue(String name) {
+			return measurements.get(name);
+		}
+
+		public JSONObject toJSONObject() {
+			JSONObject json = new JSONObject();
+
+			try {
+				json.put("id", id);
+				json.put("status", status.toString());
+				json.put("measurements", new JSONObject(measurements));
+
+			} catch (JSONException je) {
+				Log.e(LOG_TAG, "", je);
+
+			}
+
+			return json;
+		}
+
+		public static Measurement asFailed(String measurementId) {
+			return new Measurement(measurementId, Status.FAILED, Collections.EMPTY_MAP);
+		}
+
+		public static Measurement asSuccessful(String measurementId, Map<String, Long> measurements) {
+			return new Measurement(measurementId, Status.SUCCESSFUL, measurements);
+		}
+
+		public static Measurement asSuccessful(String measurementId) {
+			return asSuccessful(measurementId, Maps.<String, Long>newHashMap());
+		}
+
+	}
+
 }

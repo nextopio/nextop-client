@@ -11,37 +11,36 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 
-public class BenchmarkReporter implements RequestBenchmark.CompletionListener {
+
+public class BenchmarkReporter implements Benchmark.ResultListener {
 	static final String LOG_TAG = BenchmarkReporter.class.getSimpleName();
 
-	final URL url;
+	private final URL url;
 
-	BenchmarkReporter(URL resultUrl) {
-		url = resultUrl;
+	public BenchmarkReporter(URL reportingUrl) {
+		url = reportingUrl;
 	}
 
 	@Override
-	public void onCompleted(RequestBenchmark.Record record) {
-		Log.d(LOG_TAG, "post to: " + url.toString());
+	public void onResult(Benchmark.Result result) {
+		new AsyncTask<Benchmark.Result, Void, Void>() {
 
-		new AsyncTask<RequestBenchmark.Record, Void, Void>() {
 			@Override
-			protected Void doInBackground(RequestBenchmark.Record... records) {
+			protected Void doInBackground(Benchmark.Result... results) {
 				try {
-					post(url, records[0].toJSONObject());
-
-				} catch(IOException io) {
-					Log.e(LOG_TAG, "", io);
+					post(url, results[0].toJSONObject());
+				} catch(IOException ioe) {
+					Log.e(LOG_TAG, "", ioe);
 				}
 
 				return null;
 			}
-		}.execute(record);
+		}.execute(result);
 
 	}
-
 
 	private void post(URL resultUrl, JSONObject json) throws IOException {
 		DefaultHttpClient client = new DefaultHttpClient();
@@ -55,4 +54,15 @@ public class BenchmarkReporter implements RequestBenchmark.CompletionListener {
 		client.execute(post);
 	}
 
+	public static BenchmarkReporter withStringUrl(String str) {
+		URL url = null;
+
+		try {
+			url = new URL(str);
+		} catch(MalformedURLException mue) {
+			Log.e(LOG_TAG, String.format("Will not report. Bad URL: %s", str), mue);
+		}
+
+		return new BenchmarkReporter(url);
+	}
 }
