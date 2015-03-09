@@ -46,8 +46,10 @@ dependencies {
         // use the version included in Android
         exclude module: 'commons-logging'
     }
-    // since there is no standard volley distribution (?),
-    // expect users to have their own package of volley
+    // TODO the new tools don't like "provided" with aars?
+    // TODO for now, bundle volley with Nextop
+    // TODO(provided) since there is no standard volley distribution (?),
+    // TODO(provided) expect users to have their own package of volley
     compile project(':volley')
 
     // FIXME why is this not included as a transitive dependency of :java-common?
