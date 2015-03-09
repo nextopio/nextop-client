@@ -4,6 +4,8 @@ package io.nextop;
 import com.google.common.base.Objects;
 
 import javax.annotation.Nullable;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 public final class Authority {
     static enum Type {
@@ -108,8 +110,6 @@ public final class Authority {
     }
 
 
-
-
     @Override
     public String toString() {
         switch (type) {
@@ -149,4 +149,25 @@ public final class Authority {
         return c;
     }
 
+
+
+    public static InetAddress toInetAddress(Authority authority) {
+        switch (authority.type) {
+            case IP:
+                try {
+                    return InetAddress.getByAddress(authority.getIp().bytes);
+                } catch (UnknownHostException e) {
+                    throw new IllegalArgumentException(e);
+                }
+            case NAMED:
+                try {
+                    return InetAddress.getByName(authority.getDomainName().toString());
+                } catch (UnknownHostException e) {
+                    throw new IllegalArgumentException(e);
+                }
+            default:
+            case LOCAL:
+                throw new IllegalArgumentException();
+        }
+    }
 }

@@ -1,5 +1,6 @@
 package io.nextop.demo.flip;
 
+import com.google.common.primitives.Ints;
 import io.nextop.Id;
 import io.nextop.rx.RxManaged;
 
@@ -13,6 +14,27 @@ public class FeedViewModel extends RxManaged {
     long maxUpdateIndex = 0L;
     long minUpdateIndex = 0L;
 
+    // FIXME remove
+    int k = 20;
+    int[][] shuffle = new int[k][];
+    {
+        Random r = new Random();
+        for (int i = 0; i < k; ++i) {
+            int n = 100;
+            int[] s = new int[n];
+            for (int j = 0; j < n; ++j) {
+                s[j] = j;
+            }
+            for (int j = n - 1; 0 < j; --j) {
+                int index = r.nextInt(j + 1);
+                int t = s[index];
+                s[index] = s[j];
+                s[j] = t;
+            }
+            shuffle[i] = s;
+        }
+    }
+
 
     public FeedViewModel(Id feedId) {
         super(feedId);
@@ -20,12 +42,23 @@ public class FeedViewModel extends RxManaged {
 
 
     public int size() {
-        return orderedStates.size();
+        return /* FIXME remove */ k * orderedStates.size();
     }
 
 
     public Id getFlipId(int index) {
-        return orderedStates.get(index).flipId;
+        // FIXME remove
+        int n = orderedStates.size();
+        int i = index / n;
+        int[] s = shuffle[i];
+        int j = index % n;
+        if (0 < i && j < s.length) {
+            j = s[j];
+            while (n <= j) {
+                j /= 2;
+            }
+        }
+        return orderedStates.get(j).flipId;
     }
 
 
