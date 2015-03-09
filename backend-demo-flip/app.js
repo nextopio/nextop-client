@@ -77,8 +77,8 @@ app.get('/status', function(req, res) {
 // ?count= for top count
 // ?before= to go backward from index
 app.get('/feed', function (req, res) {
-
-    var count = req.query.count || 50;
+    // FIXME passing count in is broken
+    var count = req.query.count || 200;
     if ('before' in req.query) {
         var before = req.query.before;
         mysqlClient.query('SELECT flip_id, most_recent_update_index FROM Feed' +

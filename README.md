@@ -5,7 +5,10 @@ Nextop is rethinking a CDN for mobile from the ground up. Mobile devices operate
  users >2x faster than leading CDNs, while never losing a transaction.
 
 The core technology is a client SDK that replaces or plugs into your existing network library,
-and a proxy server that translates between the SDK and your existing HTTP backend.
+and a proxy server that translates between the SDK and your existing HTTP backend. Nextop optimizes your traffic
+through the region of pain - between the cloud and device - without you doing any work.
+
+![break through the region of pain](docs/assets/region_of_pain-512.png)
 
 With this setup, for example, Nextop can load image previews and
 blocking API calls before loading everything else for a view. As a developer you
@@ -27,13 +30,12 @@ improving transfer of all requests in all network conditions.
 
 | Current Version |
 |-----------------|
-| 0.1.3           |
+| 0.1.4           |
 
 | Module              | Android Versions Supported   | Notes                                                             |
 |---------------------|------------------------------|-------------------------------------------------------------------|
 | `android`           | 10+                          |                                                                   |
 | `android-v15`       | 15+                          | Includes all of `android` plus fragments                          |
-| `aws-android-sdk`   | 10+                          | [Amazon AWS SDK](http://aws.amazon.com/documentation/sdk-for-android/) on Nextop<br>(see demos for perf) |
 
 Gradle dependency (AAR):
 
@@ -83,8 +85,9 @@ http://search.maven.org/remotecontent?filepath=io/nextop/java-common/${CURRENT_V
 
 | Date       | Post                                                                                                                                              |
 |------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| 02.13.15   | [Binding Rx subscriptions to view lifecycles, and using them to optimize your network traffic](docs/02.13.15_SUBSCRIPTIONS_NETWORKING_VIEWS.md)   ||
+| 03.02.15   | [Faster Image Loading on Android is now a one-liner](docs/03.02.2015_FAST_IMAGE_LOADING_EASY_INTEGRATION.md)                                      |
 | 02.23.15   | [![profile](docs/assets/profile_32.png) How do mobile app teams QA test poor cellphone connections?](http://qr.ae/EMeBB)                          |
+| 02.13.15   | [Binding Rx subscriptions to view lifecycles, and using them to optimize your network traffic](docs/02.13.15_SUBSCRIPTIONS_NETWORKING_VIEWS.md)   |
 
 ## Cordova
 

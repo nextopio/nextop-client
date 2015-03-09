@@ -7,6 +7,10 @@ public class NoCopyByteArrayOutputStream extends ByteArrayOutputStream {
     public NoCopyByteArrayOutputStream(int size) {
         super(size);
     }
+    public NoCopyByteArrayOutputStream(byte[] buf) {
+        super(0);
+        this.buf = buf;
+    }
 
 
     public byte[] getBytes() {

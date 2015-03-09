@@ -82,32 +82,19 @@ public abstract class WireValue {
 //
 
 
-    static int intv(byte[] bytes, int offset) {
-        return ((0xFF & bytes[offset]) << 24)
-                | ((0xFF & bytes[offset + 1]) << 16)
-                | ((0xFF & bytes[offset + 2]) << 8)
-                | (0xFF & bytes[offset + 3]);
-    }
-    static long longv(byte[] bytes, int offset) {
-        return ((0xFFL & bytes[offset]) << 56)
-                | ((0xFFL & bytes[offset + 1]) << 48)
-                | ((0xFFL & bytes[offset + 2]) << 40)
-                | ((0xFFL & bytes[offset + 3]) << 32)
-                | ((0xFFL & bytes[offset + 4]) << 24)
-                | ((0xFFL & bytes[offset + 5]) << 16)
-                | ((0xFFL & bytes[offset + 6]) << 8)
-                | (0xFFL & bytes[offset + 7]);
-    }
 
 
-    static WireValue valueOf(ByteBuffer bb) {
+
+    // FIXME rename to "fromBytes"
+    public static WireValue valueOf(ByteBuffer bb) {
         int n = bb.remaining();
         byte[] bytes = new byte[n];
         bb.get(bytes, 0, n);
         return valueOf(bytes, 0);
     }
 
-    static WireValue valueOf(byte[] bytes) {
+    // FIXME rename to "fromBytes"
+    public static WireValue valueOf(byte[] bytes) {
         return valueOf(bytes, 0);
     }
 
@@ -115,7 +102,7 @@ public abstract class WireValue {
         int h = 0xFF & bytes[offset];
         if ((h & H_COMPRESSED) == H_COMPRESSED) {
             int nb = h & ~H_COMPRESSED;
-            int size = intv(bytes, offset + 1);
+            int size = getint(bytes, offset + 1);
             // next 4 is size in bytes
             int[] offsets = new int[size + 1];
             offsets[0] = offset + 9;
@@ -217,7 +204,7 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            int length = intv(bytes, offset + 1);
+            int length = getint(bytes, offset + 1);
             return new String(bytes, offset + 5, length, Charsets.UTF_8);
         }
         @Override
@@ -301,7 +288,7 @@ public abstract class WireValue {
         }
         @Override
         public ByteBuffer asBlob() {
-            int length = intv(bytes, offset + 1);
+            int length = getint(bytes, offset + 1);
             return ByteBuffer.wrap(bytes, offset + 5, length);
         }
         @Override
@@ -436,7 +423,7 @@ public abstract class WireValue {
         @Override
         public List<WireValue> asList() {
             return new AbstractList<WireValue>() {
-                int n = intv(bytes, offset + 1);
+                int n = getint(bytes, offset + 1);
                 int[] offsets = null;
                 int offseti = 0;
 
@@ -498,27 +485,27 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            throw new UnsupportedOperationException();
+            return String.valueOf(asInt());
         }
         @Override
         public int asInt() {
-            return intv(bytes, offset + 1);
+            return getint(bytes, offset + 1);
         }
         @Override
         public long asLong() {
-            throw new UnsupportedOperationException();
+            return asInt();
         }
         @Override
         public float asFloat() {
-            throw new UnsupportedOperationException();
+            return (float) asInt();
         }
         @Override
         public double asDouble() {
-            throw new UnsupportedOperationException();
+            return (double) asInt();
         }
         @Override
         public boolean asBoolean() {
-            throw new UnsupportedOperationException();
+            return 0 != asInt();
         }
         @Override
         public List<WireValue> asList() {
@@ -549,27 +536,27 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            throw new UnsupportedOperationException();
+            return String.valueOf(asLong());
         }
         @Override
         public int asInt() {
-            throw new UnsupportedOperationException();
+            return (int) asLong();
         }
         @Override
         public long asLong() {
-            return longv(bytes, offset + 1);
+            return getlong(bytes, offset + 1);
         }
         @Override
         public float asFloat() {
-            throw new UnsupportedOperationException();
+            return (float) asLong();
         }
         @Override
         public double asDouble() {
-            throw new UnsupportedOperationException();
+            return (double) asLong();
         }
         @Override
         public boolean asBoolean() {
-            throw new UnsupportedOperationException();
+            return 0 != asLong();
         }
         @Override
         public List<WireValue> asList() {
@@ -600,27 +587,27 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            throw new UnsupportedOperationException();
+            return String.valueOf(asFloat());
         }
         @Override
         public int asInt() {
-            throw new UnsupportedOperationException();
+            return (int) asFloat();
         }
         @Override
         public long asLong() {
-            throw new UnsupportedOperationException();
+            return (long) asFloat();
         }
         @Override
         public float asFloat() {
-            return Float.intBitsToFloat(intv(bytes, offset + 1));
+            return Float.intBitsToFloat(getint(bytes, offset + 1));
         }
         @Override
         public double asDouble() {
-            throw new UnsupportedOperationException();
+            return (double) asFloat();
         }
         @Override
         public boolean asBoolean() {
-            throw new UnsupportedOperationException();
+            return 0.f != asFloat();
         }
         @Override
         public List<WireValue> asList() {
@@ -651,27 +638,27 @@ public abstract class WireValue {
 
         @Override
         public String asString() {
-            throw new UnsupportedOperationException();
+            return String.valueOf(asDouble());
         }
         @Override
         public int asInt() {
-            throw new UnsupportedOperationException();
+            return (int) asDouble();
         }
         @Override
         public long asLong() {
-            throw new UnsupportedOperationException();
+            return (long) asDouble();
         }
         @Override
         public float asFloat() {
-            throw new UnsupportedOperationException();
+            return (float) asDouble();
         }
         @Override
         public double asDouble() {
-            return Double.longBitsToDouble(longv(bytes, offset + 1));
+            return Double.longBitsToDouble(getlong(bytes, offset + 1));
         }
         @Override
         public boolean asBoolean() {
-            throw new UnsupportedOperationException();
+            return 0.0 != asDouble();
         }
         @Override
         public List<WireValue> asList() {
@@ -738,7 +725,8 @@ public abstract class WireValue {
         }
         @Override
         public Message asMessage() {
-            return MessageCodec.valueOf(bytes, offset, cs);
+            // [0] is the header
+            return MessageCodec.valueOf(bytes, offset + 1, cs);
         }
         @Override
         public EncodedImage asImage() {
@@ -793,7 +781,8 @@ public abstract class WireValue {
         }
         @Override
         public EncodedImage asImage() {
-            return ImageCodec.valueOf(bytes, offset);
+            // [0] is the header
+            return ImageCodec.valueOf(bytes, offset + 1);
         }
     }
 
@@ -1123,8 +1112,14 @@ public abstract class WireValue {
                 }
                 return c;
             }
+            case MESSAGE:
+                return value.asMessage().hashCode();
+            case IMAGE:
+                return value.asImage().hashCode();
+            case NULL:
+                return 0;
             default:
-                throw new IllegalArgumentException();
+                throw new IllegalArgumentException("" + value.type);
         }
     }
 
@@ -1159,6 +1154,12 @@ public abstract class WireValue {
                 return a.asMap().equals(b.asMap());
             case LIST:
                 return a.asList().equals(b.asList());
+            case MESSAGE:
+                return a.asMessage().equals(b.asMessage());
+            case IMAGE:
+                return a.asImage().equals(b.asImage());
+            case NULL:
+                return true;
             default:
                 throw new IllegalArgumentException();
         }
@@ -1384,9 +1385,9 @@ public abstract class WireValue {
 //        System.out.printf("_byteSize %s\n", h);
         switch (h) {
             case H_UTF8:
-                return 5 + intv(bytes, offset + 1);
+                return 5 + getint(bytes, offset + 1);
             case H_BLOB:
-                return 5 + intv(bytes, offset + 1);
+                return 5 + getint(bytes, offset + 1);
             case H_INT32:
                 return 5;
             case H_INT64:
@@ -1400,9 +1401,9 @@ public abstract class WireValue {
             case H_FALSE_BOOLEAN:
                 return 1;
             case H_MAP:
-                return 5 + intv(bytes, offset + 1);
+                return 5 + getint(bytes, offset + 1);
             case H_LIST:
-                return 9 + intv(bytes, offset + 5);
+                return 9 + getint(bytes, offset + 5);
             case H_INT32_LIST:
                 // FIXME see listh
                 throw new IllegalArgumentException();
@@ -1415,10 +1416,18 @@ public abstract class WireValue {
             case H_FLOAT64_LIST:
                 // FIXME see listh
                 throw new IllegalArgumentException();
+            case H_MESSAGE:
+                return 5 + getint(bytes, offset + 1);
+            case H_IMAGE:
+                return 5 + getint(bytes, offset + 1);
+            case H_NULL:
+                return 1;
             default:
                 throw new IllegalArgumentException("" + h);
         }
     }
+
+
 
     public void toBytes(ByteBuffer bb) {
 
@@ -1565,14 +1574,16 @@ public abstract class WireValue {
             case BOOLEAN:
                 bb.put((byte) (value.asBoolean() ? H_TRUE_BOOLEAN : H_FALSE_BOOLEAN));
                 break;
-            case NULL:
-                bb.put((byte) H_NULL);
-                break;
             case MESSAGE:
+                bb.put((byte) H_MESSAGE);
                 MessageCodec.toBytes(value.asMessage(), lb, bb);
                 break;
             case IMAGE:
-                // FIXME
+                bb.put((byte) H_IMAGE);
+                ImageCodec.toBytes(value.asImage(), lb, bb);
+                break;
+            case NULL:
+                bb.put((byte) H_NULL);
                 break;
             default:
                 throw new IllegalArgumentException();
@@ -1605,8 +1616,12 @@ public abstract class WireValue {
 
         int luti(WireValue value) {
             S s = stats.get(value);
-            assert null != s;
-            return s.luti;
+            if (null != s) {
+                return s.luti;
+            } else {
+                // not in the lut
+                return -1;
+            }
         }
 
 
@@ -1810,6 +1825,14 @@ public abstract class WireValue {
                     return 8;
                 case BOOLEAN:
                     return 1;
+                case MESSAGE:
+                    // FIXME
+                    return 1;
+                case IMAGE:
+                    // FIXME
+                    return 1;
+                case NULL:
+                    return 1;
                 default:
                     throw new IllegalArgumentException();
             }
@@ -1922,6 +1945,28 @@ public abstract class WireValue {
                     return Float.compare(a.asFloat(), b.asFloat());
                 case FLOAT64:
                     return Double.compare(a.asDouble(), b.asDouble());
+                case MESSAGE:
+                    return a.asMessage().id.compareTo(b.asMessage().id);
+                case IMAGE: {
+                    // compare blobs
+                    ByteBuffer abytes = a.asImage().toBuffer();
+                    ByteBuffer bbytes = b.asImage().toBuffer();
+                    int n = abytes.remaining();
+                    int m = bbytes.remaining();
+                    d = n - m;
+                    if (0 != d) {
+                        return d;
+                    }
+                    for (int i = 0; i < n; ++i) {
+                        d = (0xFF & abytes.get(i)) - (0xFF & bbytes.get(i));
+                        if (0 != d) {
+                            return d;
+                        }
+                    }
+                    return 0;
+                }
+                case NULL:
+                    return 0;
                 default:
                     throw new IllegalArgumentException();
             }
@@ -1929,10 +1974,21 @@ public abstract class WireValue {
     }
 
 
-
+//    static final class SizeEstimate {
+//        long bytes;
+//        int verifiedNodes;
+//        int unverifiedNodes;
+//    }
+//
+//    public abstract SizeEstimate estimateSize();
 
 
     // logical view, regardless of wire format
+
+    // FIXME move Id to first class type
+    public Id asId() {
+        return Id.valueOf(asString());
+    }
 
     public abstract String asString();
     public abstract int asInt();
@@ -2492,7 +2548,10 @@ public abstract class WireValue {
 
         public static EncodedImage valueOf(byte[] bytes, int offset) {
             EncodedImage.Format format;
-            switch (intv(bytes, offset)) {
+            int c = offset;
+            // skip bytes
+            c += 4;
+            switch (0xFF & bytes[c]) {
                 case H_F_WEBP:
                     format = EncodedImage.Format.WEBP;
                     break;
@@ -2505,8 +2564,9 @@ public abstract class WireValue {
                 default:
                     throw new IllegalArgumentException();
             }
+            c += 1;
             EncodedImage.Orientation orientation;
-            switch (intv(bytes, offset + 4)) {
+            switch (0xFF & bytes[c]) {
                 case H_O_REAR_FACING:
                     orientation = EncodedImage.Orientation.REAR_FACING;
                     break;
@@ -2516,13 +2576,20 @@ public abstract class WireValue {
                 default:
                     throw new IllegalArgumentException();
             }
-            int width = intv(bytes, offset + 8);
-            int height = intv(bytes, offset + 12);
-            int length = intv(bytes, offset + 16);
-            return new EncodedImage(format, orientation, width, height, bytes, offset + 20, length);
+            c += 1;
+            int width = getint(bytes, c);
+            c += 4;
+            int height = getint(bytes, c);
+            c += 4;
+            int length = getint(bytes, c);
+            c += 4;
+            return new EncodedImage(format, orientation, width, height, bytes, c, length);
         }
 
-        public static void toBytes(EncodedImage image, ByteBuffer bb) {
+        public static void toBytes(EncodedImage image, Lb lb, ByteBuffer bb) {
+            bb.putInt(0);
+            int i = bb.position();
+
             switch (image.format) {
                 case WEBP:
                     bb.put((byte) H_F_WEBP);
@@ -2550,6 +2617,9 @@ public abstract class WireValue {
             bb.putInt(image.height);
             bb.putInt(image.length);
             bb.put(image.bytes, image.offset, image.length);
+
+            int bytes = bb.position() - i;
+            bb.putInt(i - 4, bytes);
         }
     }
 
@@ -2558,29 +2628,37 @@ public abstract class WireValue {
 
         public static Message valueOf(byte[] bytes, int offset, CompressionState cs) {
             int c = offset;
+            // skip bytes
+            c += 4;
+
             Id id = IdCodec.valueOf(bytes, c);
             c += IdCodec.LENGTH;
             Id groupId = IdCodec.valueOf(bytes, c);
             c += IdCodec.LENGTH;
-            int groupPriority = intv(bytes, c);
+            int groupPriority = getint(bytes, c);
             c += 4;
             Route route = Route.valueOf(WireValue.valueOf(bytes, c, cs).asString());
-            c += 5 + intv(bytes, c + 1);
+            c += 5 + getint(bytes, c + 1);
             Map<WireValue, WireValue> headers = WireValue.valueOf(bytes, c, cs).asMap();
-            c += 5 + intv(bytes, c + 1);
+            c += 5 + getint(bytes, c + 1);
             Map<WireValue, WireValue> parameters = WireValue.valueOf(bytes, c, cs).asMap();
             return new Message(id, groupId, groupPriority, route, headers, parameters);
         }
 
         public static void toBytes(Message message, Lb lb, ByteBuffer bb) {
+            bb.putInt(0);
+            int i = bb.position();
+
             IdCodec.toBytes(message.id, bb);
             IdCodec.toBytes(message.groupId, bb);
             bb.putInt(message.groupPriority);
-            // FIXME support serialID when it comes in
-            // TODO (?) NURL codec to avoid string conversion
-            WireValue.toBytes(WireValue.of(message.route.toString()), lb, bb);
-            WireValue.toBytes(WireValue.of(message.headers), lb, bb);
-            WireValue.toBytes(WireValue.of(message.parameters), lb, bb);
+            // TODO (?) Route codec to avoid string conversion
+            WireValue._toBytes(WireValue.of(message.route.toString()), lb, bb);
+            WireValue._toBytes(WireValue.of(message.headers), lb, bb);
+            WireValue._toBytes(WireValue.of(message.parameters), lb, bb);
+
+            int bytes = bb.position() - i;
+            bb.putInt(i - 4, bytes);
         }
 
 
@@ -2633,5 +2711,46 @@ public abstract class WireValue {
             }
         };
     }
+
+
+
+    // wire utils
+
+    public static int getint(byte[] bytes, int offset) {
+        return ((0xFF & bytes[offset]) << 24)
+                | ((0xFF & bytes[offset + 1]) << 16)
+                | ((0xFF & bytes[offset + 2]) << 8)
+                | (0xFF & bytes[offset + 3]);
+    }
+    public static long getlong(byte[] bytes, int offset) {
+        return ((0xFFL & bytes[offset]) << 56)
+                | ((0xFFL & bytes[offset + 1]) << 48)
+                | ((0xFFL & bytes[offset + 2]) << 40)
+                | ((0xFFL & bytes[offset + 3]) << 32)
+                | ((0xFFL & bytes[offset + 4]) << 24)
+                | ((0xFFL & bytes[offset + 5]) << 16)
+                | ((0xFFL & bytes[offset + 6]) << 8)
+                | (0xFFL & bytes[offset + 7]);
+    }
+
+    public static void putint(byte[] bytes, int offset, int value) {
+        bytes[offset] = (byte) (value >>> 24);
+        bytes[offset + 1] = (byte) (value >>> 16);
+        bytes[offset + 2] = (byte) (value >>> 8);
+        bytes[offset + 3] = (byte) value;
+    }
+    public static void putlong(byte[] bytes, int offset, long value) {
+        bytes[offset] = (byte) (value >>> 56);
+        bytes[offset + 1] = (byte) (value >>> 48);
+        bytes[offset + 2] = (byte) (value >>> 40);
+        bytes[offset + 3] = (byte) (value >>> 32);
+        bytes[offset + 4] = (byte) (value >>> 24);
+        bytes[offset + 5] = (byte) (value >>> 16);
+        bytes[offset + 6] = (byte) (value >>> 8);
+        bytes[offset + 7] = (byte) value;
+    }
+
+
+
 
 }

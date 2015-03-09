@@ -1,5 +1,7 @@
 package io.nextop;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 /** To convert this to pixels, do transcoding, or scaling,
@@ -17,6 +19,9 @@ public class EncodedImage {
         /** mirrored */
         FRONT_FACING
     }
+
+    public static final Orientation DEFAULT_ORIENTATION = Orientation.REAR_FACING;
+
 
     public static final int UNKNOWN_WIDTH = -1;
     public static final int UNKNOWN_HEIGHT = -1;
@@ -78,5 +83,47 @@ public class EncodedImage {
 
     protected ByteBuffer toBuffer() {
         return ByteBuffer.wrap(bytes, offset, length);
+    }
+
+    public InputStream getInputStream() {
+        return new ByteArrayInputStream(bytes, offset, length);
+    }
+
+
+    @Override
+    public int hashCode() {
+        int c = format.hashCode();
+        c = 31 * c + orientation.hashCode();
+        c = 31 * c + width;
+        c = 31 * c + height;
+        c = 31 * c + length;
+        for (int i = 0; i < length; ++i) {
+            c = 31 * c + bytes[offset + i];
+        }
+        return c;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof EncodedImage)) {
+            return false;
+        }
+
+        EncodedImage b = (EncodedImage) obj;
+        if (!(format.equals(b.format)
+                && orientation.equals(b.orientation)
+                && width == b.width
+                && height == b.height
+                && length == b.length)) {
+            return false;
+        }
+
+        for (int i = 0; i < length; ++i) {
+            if (bytes[offset + i] != b.bytes[b.offset + i]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

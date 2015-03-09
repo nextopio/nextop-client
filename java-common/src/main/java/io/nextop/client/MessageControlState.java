@@ -20,8 +20,6 @@ import java.util.concurrent.TimeUnit;
 
 /** Shared state for all {@link MessageControlChannel} objects
  * for SEND.MESSAGE.
- * TODO RECEIVE.* and SEND.{COMPLETED, ERROR} are multicasted
- * TODO to all upstream/downstream and not persisted in the state.
  *
  * Each {@link MessageControl} object is controlled by at most one channel object.
  * Nodes take/release control via {@link #take}/{@link #release}.
@@ -29,6 +27,7 @@ import java.util.concurrent.TimeUnit;
  * The state allows introspection via the {@link #get} variants.
  *
  * Thread safe. */
+// FIXME all MessageControl should go in here (not just send)
 public final class MessageControlState {
 
     private final MessageContext context;
@@ -350,13 +349,14 @@ public final class MessageControlState {
     }
 
 
-    public boolean remove(Id id, End end) {
+    @Nullable
+    public Message remove(Id id, End end) {
         Entry entry;
         synchronized (mutex) {
             entry = entries.remove(id);
 
             if (null == entry) {
-                return false;
+                return null;
             }
 
 
@@ -378,7 +378,7 @@ public final class MessageControlState {
         entry.publish();
         entry.publishComplete();
         publish();
-        return true;
+        return entry.message;
     }
 
     public boolean yield(Id id) {
@@ -611,7 +611,7 @@ public final class MessageControlState {
             if (null != id) {
                 if (MessageControl.Type.ERROR.equals(mc.type) && Message.outboxRoute(id).equals(route)) {
                     // cancel
-                    if (remove(id, End.CANCELED)) {
+                    if (null != remove(id, End.ERROR)) {
                         upstream.onMessageControl(MessageControl.receive(MessageControl.Type.ERROR, Message.inboxRoute(id)));
                     }
                 } else if (MessageControl.Type.MESSAGE.equals(mc.type) && Message.echoRoute(id).equals(route)) {
@@ -648,7 +648,6 @@ public final class MessageControlState {
 
 
     public static enum End {
-        CANCELED,
         COMPLETED,
         ERROR
     }

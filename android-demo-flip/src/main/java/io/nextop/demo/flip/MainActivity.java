@@ -31,6 +31,9 @@ public class MainActivity extends RxActivity {
     FeedAdapter feedAdapter;
 
 
+    int animateIntervalMs = 500;
+
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
@@ -207,7 +210,6 @@ public class MainActivity extends RxActivity {
 
             imageView.reset();
 
-            int animateIntervalMs = (int) TimeUnit.SECONDS.toMillis(3);
 
             Observable<ImageViewModel> imageVmSource = new LoadingImageVmSource(NextopAndroid.getActive(view),
                     animateIntervalMs,
@@ -363,7 +365,8 @@ public class MainActivity extends RxActivity {
                             int index = frameCount++;
                             subject.onNext(frameVms[index % frameVms.length].imageVm);
                         }
-                    }, 0, loopIntervalMs, TimeUnit.MILLISECONDS));
+                    }, /* have frames hit near each other */ loopIntervalMs - (System.currentTimeMillis() % loopIntervalMs),
+                            loopIntervalMs, TimeUnit.MILLISECONDS));
                 }
             }
         }

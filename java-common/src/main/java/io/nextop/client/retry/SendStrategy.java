@@ -11,9 +11,17 @@ import java.util.concurrent.TimeUnit;
  * Strategies are immutable and can be shared, used across multiple threads. */
 public interface SendStrategy {
 
-    boolean isSend();
-    long getDelay(TimeUnit timeUnit);
+    // FIXME clarify usage of this interface
+    // FIXME - retry
+    // FIXME - isSend()
+    // FIXME   - if true, getDelay
+
+    // FIXME rename onRetry
     SendStrategy retry();
+    boolean isSend();
+    // FIXME rename getSendDelay
+    long getDelay(TimeUnit timeUnit);
+
 
 
 
@@ -26,10 +34,10 @@ public interface SendStrategy {
     ).repeatIndefinitely(
     ).build();
 
-    SendStrategy MAX_30S = new Builder().init(0, TimeUnit.MILLISECONDS
-    ).withLinearRandom(5, TimeUnit.SECONDS
-    ).repeat(3
+    SendStrategy NO_RETRY = new Builder().init(0, TimeUnit.MILLISECONDS
+    ).repeat(0
     ).build();
+
 
 
 

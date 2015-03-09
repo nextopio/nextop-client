@@ -128,6 +128,59 @@ public class WireValueTest extends TestCase {
     }
 
 
+    public void testBasicMessage() {
+        ByteBuffer bb = ByteBuffer.allocate(1024);
+
+        Message a = Message.newBuilder()
+                .setRoute("GET http://nextop.io")
+                .build();
+
+        bb.clear();
+        WireValue.of(a).toBytes(bb);
+        bb.flip();
+        Message da = WireValue.valueOf(bb).asMessage();
+
+        assertEquals(a.hashCode(), da.hashCode());
+        assertEquals(a, da);
+    }
+
+    public void testImageMessage() {
+        ByteBuffer bb = ByteBuffer.allocate(8 * 1024);
+
+        Message a = Message.newBuilder()
+                .setRoute("GET http://nextop.io")
+                .setContent(new EncodedImage(EncodedImage.Format.JPEG, EncodedImage.Orientation.REAR_FACING,
+                        200, 200, new byte[4 * 1024], 0, 2 * 1024))
+                .build();
+
+        bb.clear();
+        WireValue.of(a).toBytes(bb);
+        bb.flip();
+        Message da = WireValue.valueOf(bb).asMessage();
+
+        assertEquals(a.hashCode(), da.hashCode());
+        assertEquals(a, da);
+    }
+
+
+    public void testEncodedImage() {
+        ByteBuffer bb = ByteBuffer.allocate(8 * 1024);
+
+        EncodedImage a = new EncodedImage(EncodedImage.Format.JPEG, EncodedImage.Orientation.REAR_FACING,
+                200, 200, new byte[4 * 1024], 0, 2 * 1024);
+
+        bb.clear();
+        WireValue.of(a).toBytes(bb);
+        bb.flip();
+        EncodedImage da = WireValue.valueOf(bb).asImage();
+
+        assertEquals(a.hashCode(), da.hashCode());
+        assertEquals(a, da);
+
+    }
+
+
+
     /** from WireValueTest */
     private static JsonElement randomJson(Random r, int d) {
         return randomJson(r, d, 0);
