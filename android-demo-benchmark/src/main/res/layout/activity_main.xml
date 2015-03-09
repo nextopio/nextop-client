@@ -35,13 +35,14 @@
         android:id="@+id/context"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/controls">
+        android:layout_below="@id/controls"
+        android:gravity="center_vertical"
+        android:minHeight="48dp">
 
         <TextView
-            android:id="@+id/context_text"
+            android:id="@+id/context_method"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="context"
             />
 
     </RelativeLayout>

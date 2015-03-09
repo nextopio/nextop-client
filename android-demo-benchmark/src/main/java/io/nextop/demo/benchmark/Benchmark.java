@@ -85,6 +85,10 @@ public abstract class Benchmark<T> {
 			context.putAll(values);
 		}
 
+		public String getValue(String name) {
+			return context.get(name);
+		}
+
 		public void addMeasurement(Measurement first, Measurement ...rest) {
 			measurements.addAll(Lists.asList(first, rest));
 		}

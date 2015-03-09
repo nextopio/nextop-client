@@ -81,8 +81,7 @@ public class NextopJsonBenchmark extends Benchmark<URL> {
 				urls.add(new URL(str));
 
 			} catch(MalformedURLException mue) {
-				Log.e(LOG_TAG, String.format("Skipping url: %s", str));
-				Log.e(LOG_TAG, "", mue);
+				Log.e(LOG_TAG, String.format("Skipping url: %s", str), mue);
 
 			}
 		}

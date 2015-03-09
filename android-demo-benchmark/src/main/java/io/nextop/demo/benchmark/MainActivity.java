@@ -10,6 +10,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ListView;
+import android.widget.TextView;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
@@ -39,7 +40,7 @@ public class MainActivity extends Activity {
 	List<String> benchmarkUrls = Collections.EMPTY_LIST;
 
 	ListView timingsList;
-	TimingAdapter timingsAdapter;
+	BenchmarkMeasurementAdapter timingsAdapter;
 
 
 	@Override
@@ -70,7 +71,7 @@ public class MainActivity extends Activity {
 		setContentView(R.layout.activity_main);
 
 		timingsList = (ListView) findViewById(R.id.timings);
-		timingsAdapter = new TimingAdapter(this);
+		timingsAdapter = new BenchmarkMeasurementAdapter(this);
 		timingsList.setAdapter(timingsAdapter);
 
 		loadBenchmarkUrls();
@@ -109,6 +110,9 @@ public class MainActivity extends Activity {
 		benchmark.addListener(new Benchmark.ResultListener() {
 			@Override
 			public void onResult(Benchmark.Result result) {
+				TextView methodText = (TextView) findViewById(R.id.context_method);
+				methodText.setText(result.getValue("method"));
+
 				timingsAdapter.clear();
 				timingsAdapter.addAll(result.getMeasurements());
 				timingsAdapter.notifyDataSetChanged();
@@ -134,6 +138,9 @@ public class MainActivity extends Activity {
 		benchmark.addListener(new Benchmark.ResultListener() {
 			@Override
 			public void onResult(Benchmark.Result result) {
+				TextView methodText = (TextView) findViewById(R.id.context_method);
+				methodText.setText(result.getValue("method"));
+
 				timingsAdapter.clear();
 				timingsAdapter.addAll(result.getMeasurements());
 				timingsAdapter.notifyDataSetChanged();
@@ -162,4 +169,5 @@ public class MainActivity extends Activity {
 			finish();
 		}
 	}
+
 }
