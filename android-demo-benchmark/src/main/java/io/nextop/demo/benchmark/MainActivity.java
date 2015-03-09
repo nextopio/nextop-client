@@ -27,11 +27,17 @@ import java.net.URL;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class MainActivity extends Activity {
-	public static final String LOG_TAG = MainActivity.class.getSimpleName();
+	static final String LOG_TAG = MainActivity.class.getSimpleName();
+	static final String NEXTOP_REPORTING_URL = "http://10.1.10.10:9091/result/nextop";
+	static final String VOLLEY_REPORTING_URL = "http://10.1.10.10:9091/result/volley";
+	static final int MAX_RUNS = 50;
+	static final int RUN_INTERVAL = 10000; // ms;
 
 	String deviceId = "Unknown";
 	String wifiStrength = "Unknown";
@@ -95,59 +101,92 @@ public class MainActivity extends Activity {
 		wifiStrength = "TODO";
 	}
 
-	public void volley(View view) {
-		UUID runId = UUID.randomUUID();
-		Map<String, String> runContext = ImmutableMap.of(
-      "runId", runId.toString(),
-      "deviceId", deviceId,
-      "cellStrength", cellStrength,
-      "wifiStrength", wifiStrength
-		);
+	public void volley(final View view) {
+		final Timer timer = new Timer();
+		final AtomicInteger count = new AtomicInteger(0);
 
-		Benchmark<URL> benchmark = VolleyJsonBenchmark.withStringUrls(this, benchmarkUrls);
-		BenchmarkReporter reporter = BenchmarkReporter.withStringUrl("http://10.1.10.10:9091/result");
-		benchmark.addListener(reporter);
-		benchmark.addListener(new Benchmark.ResultListener() {
+		timer.scheduleAtFixedRate(new TimerTask() {
 			@Override
-			public void onResult(Benchmark.Result result) {
-				TextView methodText = (TextView) findViewById(R.id.context_method);
-				methodText.setText(result.getValue("method"));
+			public void run() {
+				String runId = String.format("volley-%d", count.get());
 
-				timingsAdapter.clear();
-				timingsAdapter.addAll(result.getMeasurements());
-				timingsAdapter.notifyDataSetChanged();
+				Map<String, String> runContext = ImmutableMap.of(
+          "runId", runId,
+          "deviceId", deviceId,
+          "cellStrength", cellStrength,
+          "wifiStrength", wifiStrength
+				);
+
+				Benchmark<URL> benchmark = VolleyJsonBenchmark.withStringUrls(view.getContext(), benchmarkUrls);
+
+				benchmark.addListener(BenchmarkReporter.withStringUrl(VOLLEY_REPORTING_URL));
+				benchmark.addListener(new Benchmark.ResultListener() {
+					@Override
+					public void onResult(Benchmark.Result result) {
+						TextView methodText = (TextView) findViewById(R.id.context_method);
+						methodText.setText(result.getValue("method"));
+
+						TextView runIdText = (TextView) findViewById(R.id.context_runId);
+						runIdText.setText(result.getValue("runId"));
+
+						timingsAdapter.clear();
+						timingsAdapter.addAll(result.getMeasurements());
+						timingsAdapter.notifyDataSetChanged();
+					}
+				});
+
+				benchmark.run(runContext);
+
+				if (count.incrementAndGet() >= MAX_RUNS) {
+					timer.cancel();
+				}
 			}
-		});
+		}, 0, RUN_INTERVAL);
 
-		benchmark.run(runContext);
+
 	}
 
-	public void nextop(View view) {
+	public void nextop(final View view) {
+		final Timer timer = new Timer();
+		final AtomicInteger count = new AtomicInteger(0);
 
-		UUID runId = UUID.randomUUID();
-		Map<String, String> runContext = ImmutableMap.of(
-      "runId", runId.toString(),
-      "deviceId", deviceId,
-      "cellStrength", cellStrength,
-      "wifiStrength", wifiStrength
-		);
-
-		Benchmark<URL> benchmark = NextopJsonBenchmark.withStringUrls(this, benchmarkUrls);
-		BenchmarkReporter reporter = BenchmarkReporter.withStringUrl("http://10.1.10.10:9091/result");
-		benchmark.addListener(reporter);
-		benchmark.addListener(new Benchmark.ResultListener() {
+		timer.schedule(new TimerTask() {
 			@Override
-			public void onResult(Benchmark.Result result) {
-				TextView methodText = (TextView) findViewById(R.id.context_method);
-				methodText.setText(result.getValue("method"));
+			public void run() {
+				String runId = String.format("nextop-%d", count.get());
 
-				timingsAdapter.clear();
-				timingsAdapter.addAll(result.getMeasurements());
-				timingsAdapter.notifyDataSetChanged();
+				Map<String, String> runContext = ImmutableMap.of(
+          "runId", runId,
+          "deviceId", deviceId,
+          "cellStrength", cellStrength,
+          "wifiStrength", wifiStrength
+				);
+
+				Benchmark<URL> benchmark = NextopJsonBenchmark.withStringUrls(view.getContext(), benchmarkUrls);
+
+				benchmark.addListener(BenchmarkReporter.withStringUrl(NEXTOP_REPORTING_URL));
+				benchmark.addListener(new Benchmark.ResultListener() {
+					@Override
+					public void onResult(Benchmark.Result result) {
+						TextView methodText = (TextView) findViewById(R.id.context_method);
+						methodText.setText(result.getValue("method"));
+
+						TextView runIdText = (TextView) findViewById(R.id.context_runId);
+						runIdText.setText(result.getValue("runId"));
+
+						timingsAdapter.clear();
+						timingsAdapter.addAll(result.getMeasurements());
+						timingsAdapter.notifyDataSetChanged();
+					}
+				});
+
+				benchmark.run(runContext);
+
+				if (count.incrementAndGet() >= MAX_RUNS) {
+					timer.cancel();
+				}
 			}
-		});
-
-		benchmark.run(runContext);
+		}, 0, RUN_INTERVAL);
 	}
 
 	private void loadBenchmarkUrls() {
