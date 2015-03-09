@@ -886,18 +886,18 @@ public class Nextop {
 
         private static MessageControlNode createLimitedNode() {
             // FIXME 0.2 see ClientDemo for where we want to be
-            NextopNode nextopNode = new NextopNode();
-            nextopNode.setWireFactory(new NextopClientWireFactory(
-                    new NextopClientWireFactory.Config(Authority.valueOf("dns.nextop.io"), 2,
-                            /* FIXME */ Collections.singletonList(Authority.valueOf(/*"127.0.0.1:27780"*/"54.149.233.13:27780")))));
+//            NextopNode nextopNode = new NextopNode();
+//            nextopNode.setWireFactory(new NextopClientWireFactory(
+//                    new NextopClientWireFactory.Config(Authority.valueOf("dns.nextop.io"), 2,
+//                            /* FIXME */ Collections.singletonList(Authority.valueOf(/*"127.0.0.1:27780"*/"54.149.233.13:27780")))));
+//
+//            return nextopNode;
 
-            return nextopNode;
-
-//            HttpNode httpNode = new HttpNode();
+            HttpNode httpNode = new HttpNode();
+            return httpNode;
 
 //            MultiNode multiNode = new MultiNode(nextopNode, httpNode);
 
-//            return httpNode;
         }
 
         private Limited(Context context, @Nullable Auth auth) {
