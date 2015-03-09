@@ -14,7 +14,7 @@ import java.util.UUID;
 public final class Id implements Comparable<Id> {
     private static final SecureRandom sr = new SecureRandom();
 
-    public static final int LENGTH = 32;
+    static final int LENGTH = 32;
 
     /** generate a 256-bit UUID as a 128-bit UUID + 128 bits of randomness
      * @see <a href="http://www.ietf.org/rfc/rfc4122.txt">RFC4122</a>
@@ -40,34 +40,17 @@ public final class Id implements Comparable<Id> {
     }
 
     public static Id valueOf(String s) throws IllegalArgumentException {
-        if (2 * LENGTH != s.length()) {
+        if (64 != s.length()) {
             throw new IllegalArgumentException();
         }
         byte[] bytes = HexBytes.valueOf(s);
-        if (LENGTH != bytes.length) {
+        if (32 != bytes.length) {
             throw new IllegalArgumentException();
         }
 
         Id id = new Id(bytes);
         assert id.toString().equals(s);
         return id;
-    }
-
-
-
-    public static void toBytes(Id id, byte[] buffer, int offset) {
-        if (offset < 0 || buffer.length < offset + LENGTH) {
-            throw new IllegalArgumentException();
-        }
-        System.arraycopy(id.bytes, id.offset, buffer, offset, LENGTH);
-    }
-
-    public static Id fromBytes(byte[] buffer, int offset) {
-        if (offset < 0 || buffer.length < offset + LENGTH) {
-            throw new IllegalArgumentException();
-        }
-        byte[] bytes = Arrays.copyOfRange(buffer, offset, offset + LENGTH);
-        return new Id(bytes, 0);
     }
 
 
@@ -85,10 +68,6 @@ public final class Id implements Comparable<Id> {
         this.offset = offset;
         hashCode = Hashing.murmur3_128().hashBytes(bytes, offset, LENGTH).asLong();
     }
-
-
-
-
 
 
     @Override
@@ -112,21 +91,13 @@ public final class Id implements Comparable<Id> {
             return false;
         }
         Id b = (Id) obj;
-        if (hashCode != b.hashCode) {
-            return false;
-        }
-        for (int i = 0; i < LENGTH; ++i) {
-            if (bytes[offset + i] != b.bytes[b.offset + i]) {
-                return false;
-            }
-        }
-        return true;
+        return hashCode == b.hashCode && Arrays.equals(bytes, b.bytes);
     }
 
 
     @Override
     public int compareTo(Id b) {
-        for (int i = 0; i < LENGTH; ++i) {
+        for (int i = 0; i < 32; ++i) {
             int d = (0xFF & bytes[offset + i]) - (0xFF & b.bytes[b.offset + i]);
             if (0 != d) {
                 return d;

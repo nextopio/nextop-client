@@ -64,7 +64,6 @@ repositories {
 
 
 dependencies {
-
 //    shadow project(":org.apache-jarjar")
 
     compile fileTree(dir: 'libs', include: ['*.jar'])

@@ -89,8 +89,6 @@ public class FlipViewModelManager extends ThinViewModelManager<FlipViewModel> {
                 .setRoute("GET http://" + Flip.REMOTE + "/flip/$flip-id/frame")
                 .set("flip-id", flipVm.id)
                 .build();
-        // FIXME remove
-        String uriString = sync.toUriString();
         state.bind(nextop.send(sync))
                 .doOnNext(new Action1<Message>() {
                     @Override

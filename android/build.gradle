@@ -46,9 +46,7 @@ dependencies {
         // use the version included in Android
         exclude module: 'commons-logging'
     }
-    // since there is no standard volley distribution (?),
-    // expect users to have their own package of volley
-    provided project(':volley')
+    compile project(':volley')
 
     // FIXME why is this not included as a transitive dependency of :java-common?
     // FIXME see http://forums.gradle.org/gradle/topics/including-a-java-project-into-an-android-library-project-does-not-include-transitive-file-dependencies?rfm=1

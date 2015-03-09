@@ -20,8 +20,6 @@ public class FlipViewModel extends RxManaged {
     long maxUpdateIndex = 0;
 
 
-    // FIXME remove
-    int k = 20;
 
 
     void add(FrameState state) {
@@ -59,12 +57,12 @@ public class FlipViewModel extends RxManaged {
 
 
     public int size() {
-        return /* FIXME remove */ k * orderedStates.size();
+        return orderedStates.size();
     }
 
 
     public FrameViewModel getFrameVm(int index) {
-        return orderedStates.get(index /* FIXME remove */ % orderedStates.size()).frameVm;
+        return orderedStates.get(index).frameVm;
     }
 
     public FrameViewModel getFrameVm(Id frameId) {
