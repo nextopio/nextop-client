@@ -134,14 +134,7 @@ public class NextopNode extends AbstractMessageControlNode {
         if (active) {
             MessageControlState mcs = getMessageControlState();
             if (!mcs.onActiveMessageControl(mc, upstream)) {
-                switch (mc.type) {
-                    case MESSAGE:
-                        mcs.add(mc.message);
-                        break;
-                    default:
-                        // ignore
-                        break;
-                }
+                mcs.add(mc);
             }
         }
         // TODO else send back upstream?
@@ -476,7 +469,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             // create it
                             byte[] bytes;
                             try {
-                                WireValue.of(entry.message).toBytes(serBuffer);
+                                pkg(entry.mc).toBytes(serBuffer);
                                 serBuffer.flip();
                                 bytes = new byte[serBuffer.remaining()];
                                 serBuffer.get(bytes);
@@ -493,7 +486,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                 chunkOffsets[i] = chunkOffsets[i - 1] + config.chunkBytes;
                             }
 
-                            assert WireValue.of(entry.message).equals(WireValue.valueOf(bytes));
+                            assert pkg(entry.mc).equals(WireValue.valueOf(bytes));
 
                             writeState = new MessageWriteState(entry.id, bytes, chunkOffsets);
 
@@ -587,7 +580,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
                     // done with entry, transfer to pending ack
                     mcs.remove(entry.id, MessageControlState.End.COMPLETED);
-                    sts.writePendingAck.add(entry.message);
+                    sts.writePendingAck.add(entry.mc);
                     entry = null;
                 }
 
@@ -811,12 +804,8 @@ public class NextopNode extends AbstractMessageControlNode {
                                         post(new Runnable() {
                                             @Override
                                             public void run() {
-                                                Message message = messageValue.asMessage();
-                                                upstream.onMessageControl(MessageControl.receive(message));
-                                                // FIXME mcs needs to transmit message controls.
-                                                // FIXME the hard part is how to handle that on channels that don't do controls (but this might not matter because message controls are only on the down for a multi client)
-                                                // FIXME actually, yes, this won't matter for a multi client. so adding it for a full client is fine
-                                                upstream.onMessageControl(MessageControl.receive(MessageControl.Type.COMPLETE, message.route));
+                                                MessageControl mc = unpkg(messageValue);
+                                                upstream.onMessageControl(MessageControl.receive(mc.type, mc.message));
                                             }
                                         });
                                         break;
@@ -852,9 +841,9 @@ public class NextopNode extends AbstractMessageControlNode {
                                 Id uid = Id.fromBytes(controlBuffer, c);
 
                                 // move from pending to active
-                                @Nullable Message message = sts.writePendingAck.remove(uid, MessageControlState.End.ERROR);
-                                if (null != message) {
-                                    mcs.add(message);
+                                @Nullable MessageControl mc = sts.writePendingAck.remove(uid, MessageControlState.End.ERROR);
+                                if (null != mc) {
+                                    mcs.add(mc);
                                 } else {
                                     // this would be a bug in sync state - one node thought the other had something it doesn't
                                     assert false;
@@ -905,7 +894,15 @@ public class NextopNode extends AbstractMessageControlNode {
         return ack;
     }
 
+    // message packaging
 
+    static WireValue pkg(MessageControl mc) {
+        return MessageControl.toWireValue(mc);
+    }
+
+    static MessageControl unpkg(WireValue value) {
+        return MessageControl.fromWireValue(value);
+    }
 
 
     // FIXME relied on new threads being a membar. all this state is shared across 1+1 (writer+reader) threads in sequence

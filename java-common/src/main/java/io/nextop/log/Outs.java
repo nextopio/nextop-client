@@ -14,9 +14,14 @@ public final class Outs {
         return new MaskedOut(out, allowedTypes);
     }
 
+    public static Log.Out sysout() {
+        return new SysOut();
+    }
+
     public static Log.Out empty() {
         return new EmptyOut();
     }
+
 
 
     public static final int DEFAULT_LINE_WIDTH = 320;
@@ -165,6 +170,68 @@ public final class Outs {
             if (isWriteUp(entry.level, entry.type)) {
                 impl.writeUp(entry);
             }
+        }
+    }
+
+    private static final class SysOut implements Log.Out {
+        SysOut() {
+        }
+
+
+        /////// Out ///////
+
+        @Override
+        public boolean isWrite(Level level, LogEntry.Type type) {
+            return true;
+        }
+
+        @Override
+        public int lineWidth() {
+            return DEFAULT_LINE_WIDTH;
+        }
+
+        @Override
+        public int keyWidth() {
+            return DEFAULT_KEY_WIDTH;
+        }
+
+        @Override
+        public int valueWidth() {
+            return DEFAULT_VALUE_WIDTH;
+        }
+
+        @Override
+        public int unitWidth() {
+            return DEFAULT_UNIT_WIDTH;
+        }
+
+        @Override
+        public void write(Level level, LogEntry.Type type, String ... lines) {
+            int n = lines.length;
+            if (n <= 0) {
+                return;
+            }
+            String prefix = String.format("[%s] ", level);
+            int net = 0;
+            for (int i = 0; i < n; ++i) {
+                net += prefix.length() + lines[i].length() + 1;
+            }
+            StringBuilder sb = new StringBuilder(net);
+            sb.append(lines[0]);
+            for (int i = 1; i < n; ++i) {
+                sb.append('\n').append(lines[i]);
+            }
+            System.out.print(sb.toString());
+        }
+
+        @Override
+        public boolean isWriteUp(Level level, LogEntry.Type type) {
+            return false;
+        }
+
+        @Override
+        public void writeUp(LogEntry entry) {
+            // Do nothing
         }
     }
 

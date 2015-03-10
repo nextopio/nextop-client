@@ -18,11 +18,12 @@ import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-/** Shared state for all {@link MessageControlChannel} objects
- * for SEND.MESSAGE.
+/** Shared state for all {@link MessageControlChannel} objects.
  *
  * Each {@link MessageControl} object is controlled by at most one channel object.
- * Nodes take/release control via {@link #take}/{@link #release}.
+ * Groups are locked, such that if the message control at the front of the group is controlled,
+ * the rest of group is inaccessible.
+ * Channels take/release control via {@link #take}/{@link #release}.
  *
  * The state allows introspection via the {@link #get} variants.
  *
@@ -309,18 +310,18 @@ public final class MessageControlState {
         }
     }
 
-    public boolean add(Message message) {
+    public boolean add(MessageControl mc) {
         // see notes at top - only SEND.MESSAGE message control
 
         Entry entry;
         Collection<Subscriber<? super Entry>> subscribers;
         synchronized (mutex) {
             // check already added
-            if (entries.containsKey(message.id)) {
+            if (entries.containsKey(mc.message.id)) {
                 return false;
             }
 
-            entry = new Entry(headIndex++, message);
+            entry = new Entry(headIndex++, mc);
             entries.put(entry.id, entry);
             pending.remove(entry.id);
             subscribers = pendingSubscribers.removeAll(entry.id);
@@ -350,7 +351,7 @@ public final class MessageControlState {
 
 
     @Nullable
-    public Message remove(Id id, End end) {
+    public MessageControl remove(Id id, End end) {
         Entry entry;
         synchronized (mutex) {
             entry = entries.remove(id);
@@ -378,7 +379,7 @@ public final class MessageControlState {
         entry.publish();
         entry.publishComplete();
         publish();
-        return entry.message;
+        return entry.mc;
     }
 
     public boolean yield(Id id) {
@@ -665,6 +666,7 @@ public final class MessageControlState {
         public final int groupPriority;
 
         public final Message message;
+        public final MessageControl mc;
 
 
         /////// PROPERTIES ///////
@@ -693,12 +695,13 @@ public final class MessageControlState {
 
 
 
-        Entry(int index, Message message) {
+        Entry(int index, MessageControl mc) {
             this.index = index;
-            groupId = message.groupId;
-            id = message.id;
-            groupPriority = message.groupPriority;
-            this.message = message;
+            this.mc = mc;
+            message = mc.message;
+            groupId = mc.message.groupId;
+            id = mc.message.id;
+            groupPriority = mc.message.groupPriority;
             publish = BehaviorSubject.create(this);
 
             outboxTransferProgress = TransferProgress.none(id);

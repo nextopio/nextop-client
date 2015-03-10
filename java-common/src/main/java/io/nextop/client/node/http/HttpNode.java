@@ -1,12 +1,8 @@
 package io.nextop.client.node.http;
 
-import io.nextop.Id;
-import io.nextop.Message;
-import io.nextop.Route;
+import io.nextop.*;
 import io.nextop.client.MessageControl;
 import io.nextop.client.MessageControlState;
-import io.nextop.Wire;
-import io.nextop.Wires;
 import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.client.retry.SendStrategy;
 import io.nextop.org.apache.http.*;
@@ -211,19 +207,11 @@ public final class HttpNode extends AbstractMessageControlNode {
         if (active) {
             MessageControlState mcs = getMessageControlState();
             if (!mcs.onActiveMessageControl(mc, upstream)) {
-                switch (mc.type) {
-                    case MESSAGE:
-                        mcs.add(mc.message);
-                        break;
-                    default:
-                        // ignore
-                        break;
-                }
+                mcs.add(mc);
             }
         }
         // TODO else send back upstream?
     }
-
 
 
     private static final class SharedLooperState {
