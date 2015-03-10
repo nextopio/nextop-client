@@ -59,7 +59,7 @@ public class Message {
     /** send the message be sent when the radio is active,
      * but do not activate the radio to send it.
      * Implementations can use a heuristic for an active radio:
-     * <30s after a best effort message is sent. */
+     * &le;30s after a best effort message is sent. */
     public static final int V_PASSIVE_HOLD_FOR_ACTIVE_RADIO = 1;
 
 

@@ -46,6 +46,11 @@ public abstract class Ip {
     }
 
 
+    public byte[] getAddress() {
+        return bytes.clone();
+    }
+
+
     @Override
     public int hashCode() {
         return hashCode;

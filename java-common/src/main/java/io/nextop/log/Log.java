@@ -170,7 +170,7 @@ public interface Log {
         boolean isWrite(Level level, LogEntry.Type type);
         /** @return the line width of the log/console, so output can be properly formatted */
         int lineWidth();
-        /** @return the width of keys in the log/console. Must be <= {@link #lineWidth} */
+        /** @return the width of keys in the log/console. Must be &le; {@link #lineWidth} */
         int keyWidth();
         int valueWidth();
         int unitWidth();
