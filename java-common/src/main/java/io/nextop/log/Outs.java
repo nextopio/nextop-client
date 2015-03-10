@@ -14,6 +14,10 @@ public final class Outs {
         return new MaskedOut(out, allowedTypes);
     }
 
+    public static Log.Out empty() {
+        return new EmptyOut();
+    }
+
 
     public static final int DEFAULT_LINE_WIDTH = 320;
     public static final int DEFAULT_KEY_WIDTH = 18;
@@ -161,6 +165,54 @@ public final class Outs {
             if (isWriteUp(entry.level, entry.type)) {
                 impl.writeUp(entry);
             }
+        }
+    }
+
+    private static final class EmptyOut implements Log.Out {
+        EmptyOut() {
+        }
+
+
+        /////// Out ///////
+
+        @Override
+        public boolean isWrite(Level level, LogEntry.Type type) {
+            return false;
+        }
+
+        @Override
+        public int lineWidth() {
+            return DEFAULT_LINE_WIDTH;
+        }
+
+        @Override
+        public int keyWidth() {
+            return DEFAULT_KEY_WIDTH;
+        }
+
+        @Override
+        public int valueWidth() {
+            return DEFAULT_VALUE_WIDTH;
+        }
+
+        @Override
+        public int unitWidth() {
+            return DEFAULT_UNIT_WIDTH;
+        }
+
+        @Override
+        public void write(Level level, LogEntry.Type type, String ... lines) {
+            // Do nothing
+        }
+
+        @Override
+        public boolean isWriteUp(Level level, LogEntry.Type type) {
+            return false;
+        }
+
+        @Override
+        public void writeUp(LogEntry entry) {
+            // Do nothing
         }
     }
 }

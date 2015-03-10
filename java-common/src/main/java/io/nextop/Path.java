@@ -3,6 +3,7 @@ package io.nextop;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import rx.functions.Func1;
 
 import javax.annotation.Nullable;
@@ -57,6 +58,47 @@ public class Path {
     }
 
 
+    public Path append(String s) {
+        return append(valueOf(s));
+    }
+
+    public Path append(Path suffix) {
+        return new Path(ImmutableList.copyOf(Iterables.concat(segments, suffix.segments)));
+    }
+
+    public boolean startsWith(Path prefix) {
+        int n = prefix.segments.size();
+        int m = segments.size();
+        if (m < n) {
+            return false;
+        }
+        for (int i = 0; i < n; ++i) {
+            if (!segments.get(i).equals(prefix.segments.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean endsWidth(Path suffix) {
+        int n = suffix.segments.size();
+        int m = segments.size();
+        if (m < n) {
+            return false;
+        }
+        for (int i = 0; i < n; ++i) {
+            if (!segments.get(m - 1 - i).equals(suffix.segments.get(n - 1 - i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+
+    ////// FIXED ///////
+    /* fixed means all segments are FIXED. To be fixed,
+     * VARIABLE need to be replaced with the variable values. */
+
     public boolean isFixed() {
         for (Segment segment : segments) {
             if (!Segment.Type.FIXED.equals(segment.type)) {
@@ -65,7 +107,6 @@ public class Path {
         }
         return true;
     }
-
 
     public Path fix(Func1<String, Object> subs) throws URISyntaxException {
         int n = segments.size();

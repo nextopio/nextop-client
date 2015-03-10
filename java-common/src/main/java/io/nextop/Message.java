@@ -47,6 +47,21 @@ public class Message {
     public static final WireValue H_YIELDABLE = WireValue.of("$yieldable");
 
 
+    // PASSIVE MODES
+    // FIXME(0.2) important for battery - support this in all nodes
+    /* passive options control the scheduling of the message.
+     * by default (no passive) messages are sent with best effort.
+     * Passive options can be used to limit battery usage in apps
+     * that send a continuous stream of data, like logs.
+     * Passing options are:
+      * - {@link #V_PASSIVE_ACTIVE_RADIO} */
+    public static final WireValue H_PASSIVE = WireValue.of("$passive");
+    /** send the message be sent when the radio is active,
+     * but do not activate the radio to send it.
+     * Implementations can use a heuristic for an active radio:
+     * <30s after a best effort message is sent. */
+    public static final int V_PASSIVE_HOLD_FOR_ACTIVE_RADIO = 1;
+
 
     public static final Id DEFAULT_GROUP_ID = Id.create(0L, 0L, 0L, 0L);
     public static final int DEFAULT_GROUP_PRIORITY = 0;
@@ -55,20 +70,48 @@ public class Message {
 
     /////// ROUTES ///////
 
+    private static final Path P_MESSAGE_PREFIX = Path.valueOf("/m");
+
+    /** @see #getLocalId */
     public static Route outboxRoute(Id id) {
-        return Route.local(Target.create(Method.PUT, Path.valueOf(id.toString())));
+        return Route.local(Target.create(Method.PUT, P_MESSAGE_PREFIX.append(id.toString())));
     }
-    /** @see Route#getLocalId */
+    /** @see #getLocalId */
     public static Route inboxRoute(Id id) {
-        return Route.local(Target.create(Method.POST, Path.valueOf(id.toString())));
+        return Route.local(Target.create(Method.POST, P_MESSAGE_PREFIX.append(id.toString())));
     }
-    /** @see Route#getLocalId */
+    /** @see #getLocalId */
     public static Route echoRoute(Id id) {
-        return Route.local(Target.create(Method.GET, Path.valueOf("/" + id)));
+        return Route.local(Target.create(Method.GET, P_MESSAGE_PREFIX.append("/" + id)));
     }
-    /** @see Route#getLocalId */
+    /** @see #getLocalId */
     public static Route echoHeadRoute(Id id) {
-        return Route.local(Target.create(Method.HEAD, Path.valueOf("/" + id)));
+        return Route.local(Target.create(Method.HEAD, P_MESSAGE_PREFIX.append("/" + id)));
+    }
+
+    public static Route logRoute() {
+        return Route.local(Target.create(Method.POST, Path.valueOf("/log")));
+    }
+
+
+    public static boolean isLocal(Route route) {
+        return route.via.isLocal();
+    }
+
+    @Nullable
+    public static Id getLocalId(Route route) {
+        if (isLocal(route) && route.target.path.isFixed()
+                && route.target.path.startsWith(P_MESSAGE_PREFIX) && 2 <= route.target.path.segments.size()) {
+            Path.Segment first = route.target.path.segments.get(0);
+            assert Path.Segment.Type.FIXED.equals(first.type);
+            try {
+                return Id.valueOf(first.value);
+            } catch (IllegalArgumentException e) {
+                // FIXME log, strange ... could be a client-generated bad value
+                return null;
+            }
+        }
+        return null;
     }
 
 

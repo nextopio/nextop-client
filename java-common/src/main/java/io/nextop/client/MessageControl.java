@@ -2,6 +2,7 @@ package io.nextop.client;
 
 import io.nextop.Message;
 import io.nextop.Route;
+import io.nextop.WireValue;
 
 public final class MessageControl {
     public static enum Direction {
@@ -55,6 +56,18 @@ public final class MessageControl {
         return new MessageControl(dir, type, message);
     }
 
+
+    /////// SERIALIZATION ///////
+
+    public static WireValue toWireValue(MessageControl mc) {
+        // FIXME
+        return null;
+    }
+
+    public static MessageControl fromWireValue(WireValue value) {
+        // FIXME
+        return null;
+    }
 
 
     public final Direction dir;

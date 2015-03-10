@@ -21,10 +21,7 @@ import io.nextop.client.MessageContexts;
 import io.nextop.client.MessageControlNode;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.node.Head;
-import io.nextop.client.node.MultiNode;
 import io.nextop.client.node.http.HttpNode;
-import io.nextop.client.node.nextop.NextopClientWireFactory;
-import io.nextop.client.node.nextop.NextopNode;
 import io.nextop.com.crittercism.app.Crittercism;
 import rx.Observable;
 import rx.Scheduler;
@@ -430,7 +427,7 @@ public class Nextop {
         static <T> Receiver<T> create(final Nextop nextop, Route route, Observable<T> in, UnsubscribeBehavior defaultUnsubscribeBehavior) {
             Map<UnsubscribeBehavior, Observable<T>> ins = new HashMap<UnsubscribeBehavior, Observable<T>>(2);
 
-            final @Nullable Id id = route.getLocalId();
+            final @Nullable Id id = Message.getLocalId(route);
             if (null != id) {
                 ins.put(UnsubscribeBehavior.DETACH, in.share());
                 ins.put(UnsubscribeBehavior.CANCEL_SEND, in.doOnUnsubscribe(new Action0() {
@@ -471,7 +468,7 @@ public class Nextop {
         // return null if there is no outgoing message for this nurl
         @Nullable
         public Id getId() {
-            return route.getLocalId();
+            return Message.getLocalId(route);
         }
 
 
@@ -481,8 +478,6 @@ public class Nextop {
         }
 
         private static class Source<T> {
-
-
             final Map<UnsubscribeBehavior, Observable<T>> ins;
 
             Source(Map<UnsubscribeBehavior, Observable<T>> ins) {

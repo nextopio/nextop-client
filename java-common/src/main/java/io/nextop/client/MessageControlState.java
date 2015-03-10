@@ -606,8 +606,8 @@ public final class MessageControlState {
     public boolean onActiveMessageControl(MessageControl mc, MessageControlChannel upstream) {
         Message message = mc.message;
         Route route = message.route;
-        if (route.isLocal()) {
-            Id id = route.getLocalId();
+        if (Message.isLocal(route)) {
+            Id id = Message.getLocalId(route);
             if (null != id) {
                 if (MessageControl.Type.ERROR.equals(mc.type) && Message.outboxRoute(id).equals(route)) {
                     // cancel

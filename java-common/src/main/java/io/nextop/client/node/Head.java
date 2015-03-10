@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class Head implements MessageControlNode, Log.Out {
+public class Head implements MessageControlNode {
 
     public static Head create(MessageContext context, MessageControlState mcs, MessageControlNode downstream,
                                             Scheduler callbackScheduler) {
