@@ -45,6 +45,7 @@ dependencies {
     compile(project(':java-common')) {
         // use the version included in Android
         exclude module: 'commons-logging'
+        exclude module: 'commons-collections'
     }
     // TODO the new tools don't like "provided" with aars?
     // TODO for now, bundle volley with Nextop
