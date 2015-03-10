@@ -107,3 +107,9 @@ Nextop is an open source project sponsored by [Nextop Inc](http://nextop.io). We
 Get Support <<support@nextop.io>>
 
 Twitter [@nextopio](https://twitter.com/nextopio)
+
+# The T-Shirt
+
+[![launch2](docs/assets/launch2.png)](http://printallover.me/products/0000000p-nextop-1)
+
+[Get a free Nextop t-shirt by submitting an issue that helps the project.](https://github.com/nextopio/nextop-client/issues)
