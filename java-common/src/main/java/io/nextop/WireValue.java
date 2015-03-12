@@ -2,10 +2,7 @@ package io.nextop;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Function;
-import com.google.common.collect.Collections2;
-import com.google.common.collect.ForwardingList;
-import com.google.common.collect.ForwardingMap;
-import com.google.common.collect.Lists;
+import com.google.common.collect.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -2670,17 +2667,35 @@ public abstract class WireValue {
     }
 
 
-    private static Map<WireValue, WireValue> asWireValueMap(Map<?, ?> map) {
-        Transformer wireValueTransformer = new Transformer() {
-            @Override
-            public Object transform(Object input) {
-                return of(input);
+    public static boolean isWireValues(Collection<?> values) {
+        for (Object value : values) {
+            if (!(value instanceof WireValue)) {
+                return false;
             }
-        };
-        // TODO have to make sure the transforms maintain the map contract
-        // TODO in this case, they do, since wire values are a bijection
-        // TODO wish Guava had something that could trust the user
-        return (Map<WireValue, WireValue>) TransformedMap.decorate(map, wireValueTransformer, wireValueTransformer);
+        }
+        return true;
+    }
+
+
+    private static Map<WireValue, WireValue> asWireValueMap(Map<?, ?> map) {
+        if (isWireValues(map.keySet())) {
+            // lazily transform the values
+            return Maps.transformValues((Map<WireValue, Object>) map, new Function<Object, WireValue>() {
+                @Override
+                public WireValue apply(@Nullable Object input) {
+                    return of(input);
+                }
+            });
+        } else {
+            Map<WireValue, WireValue> t = new HashMap<WireValue, WireValue>(map.size());
+            for (Map.Entry<?, ?> e : map.entrySet()) {
+                @Nullable Object j = t.put(of(e.getKey()), of(e.getValue()));
+                if (null != j) {
+                    throw new IllegalStateException("Map to WireValue is not a bijection.");
+                }
+            }
+            return t;
+        }
     }
     private static List<WireValue> asWireValueList(List<?> list) {
         return Lists.transform(list, new Function<Object, WireValue>() {

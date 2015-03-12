@@ -24,8 +24,8 @@ public final class Outs {
 
 
 
-    public static final int DEFAULT_LINE_WIDTH = 320;
-    public static final int DEFAULT_KEY_WIDTH = 18;
+    public static final int DEFAULT_LINE_WIDTH = 90;
+    public static final int DEFAULT_KEY_WIDTH = 32;
     public static final int DEFAULT_VALUE_WIDTH = 8;
     public static final int DEFAULT_UNIT_WIDTH = 6;
 
@@ -217,9 +217,8 @@ public final class Outs {
                 net += prefix.length() + lines[i].length() + 1;
             }
             StringBuilder sb = new StringBuilder(net);
-            sb.append(lines[0]);
-            for (int i = 1; i < n; ++i) {
-                sb.append('\n').append(lines[i]);
+            for (String line : lines) {
+                sb.append(line).append('\n');
             }
             System.out.print(sb.toString());
         }

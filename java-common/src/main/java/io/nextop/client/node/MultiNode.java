@@ -1,6 +1,7 @@
 package io.nextop.client.node;
 
 
+import com.google.common.collect.ImmutableSet;
 import io.nextop.Authority;
 import io.nextop.client.MessageControl;
 import io.nextop.client.MessageControlChannel;
@@ -227,14 +228,14 @@ public class MultiNode extends AbstractMessageControlNode {
 
 
         public static Downstream create(MessageControlNode node, Support ... support) {
-            return new Downstream(node, EnumSet.copyOf(Arrays.asList(support)));
+            return new Downstream(node, ImmutableSet.copyOf(support));
         }
 
 
         public final MessageControlNode node;
-        public final EnumSet<Support> support;
+        public final ImmutableSet<Support> support;
 
-        Downstream(MessageControlNode node, EnumSet<Support> support) {
+        Downstream(MessageControlNode node, ImmutableSet<Support> support) {
             this.node = node;
             this.support = support;
         }

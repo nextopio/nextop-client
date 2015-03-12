@@ -58,7 +58,7 @@ public final class AggregatorLog extends DefaultLog {
 
     @Override
     public void count(Level level, String key, final long d) {
-        update(level, new AggregatorKey(AggregatorType.PERCENTILE, key), new Action1<Aggregator>() {
+        update(level, new AggregatorKey(AggregatorType.COUNT, key), new Action1<Aggregator>() {
             @Override
             public void call(Aggregator aggregator) {
                 ((Count) aggregator).add(d);
@@ -117,6 +117,7 @@ public final class AggregatorLog extends DefaultLog {
                         aggregator.ejected = true;
                         aggregator.eject();
                     }
+                    itr.remove();
                 } else {
                     maxNonEjectionNanos = aggregator.mostRecentUpdateNanos;
                     break;
@@ -148,6 +149,13 @@ public final class AggregatorLog extends DefaultLog {
 
             aggregator = aggregators.get(key);
             if (null != aggregator) {
+                assert !aggregator.ejected;
+                if (aggregator.ejected) {
+                    // FIXME
+                    NL.nl.count(Level.SEVERE, "log.ejected.failure", 1);
+                    return;
+                }
+
                 orderedAggregators.remove(aggregator);
                 aggregator.mostRecentUpdateNanos = nanos;
                 orderedAggregators.add(aggregator);
@@ -193,6 +201,8 @@ public final class AggregatorLog extends DefaultLog {
             }
         }
         if (ejected) {
+            // old bucket ejected
+            // add the value to the latest active bucket
             update(level, key, updater);
         }
     }
@@ -354,9 +364,6 @@ public final class AggregatorLog extends DefaultLog {
             int n = countWindowsMs.length;
             long nanos = System.nanoTime();
 
-            // ensure the windows are up current before reporting
-            rotateWindows(nanos);
-
             // two-line formatting
             // e.g.
             // -0.9m   -3m        -20m
@@ -409,6 +416,9 @@ public final class AggregatorLog extends DefaultLog {
                     out.writeUp(LogEntry.count(level, wkey, wvalue));
                 }
             }
+
+            // ensure the windows are current for next reporting
+            rotateWindows(nanos);
         }
     }
 
