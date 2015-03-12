@@ -151,8 +151,8 @@ public final class AggregatorLog extends DefaultLog {
             if (null != aggregator) {
                 assert !aggregator.ejected;
                 if (aggregator.ejected) {
-                    // FIXME
-                    NL.nl.count(Level.SEVERE, "log.ejected.failure", 1);
+                    // FIXME log this outside of lock - broken invariant
+//                    NL.nl.count(Level.SEVERE, "log.ejected.failure", 1);
                     return;
                 }
 
