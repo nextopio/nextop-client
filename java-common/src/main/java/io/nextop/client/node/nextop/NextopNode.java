@@ -875,6 +875,7 @@ public class NextopNode extends AbstractMessageControlNode {
             public void run() {
                 try {
                     MessageControl mc = unpkg(pkg);
+                    NL.nl.count("node.nextop.read." + mc.type);
                     upstream.onMessageControl(MessageControl.receive(mc.type, mc.message));
                 } catch (Exception e) {
                     // FIXME the nack might create an infinite retry here; think about something better

@@ -10,8 +10,8 @@ public final class Outs {
         return new SplitOut(console, upstream);
     }
 
-    public static Log.Out upstreamMask(Log.Out out, EnumSet<LogEntry.Type> allowedTypes) {
-        return new MaskedOut(out, allowedTypes);
+    public static Log.Out mask(Log.Out out, EnumSet<LogEntry.Type> allowedConsole, EnumSet<LogEntry.Type> allowedUp) {
+        return new MaskedOut(out, allowedConsole, allowedUp);
     }
 
     public static Log.Out sysout() {
@@ -116,10 +116,12 @@ public final class Outs {
 
     private static final class MaskedOut implements Log.Out {
         private final Log.Out impl;
+        private final EnumSet<LogEntry.Type> allowedConsole;
         private final EnumSet<LogEntry.Type> allowedUp;
 
-        public MaskedOut(Log.Out impl, EnumSet<LogEntry.Type> allowedUp) {
+        public MaskedOut(Log.Out impl, EnumSet<LogEntry.Type> allowedConsole, EnumSet<LogEntry.Type> allowedUp) {
             this.impl = impl;
+            this.allowedConsole = allowedConsole;
             this.allowedUp = allowedUp;
         }
 
@@ -129,7 +131,7 @@ public final class Outs {
 
         @Override
         public boolean isWrite(Level level, LogEntry.Type type) {
-            return impl.isWrite(level, type);
+            return allowedConsole.contains(type) && impl.isWrite(level, type);
         }
 
         @Override
@@ -154,7 +156,9 @@ public final class Outs {
 
         @Override
         public void write(Level level, LogEntry.Type type, String ... lines) {
-            impl.write(level, type, lines);
+            if (isWrite(level, type)) {
+                impl.write(level, type, lines);
+            }
         }
 
 
