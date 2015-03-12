@@ -492,6 +492,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             writeState = new MessageWriteState(entry.id, bytes, chunkOffsets);
 
                             NL.nl.message("node.nextop.write", "Create write state took %.3fms", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                            NL.nl.count("node.nextop.write." + entry.mc.type);
                         }
                     }
 
