@@ -27,18 +27,19 @@ public class DefaultLog implements Log {
     /////// Log ///////
 
     @Override
-    public void count(String key) {
-        count(key, 1);
+    public void count(String keyFormat, Object ... keyArgs) {
+        count(keyFormat, 1, keyArgs);
     }
 
     @Override
-    public void count(String key, long d) {
-        count(defaultLevel, key, d);
+    public void count(String keyFormat, long d, Object ... keyArgs) {
+        count(defaultLevel, keyFormat, d, keyArgs);
     }
 
     @Override
-    public void count(Level level, String key, long d) {
+    public void count(Level level, String keyFormat, long d, Object ... keyArgs) {
         if (out.isWrite(level, LogEntry.Type.COUNT)) {
+            String key = String.format(keyFormat, keyArgs);
             int r = out.lineWidth() - (Math.max(key.length(), out.keyWidth()) + 1);
             out.write(level, LogEntry.Type.COUNT, String.format("%-" + out.keyWidth() + "s %" + r + "d",
                     key, d));
@@ -46,13 +47,14 @@ public class DefaultLog implements Log {
     }
 
     @Override
-    public void metric(String key, long value, Object unit) {
-        metric(defaultLevel, key, value, unit);
+    public void metric(String keyFormat, long value, Object unit, Object ... keyArgs) {
+        metric(defaultLevel, keyFormat, value, unit, keyArgs);
     }
 
     @Override
-    public void metric(Level level, String key, long value, Object unit) {
+    public void metric(Level level, String keyFormat, long value, Object unit, Object ... keyArgs) {
         if (out.isWrite(level, LogEntry.Type.METRIC)) {
+            String key = String.format(keyFormat, keyArgs);
             int r = out.lineWidth() - (Math.max(key.length(), out.keyWidth()) + 1);
             out.write(level, LogEntry.Type.METRIC, String.format("%-" + out.keyWidth() + "s %" + r + "s",
                     key, String.format("%d %-" + out.unitWidth() + "s", value, unit)));

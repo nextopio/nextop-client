@@ -16,13 +16,13 @@ import java.util.logging.Logger;
 public interface Log {
 
 
-    void count(String key);
-    void count(String key, long d);
-    void count(Level level, String key, long d);
+    void count(String keyFormat, Object ... keyArgs);
+    void count(String keyFormat, long d, Object ... keyArgs);
+    void count(Level level, String keyFormat, long d, Object ... keyArgs);
 
+    void metric(String keyFormat, long value, Object unit, Object ... keyArgs);
     /** @param unit a {@link TimeUnit} or general {@link Unit} */
-    void metric(String key, long value, Object unit);
-    void metric(Level level, String key, long value, Object unit);
+    void metric(Level level, String keyFormat, long value, Object unit, Object ... keyArgs);
 
 
     // duration* methods write as metrics. the metric is the time to run the callback

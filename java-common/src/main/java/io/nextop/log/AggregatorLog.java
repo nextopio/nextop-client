@@ -57,24 +57,30 @@ public final class AggregatorLog extends DefaultLog {
     /* for counts and metrics, only the aggregates are written upstream. */
 
     @Override
-    public void count(Level level, String key, final long d) {
-        update(level, new AggregatorKey(AggregatorType.COUNT, key), new Action1<Aggregator>() {
-            @Override
-            public void call(Aggregator aggregator) {
-                ((Count) aggregator).add(d);
-            }
-        });
+    public void count(Level level, String keyFormat, final long d, Object ... keyArgs) {
+        if (out.isWrite(level, LogEntry.Type.METRIC) || out.isWriteUp(level, LogEntry.Type.METRIC)) {
+            final String key = String.format(keyFormat, keyArgs);
+            update(level, new AggregatorKey(AggregatorType.COUNT, key), new Action1<Aggregator>() {
+                @Override
+                public void call(Aggregator aggregator) {
+                    ((Count) aggregator).add(d);
+                }
+            });
+        }
     }
 
     @Override
-    public void metric(Level level, String key, final long value, final Object unit) {
-        final Unit u = Unit.valueOf(unit);
-        update(level, new AggregatorKey(AggregatorType.PERCENTILE, key), new Action1<Aggregator>() {
-            @Override
-            public void call(Aggregator aggregator) {
-                ((Percentile) aggregator).add(value, u);
-            }
-        });
+    public void metric(Level level, String keyFormat, final long value, final Object unit, Object ... keyArgs) {
+        if (out.isWrite(level, LogEntry.Type.METRIC) || out.isWriteUp(level, LogEntry.Type.METRIC)) {
+            final String key = String.format(keyFormat, keyArgs);
+            final Unit u = Unit.valueOf(unit);
+            update(level, new AggregatorKey(AggregatorType.PERCENTILE, key), new Action1<Aggregator>() {
+                @Override
+                public void call(Aggregator aggregator) {
+                    ((Percentile) aggregator).add(value, u);
+                }
+            });
+        }
     }
 
 

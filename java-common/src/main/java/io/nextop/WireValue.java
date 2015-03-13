@@ -101,7 +101,7 @@ public abstract class WireValue {
         return valueOf(bytes, 0);
     }
 
-    static WireValue valueOf(byte[] bytes, int offset) {
+    public static WireValue valueOf(byte[] bytes, int offset) {
         int h = 0xFF & bytes[offset];
         if ((h & H_COMPRESSED) == H_COMPRESSED) {
             int nb = h & ~H_COMPRESSED;

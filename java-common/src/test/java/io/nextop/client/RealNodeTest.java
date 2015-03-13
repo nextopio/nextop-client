@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 public class RealNodeTest extends TestCase {
 
 
-    public void testRealProxy() throws Exception {
+    public void testRealProxy() throws Throwable {
         Scheduler testScheduler = MoreSchedulers.serial();
 
         // run the test on the correct scheduler

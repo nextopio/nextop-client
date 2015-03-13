@@ -15,13 +15,13 @@ repositories {
 }
 
 android {
-    compileSdkVersion 21
-    buildToolsVersion '22'
+    compileSdkVersion 22
+    buildToolsVersion '22.0.0'
 
     defaultConfig {
         applicationId "io.nextop.demo.globaleye"
         minSdkVersion 15
-        targetSdkVersion 21
+        targetSdkVersion 22
         versionName project.version
         versionCode androidVersionCode()
     }

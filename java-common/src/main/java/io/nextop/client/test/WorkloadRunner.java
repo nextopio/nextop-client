@@ -18,7 +18,7 @@ public abstract class WorkloadRunner implements Action0 {
     protected final Scheduler scheduler;
 
     @Nullable
-    volatile Exception e = null;
+    volatile Throwable e = null;
     final Semaphore end = new Semaphore(0);
 
     int n = 200;
@@ -36,7 +36,7 @@ public abstract class WorkloadRunner implements Action0 {
     }
 
 
-    public void join() throws Exception {
+    public void join() throws Throwable {
         end.acquire();
         if (null != e) {
             throw e;
@@ -44,8 +44,7 @@ public abstract class WorkloadRunner implements Action0 {
     }
 
 
-
-    void end(@Nullable Exception e) {
+    void end(@Nullable Throwable e) {
         this.e = e;
         end.release();
     }
@@ -65,7 +64,7 @@ public abstract class WorkloadRunner implements Action0 {
                             cleanup();
                         }
                         end(null);
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         end(e);
                     }
                 }
