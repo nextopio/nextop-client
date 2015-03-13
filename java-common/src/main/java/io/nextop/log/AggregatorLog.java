@@ -21,7 +21,7 @@ public final class AggregatorLog extends DefaultLog {
 
     // aggregate config
     final int metricReservoirSize = 16;
-    final int[] metricPercentiles = new int[]{5, 50, 95};
+    final int[] metricPercentiles = new int[]{1, 50, 99};
     final int metricWindowSize = 4;
     // a total count is also maintained
     final int[] countWindowsMs = new int[]{5000, 60000};
@@ -308,6 +308,7 @@ public final class AggregatorLog extends DefaultLog {
         // initializes to zero
         final long[] windows = new long[countWindowsMs.length];
         final long[] windowStartNanos = new long[countWindowsMs.length];
+        final long[] previousWindows = new long[countWindowsMs.length];
 
         long total = 0L;
         long startNanos = 0L;
@@ -316,7 +317,6 @@ public final class AggregatorLog extends DefaultLog {
         Count(AggregatorKey key, long nanos) {
             super(key, nanos);
         }
-
 
         synchronized void add(long d) {
             long nanos = System.nanoTime();
@@ -353,6 +353,7 @@ public final class AggregatorLog extends DefaultLog {
             for (int i = 0; i < n; ++i) {
                 if (TimeUnit.MILLISECONDS.toNanos(countWindowsMs[i]) < nanos - windowStartNanos[i]) {
                     // start a new window
+                    previousWindows[i] = windows[i];
                     windows[i] = 0L;
                     windowStartNanos[i] = nanos;
                 }
@@ -379,20 +380,22 @@ public final class AggregatorLog extends DefaultLog {
                 for (int i = 0; i < 2; ++i) {
                     lines[i] = new StringBuilder(out.lineWidth());
                 }
-                lines[1].append(String.format("%-" + out.keyWidth() + "s ", key));
+                String keyPrefix = String.format("%-" + out.keyWidth() + "s ", key);
+                lines[0].append(keyPrefix);
                 pad(lines);
 
                 String valueFormat = "%-" + out.valueWidth() + "d";
-                String paddedValueFormat = valueFormat + " ";
+                String cpValueFormat = String.format("%s/%s", valueFormat, valueFormat);
 
                 // windows
                 for (int i = 0; i < n; ++i) {
                     long wvalue = windows[i];
+                    long pwvalue = previousWindows[i];
                     long wnanos = windowStartNanos[i];
                     float mins = ((nanos - wnanos) / (1000 * 1000)) / (60 * 1000.f);
 
                     lines[0].append(String.format("-%.2fm ", mins));
-                    lines[1].append(String.format(paddedValueFormat, wvalue));
+                    lines[1].append(String.format(cpValueFormat, wvalue, pwvalue));
 
                     pad(lines);
                 }
@@ -433,6 +436,10 @@ public final class AggregatorLog extends DefaultLog {
         // circular, "count" is head+1
         final Sample[] mostRecent = new Sample[metricWindowSize];
         int count = 0;
+
+        final Sample[] percentiles = new Sample[metricPercentiles.length];
+        final Sample[] previousPercentiles = new Sample[metricPercentiles.length];
+
 
         // pinned to the first input
         @Nullable
@@ -505,9 +512,10 @@ public final class AggregatorLog extends DefaultLog {
 
             // calculate percentiles
             int n = metricPercentiles.length;
-            int[] percentileIndexes = new int[n];
             for (int i = 0; i < n; ++i) {
-                percentileIndexes[i] = ((10 * metricPercentiles[i] * (k - 1) + /* round */ 5) / 1000) / 10;
+                previousPercentiles[i] = percentiles[i];
+                int percentileIndex = (metricPercentiles[i] * (k - 1) + 50) / 100;
+                percentiles[i] = reservoir[percentileIndex];
             }
 
             // three-line formatting
@@ -522,18 +530,27 @@ public final class AggregatorLog extends DefaultLog {
                 for (int i = 0; i < 3; ++i) {
                     lines[i] = new StringBuilder(out.lineWidth());
                 }
-                lines[1].append(String.format("%-" + out.keyWidth() + "s ", key));
+                String keyPrefix = String.format("%-" + out.keyWidth() + "s ", key);
+                lines[0].append(keyPrefix);
                 pad(lines);
 
-                String paddedValueFormat = "%-" + out.valueWidth() + "d ";
+                String valueFormat = "%-" + out.valueWidth() + "d";
+                String cpValueFormat = String.format("%s/%s ", valueFormat, valueFormat);
+                String cValueFormat = String.format("%s ", valueFormat);
+                String mrValueFormat = String.format("%s ", valueFormat);
 
                 // percentiles
                 for (int i = 0; i < n; ++i) {
-                    Sample s = reservoir[percentileIndexes[i]];
+                    @Nullable Sample ps = previousPercentiles[i];
+                    Sample s = percentiles[i];
                     float mins = ((nanos - s.nanos) / (1000 * 1000)) / (60 * 1000.f);
 
                     lines[0].append(String.format("p%d ", metricPercentiles[i]));
-                    lines[1].append(String.format(paddedValueFormat, s.value));
+                    if (null != ps) {
+                        lines[1].append(String.format(cpValueFormat, s.value, ps.value));
+                    } else {
+                        lines[1].append(String.format(cValueFormat, s.value));
+                    }
                     lines[2].append(String.format("-%.2fm ", mins));
                     pad(lines);
                 }
@@ -546,13 +563,16 @@ public final class AggregatorLog extends DefaultLog {
                     int index = (count - 1 - i + mostRecent.length) % mostRecent.length;
                     Sample s = mostRecent[index];
                     float mins = ((nanos - s.nanos) / (1000 * 1000)) / (60 * 1000.f);
-                    lines[1].append(String.format(paddedValueFormat, s.value));
+                    lines[1].append(String.format(mrValueFormat, s.value));
                     lines[2].append(String.format("-%.2fm ", mins));
                     pad(subLines);
                 }
 
+                StringBuilder[] supLines = new StringBuilder[]{lines[0], lines[1]};
                 lines[0].append("most recent");
                 lines[1].append("] ");
+                pad(supLines);
+                lines[0].append(String.format("/ %-" + out.valueWidth() + "d", count));
                 lines[1].append(String.format("%" + out.unitWidth() + "s", unit));
 
                 String[] lineStrings = new String[3];
@@ -566,7 +586,7 @@ public final class AggregatorLog extends DefaultLog {
             if (out.isWriteUp(level, LogEntry.Type.METRIC)) {
                 for (int i = 0; i < n; ++i) {
                     String pkey = String.format("%s.p%d", key, metricPercentiles[i]);
-                    long pvalue = reservoir[percentileIndexes[i]].value;
+                    long pvalue = percentiles[i].value;
                     out.writeUp(LogEntry.metric(level, pkey, pvalue, unit));
                 }
             }

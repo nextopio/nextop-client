@@ -207,7 +207,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                 e.printStackTrace();
                                 continue top;
                             }
-                            NL.nl.message("node.nextop.control", "Transfer state sync took %.3fms", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                            NL.nl.metric("node.nextop.control.sync", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                         }
 
                         sws = new SharedWireState(wire);
@@ -439,8 +439,6 @@ public class NextopNode extends AbstractMessageControlNode {
         final byte[] serBytes = new byte[8 * 1024 * 1024];
         final ByteBuffer serBuffer = ByteBuffer.wrap(serBytes);
 
-        int messageWriteCount = 0;
-
         WriteLooper(SharedWireState sws) {
             this.sws = sws;
         }
@@ -458,7 +456,6 @@ public class NextopNode extends AbstractMessageControlNode {
 
             try {
                 NL.nl.message("node.nextop.write", "Start write loop");
-                long startWriteLoopNanos = System.nanoTime();
 
                 top:
                 while (sws.active) {
@@ -535,7 +532,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
                             writeState = new MessageWriteState(entry.id, bytes, chunkOffsets, compressed);
 
-                            NL.nl.message("node.nextop.write", "Create write state took %.3fms", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                            NL.nl.metric("node.nextop.write.state", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                             NL.nl.count("node.nextop.write.%s", entry.mc.type);
                         }
                     }
@@ -559,8 +556,7 @@ public class NextopNode extends AbstractMessageControlNode {
                             c += 1;
                             sws.wire.write(controlBuffer, 0, c, 0);
                         }
-                        NL.nl.message("node.nextop.write", "Write F_MESSAGE_START took %.3fms", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
-                        NL.nl.count("node.nextop.write.start");
+                        NL.nl.metric("node.nextop.write.start", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                     }
 
                     for (int i = 0; i < n; ++i) {
@@ -596,8 +592,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                     }
                                     sws.wire.write(writeState.bytes, start, end - start, 0);
                                 }
-                                NL.nl.message("node.nextop.write", "Write F_MESSAGE_CHUNK took %.3fms", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
-                                NL.nl.count("node.nextop.write.chunk");
+                                NL.nl.metric("node.nextop.write.chunk", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                             }
 
 
@@ -622,12 +617,8 @@ public class NextopNode extends AbstractMessageControlNode {
                             c += 1;
                             sws.wire.write(controlBuffer, 0, c, 0);
                         }
-                        NL.nl.message("node.nextop.write", "Write F_MESSAGE_END took %.3fms", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
-                        NL.nl.count("node.nextop.write.end");
+                        NL.nl.metric("node.nextop.write.end", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                     }
-
-                    messageWriteCount += 1;
-                    NL.nl.message("node.nextop.write", "Wrote %d messages in %.3fms", messageWriteCount, ((System.nanoTime() - startWriteLoopNanos) / 1000) / 1000.f);
 
                     // done with entry, transfer to pending ack
                     mcs.remove(entry.id, MessageControlState.End.COMPLETED);
@@ -666,7 +657,7 @@ public class NextopNode extends AbstractMessageControlNode {
                     u += 1;
                 }
                 if (0 < u) {
-                    NL.nl.message("node.nextop.write", "Send %d urgent took %.3fms", u, ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                    NL.nl.metric("node.nextop.write.urgent", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                 }
             }
         }
@@ -677,8 +668,6 @@ public class NextopNode extends AbstractMessageControlNode {
         final MessageControlState mcs = getMessageControlState();
 
         final byte[] controlBuffer = new byte[1024];
-
-        int messageReadCount = 0;
 
 
         ReadLooper(SharedWireState sws) {
@@ -702,15 +691,10 @@ public class NextopNode extends AbstractMessageControlNode {
             try {
 
                 NL.nl.message("node.nextop.read", "Start read loop");
-                long startReadLoopNanos = System.nanoTime();
 
                 top:
                 while (sws.active) {
-                    {
-                        long startNanos = System.nanoTime();
-                        sws.wire.read(controlBuffer, 0, 1, 0);
-                        NL.nl.message("node.nextop.read", "Read type took %.3fms", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
-                    }
+                    sws.wire.read(controlBuffer, 0, 1, 0);
                     {
                         long startNanos = System.nanoTime();
                         byte type = controlBuffer[0];
@@ -842,10 +826,6 @@ public class NextopNode extends AbstractMessageControlNode {
 
                                 sts.readStates.remove(id);
 
-
-                                messageReadCount += 1;
-                                NL.nl.message("node.nextop.read", "Read %d messages in %.3fms", messageReadCount, ((System.nanoTime() - startReadLoopNanos) / 1000) / 1000.f);
-
                                 // defer the parsing to the context thread
                                 // TODO is this better thank inline? (get numbers)
                                 post(new Dispatch(id, readState));
@@ -889,7 +869,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                 // protocol error
                                 throw new IOException("Protocol error.");
                         }
-                        NL.nl.message("node.nextop.read", "Read %d took %.3fms", type, ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                        NL.nl.metric("node.nextop.read.%s", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS, type);
                     }
 
                 }
