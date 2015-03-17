@@ -30,7 +30,7 @@ public class RealFallbackTest {
         NextopNode nextopNode = new NextopNode();
         nextopNode.setWireFactory(new NextopClientWireFactory(
                 new NextopClientWireFactory.Config(Authority.valueOf(/* FIXME move to config */ "dev-dns.nextop.io"), 2)));
-        nextopNode.setWireAdapter(Wires.compose(nextopThrottle, nextopProbe));
+        nextopNode.setWireAdapter(Wires.composeAdapters(nextopThrottle, nextopProbe));
 
         HttpNode httpNode = new HttpNode();
         httpNode.setWireAdapter(httpProbe);
