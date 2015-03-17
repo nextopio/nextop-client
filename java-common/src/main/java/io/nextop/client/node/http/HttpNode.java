@@ -91,7 +91,7 @@ public final class HttpNode extends AbstractMessageControlNode {
 
     /** yield at this many of bytes to emit progress,
      * transfer request, etc. */
-    static final int DEFAULT_YIELD_Q_BYTES = 1024;
+    static final int DEFAULT_YIELD_Q_BYTES = 4 * 1024;
 
 
 

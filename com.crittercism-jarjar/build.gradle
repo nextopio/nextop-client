@@ -1,7 +1,9 @@
 /* the purpose of jarjar'ing the crittercism lib is so that the nextop-client
  * can have its own Crittercism link that won't interfere with the app's */
+/* !! This is currently not used and being replaced with Nextop logging,
+  * for security reasons (Nextop doesn't want stack traces from apps, but Crittercism makes it hard to filter). */
 
- buildscript {
+buildscript {
     repositories {
         jcenter()
     }

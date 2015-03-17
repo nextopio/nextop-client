@@ -52,8 +52,7 @@ public class RealNodeTest extends TestCase {
         protected void run() throws Exception {
             NextopNode nextopNode = new NextopNode();
             nextopNode.setWireFactory(new NextopClientWireFactory(
-                    new NextopClientWireFactory.Config(Authority.valueOf("127.0.0.1:2778"), 2,
-                            /* FIXME */ Collections.singletonList(Authority.valueOf(/*"127.0.0.1:27780"*/"54.149.233.13:27780")))));
+                    new NextopClientWireFactory.Config(Authority.valueOf(/* FIXME move to config */ "dev-dns.nextop.io"), 2)));
 
 //            HttpNode httpNode = new HttpNode();
 //

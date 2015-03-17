@@ -74,6 +74,8 @@ public final class RemoteOut implements Log.Out {
                 .setContent(LogEntry.toWireValue(entry))
                 .set(Message.H_PASSIVE, Message.V_PASSIVE_HOLD_FOR_ACTIVE_RADIO)
                 .set(Message.H_YIELDABLE, true)
+                .setGroupId(Message.LOG_GROUP_ID)
+                .setGroupPriority(Message.LOG_GROUP_PRIORITY)
                 .build();
 
         Subscription s = head.receive(logMessage.inboxRoute()).subscribe(new Observer<Message>() {

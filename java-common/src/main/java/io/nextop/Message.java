@@ -64,7 +64,10 @@ public class Message {
 
 
     public static final Id DEFAULT_GROUP_ID = Id.create(0L, 0L, 0L, 0L);
-    public static final int DEFAULT_GROUP_PRIORITY = 0;
+    public static final int DEFAULT_GROUP_PRIORITY = 10;
+
+    public static final Id LOG_GROUP_ID = Id.create(0L, 0L, 0L, 1L);
+    public static final int LOG_GROUP_PRIORITY = 0;
 
 
 

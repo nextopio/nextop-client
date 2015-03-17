@@ -27,8 +27,7 @@ import java.util.zip.GZIPOutputStream;
  * of this class to communicate. The difference between instances is the
  * Wire.Factory, which is responsible for a secure connection.
  * The nextop protocol is optimized to pipeline messages up/down. There is a tradeoff
- * in ordering in the case the endpoint crashes. Assuming a reliable endpoint, order is maintained.
- * */
+ * in ordering in the case the endpoint crashes. Assuming a reliable endpoint, order is maintained. */
 public class NextopNode extends AbstractMessageControlNode {
 
     public static final class Config {
@@ -59,6 +58,9 @@ public class NextopNode extends AbstractMessageControlNode {
         }
     };
 
+    private static final int DEFAULT_T_STARTUP_MS = 3000;
+    private static final int DEFAULT_T_DROP_MS = 2 * DEFAULT_T_STARTUP_MS;
+
 
     final Config config;
 
@@ -78,6 +80,11 @@ public class NextopNode extends AbstractMessageControlNode {
 
     CompressionStrategy compressionStrategy = COMPRESS_NON_BINARY;
 
+    final UpstreamActive upstreamActive;
+
+    final int startupMs = DEFAULT_T_STARTUP_MS;
+    final int dropTimeoutMs = DEFAULT_T_DROP_MS;
+
 
 
     public NextopNode() {
@@ -88,6 +95,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
         sts = new SharedTransferState(this);
 
+        upstreamActive = new UpstreamActive();
     }
 
     /** Call before #init.
@@ -119,8 +127,12 @@ public class NextopNode extends AbstractMessageControlNode {
 
     @Override
     protected void initSelf(@Nullable Bundle savedState) {
-        // ready to receive
-        upstream.onActive(true);
+        // the control looper sets upstream active when there is a successful connection to the peer
+        // the control looper drops upstream active after #dropTimeoutMs of no successful connection to the peer
+        // hold for the estimated #startupMs
+        // This prevents a request from hitting another route when it will be net faster/better
+        // to hit nextop if sent before this timeout
+        upstreamActive.up(startupMs);
     }
 
     @Override
@@ -165,20 +177,87 @@ public class NextopNode extends AbstractMessageControlNode {
     }
 
 
+    /////// CONNECTIVITY ///////
+
+    private void onConnected() {
+        upstreamActive.up();
+    }
+
+    private void onDisconnected() {
+        upstreamActive.down(dropTimeoutMs);
+    }
 
 
+    private final Runnable ON_CONNECTED = new Runnable() {
+        @Override
+        public void run() {
+            onConnected();
+        }
+    };
+    private final Runnable ON_DISCONNECTED = new Runnable() {
+        @Override
+        public void run() {
+            onDisconnected();
+        }
+    };
+
+
+    final class UpstreamActive {
+        boolean active = false;
+
+        long pendingDownTime = 0L;
+        @Nullable
+        Runnable pendingDown = null;
+
+        private void clearPendingDown() {
+            pendingDownTime = 0L;
+            pendingDown = null;
+        }
+
+        void up() {
+            clearPendingDown();
+            if (!active) {
+                active = true;
+                upstream.onActive(true);
+            }
+        }
+        void down() {
+            clearPendingDown();
+            if (active) {
+                active = false;
+                upstream.onActive(false);
+            }
+        }
+
+        void up(int holdMs) {
+            up();
+            down(holdMs);
+        }
+        void down(int delayMs) {
+            long downTime = System.currentTimeMillis() + delayMs;
+            if (pendingDownTime < downTime) {
+                pendingDownTime = downTime;
+                pendingDown = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (this == pendingDown) {
+                            down();
+                        }
+                    }
+                };
+                postDelayed(pendingDown, delayMs);
+            }
+        }
+    }
 
 
     final class ControlLooper extends Thread {
-
         final byte[] controlBuffer = new byte[4 * 1024];
 
         @Override
         public void run() {
-
             @Nullable SerializationState ss = null;
             @Nullable SharedWireState sws = null;
-
 
             top:
             while (active) {
@@ -209,6 +288,8 @@ public class NextopNode extends AbstractMessageControlNode {
                             NL.nl.metric("node.nextop.control.sync", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                         }
 
+                        post(ON_CONNECTED);
+
                         sws = new SharedWireState(wire);
                         if (null == ss) {
                             ss = new SerializationState();
@@ -233,6 +314,9 @@ public class NextopNode extends AbstractMessageControlNode {
                     // FIXME log
                     e.printStackTrace();
                     continue top;
+                }
+                finally {
+                    post(ON_DISCONNECTED);
                 }
             }
 
