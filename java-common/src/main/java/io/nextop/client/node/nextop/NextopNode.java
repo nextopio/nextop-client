@@ -12,7 +12,6 @@ import io.nextop.client.MessageControlState;
 import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.log.NL;
 import io.nextop.util.NoCopyByteArrayOutputStream;
-import sun.misc.IOUtils;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
@@ -174,10 +173,10 @@ public class NextopNode extends AbstractMessageControlNode {
 
         final byte[] controlBuffer = new byte[4 * 1024];
 
-
         @Override
         public void run() {
 
+            @Nullable SerializationState ss = null;
             @Nullable SharedWireState sws = null;
 
 
@@ -211,7 +210,10 @@ public class NextopNode extends AbstractMessageControlNode {
                         }
 
                         sws = new SharedWireState(wire);
-                        WriteLooper writeLooper = new WriteLooper(sws);
+                        if (null == ss) {
+                            ss = new SerializationState();
+                        }
+                        WriteLooper writeLooper = new WriteLooper(sws, ss);
                         ReadLooper readLooper = new ReadLooper(sws);
                         sws.writeLooper = writeLooper;
                         sws.readLooper = readLooper;
@@ -429,18 +431,25 @@ public class NextopNode extends AbstractMessageControlNode {
         }
     }
 
-    final class WriteLooper extends Thread {
-        final SharedWireState sws;
-        final MessageControlState mcs = getMessageControlState();
-
-        final byte[] controlBuffer = new byte[1024];
-
+    static final class SerializationState {
         // FIXME need to work more on memory footprint.
         final byte[] serBytes = new byte[8 * 1024 * 1024];
         final ByteBuffer serBuffer = ByteBuffer.wrap(serBytes);
 
-        WriteLooper(SharedWireState sws) {
+        SerializationState() {
+        }
+    }
+
+    final class WriteLooper extends Thread {
+        final SharedWireState sws;
+        final SerializationState ss;
+        final MessageControlState mcs = getMessageControlState();
+
+        final byte[] controlBuffer = new byte[1024];
+
+        WriteLooper(SharedWireState sws, SerializationState ss) {
             this.sws = sws;
+            this.ss = ss;
         }
 
         @Override
@@ -483,6 +492,9 @@ public class NextopNode extends AbstractMessageControlNode {
                     if (null == writeState) {
                         {
                             long startNanos = System.nanoTime();
+
+                            final ByteBuffer serBuffer = ss.serBuffer;
+                            final byte[] serBytes = ss.serBytes;
 
                             // create it
                             byte[] bytes;

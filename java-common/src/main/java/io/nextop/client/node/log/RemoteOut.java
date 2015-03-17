@@ -73,6 +73,7 @@ public final class RemoteOut implements Log.Out {
                 .setRoute(Message.logRoute())
                 .setContent(LogEntry.toWireValue(entry))
                 .set(Message.H_PASSIVE, Message.V_PASSIVE_HOLD_FOR_ACTIVE_RADIO)
+                .set(Message.H_YIELDABLE, true)
                 .build();
 
         Subscription s = head.receive(logMessage.inboxRoute()).subscribe(new Observer<Message>() {

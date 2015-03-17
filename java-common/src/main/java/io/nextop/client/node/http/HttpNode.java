@@ -260,16 +260,26 @@ public final class HttpNode extends AbstractMessageControlNode {
 
         @Override
         public void run() {
+            top:
             while (active) {
                 @Nullable MessageControlState.Entry entry;
                 try {
                     entry = mcs.takeFirstAvailable(HttpNode.this,
                             Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
-                    continue;
+                    continue top;
                 }
 
                 if (null != entry) {
+                    while (!isSendable(entry.mc)) {
+                        try {
+                            entry = mcs.takeFirstAvailable(entry.id, HttpNode.this,
+                                    Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            continue top;
+                        }
+                    }
+
                     @Nullable SharedLooperState.MostRecentSend mostRecentSend = sls.mostRecentSends.get(entry.id);
                     if (null != mostRecentSend) {
                         int delayMs = (int) mostRecentSend.activeStrategy.getDelay(TimeUnit.MILLISECONDS);
