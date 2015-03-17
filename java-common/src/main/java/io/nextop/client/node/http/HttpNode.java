@@ -1,12 +1,8 @@
 package io.nextop.client.node.http;
 
-import io.nextop.Id;
-import io.nextop.Message;
-import io.nextop.Route;
+import io.nextop.*;
 import io.nextop.client.MessageControl;
 import io.nextop.client.MessageControlState;
-import io.nextop.Wire;
-import io.nextop.Wires;
 import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.client.retry.SendStrategy;
 import io.nextop.org.apache.http.*;
@@ -37,6 +33,7 @@ import io.nextop.org.apache.http.io.HttpMessageWriterFactory;
 import io.nextop.org.apache.http.io.SessionInputBuffer;
 import io.nextop.org.apache.http.io.SessionOutputBuffer;
 import io.nextop.org.apache.http.protocol.*;
+import rx.functions.Func1;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -94,7 +91,7 @@ public final class HttpNode extends AbstractMessageControlNode {
 
     /** yield at this many of bytes to emit progress,
      * transfer request, etc. */
-    static final int DEFAULT_YIELD_Q_BYTES = 1024;
+    static final int DEFAULT_YIELD_Q_BYTES = 4 * 1024;
 
 
 
@@ -211,19 +208,11 @@ public final class HttpNode extends AbstractMessageControlNode {
         if (active) {
             MessageControlState mcs = getMessageControlState();
             if (!mcs.onActiveMessageControl(mc, upstream)) {
-                switch (mc.type) {
-                    case MESSAGE:
-                        mcs.add(mc.message);
-                        break;
-                    default:
-                        // ignore
-                        break;
-                }
+                mcs.add(mc);
             }
         }
         // TODO else send back upstream?
     }
-
 
 
     private static final class SharedLooperState {
@@ -250,6 +239,14 @@ public final class HttpNode extends AbstractMessageControlNode {
         }
     }
 
+    static final Func1<MessageControlState.Entry, Boolean> IS_SENDABLE = new Func1<MessageControlState.Entry, Boolean>() {
+        @Override
+        public Boolean call(MessageControlState.Entry entry) {
+            // HTTP can't send to the Nextop local route
+            return !Message.isLocal(entry.message.route);
+        }
+    };
+
     final class RequestLooper extends Thread {
         final MessageControlState mcs;
         final SharedLooperState sls;
@@ -272,13 +269,14 @@ public final class HttpNode extends AbstractMessageControlNode {
 
         @Override
         public void run() {
+            top:
             while (active) {
                 @Nullable MessageControlState.Entry entry;
                 try {
-                    entry = mcs.takeFirstAvailable(HttpNode.this,
+                    entry = mcs.takeFirstAvailable(IS_SENDABLE, HttpNode.this,
                             Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
-                    continue;
+                    continue top;
                 }
 
                 if (null != entry) {
@@ -771,7 +769,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                 context.setAttribute(HttpClientContext.HTTP_ROUTE, route);
 
 
-                // TODO managedConn is an intance of CPoolProxy
+                // TODO managedConn is an instance of CPoolProxy
                 // TODO an easy way to call getConnection or get the connection out of it without reflection?
 
                 httpProcessor.process(request, context);
@@ -1231,6 +1229,8 @@ public final class HttpNode extends AbstractMessageControlNode {
             return super.doReceiveResponse(request, conn, context);
         }
     }
+
+
 
 
 

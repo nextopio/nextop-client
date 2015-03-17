@@ -7,16 +7,19 @@ import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Route;
 import io.nextop.client.*;
+import io.nextop.log.Log;
 import rx.Observable;
 import rx.Scheduler;
 import rx.Subscriber;
 import rx.Subscription;
 import rx.functions.Action0;
 import rx.subscriptions.BooleanSubscription;
+import rx.subscriptions.Subscriptions;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
+
 
 public class Head implements MessageControlNode {
 
@@ -39,6 +42,7 @@ public class Head implements MessageControlNode {
     final Scheduler.Worker callbackWorker;
 
 
+    final Object receiverMutex = new Object();
     final ListMultimap<Route, Subscriber> receivers = ArrayListMultimap.create();
     final List<Subscriber> defaultReceivers = new ArrayList<Subscriber>();
 
@@ -53,9 +57,17 @@ public class Head implements MessageControlNode {
     }
 
 
+    /* threading notes:
+     * if calling from a thread that is not the callback thread,
+     * receive.subscribe ... send to ensure
+     * responses get delivered to the receiver.
+     * Calling send ... receive.subscribe needs to be done
+     * on the same execution of the callback thread
+     * to ensure responses get delivered to the receiver.
+     */
 
 
-    /** must be called on callbackScheduler thread */
+    /** thread-safe */
     public void send(final Message message) {
         mcs.notifyPending(message.id);
         post(new Runnable() {
@@ -66,6 +78,7 @@ public class Head implements MessageControlNode {
         });
     }
 
+    /** thread-safe */
     public void complete(final Message message) {
         mcs.notifyPending(message.id);
         post(new Runnable() {
@@ -76,6 +89,7 @@ public class Head implements MessageControlNode {
         });
     }
 
+    /** thread-safe */
     public void error(final Message message) {
         mcs.notifyPending(message.id);
         post(new Runnable() {
@@ -86,7 +100,7 @@ public class Head implements MessageControlNode {
         });
     }
 
-    /** must be called on callbackScheduler thread */
+    /** thread-safe */
     public void cancelSend(final Id id) {
         post(new Runnable() {
             @Override
@@ -96,18 +110,22 @@ public class Head implements MessageControlNode {
         });
     }
 
-    /** must be called on callbackScheduler thread */
+    /** thread-safe */
     public Observable<Message> receive(final Route route) {
         return Observable.create(new Observable.OnSubscribe<Message>() {
             @Override
             public void call(final Subscriber<? super Message> subscriber) {
-                boolean s = receivers.put(route, subscriber);
-                assert s;
-                Subscription subscription = BooleanSubscription.create(new Action0() {
+                synchronized (receiverMutex) {
+                    boolean s = receivers.put(route, subscriber);
+                    assert s;
+                }
+                Subscription subscription = Subscriptions.create(new Action0() {
                     @Override
                     public void call() {
-                        boolean s = receivers.remove(route, subscriber);
-                        assert s;
+                        synchronized (receiverMutex) {
+                            boolean s = receivers.remove(route, subscriber);
+                            assert s;
+                        }
                     }
                 });
                 subscriber.add(subscription);
@@ -119,18 +137,22 @@ public class Head implements MessageControlNode {
 
 
     // when a listener is added, only new values are surfaced to it (old values are not surfaced)
-    /** must be called on callbackScheduler thread */
+    /** thread-safe */
     public Observable<Message> defaultReceive() {
         return Observable.create(new Observable.OnSubscribe<Message>() {
             @Override
             public void call(final Subscriber<? super Message> subscriber) {
-                boolean s = defaultReceivers.add(subscriber);
-                assert s;
-                Subscription subscription = BooleanSubscription.create(new Action0() {
+                synchronized (receiverMutex) {
+                    boolean s = defaultReceivers.add(subscriber);
+                    assert s;
+                }
+                Subscription subscription = Subscriptions.create(new Action0() {
                     @Override
                     public void call() {
-                        boolean s = defaultReceivers.remove(subscriber);
-                        assert s;
+                        synchronized (receiverMutex) {
+                            boolean s = defaultReceivers.remove(subscriber);
+                            assert s;
+                        }
                     }
                 });
                 subscriber.add(subscription);
@@ -200,9 +222,12 @@ public class Head implements MessageControlNode {
                         callbackWorker.schedule(new Action0() {
                             @Override
                             public void call() {
-                                @Nullable Subscriber firstSubscriber = Iterables.getFirst(
-                                        Iterables.concat(receivers.get(mc.message.route), defaultReceivers),
-                                        null);
+                                @Nullable Subscriber firstSubscriber;
+                                synchronized (receiverMutex) {
+                                    firstSubscriber = Iterables.getFirst(
+                                            Iterables.concat(receivers.get(mc.message.route), defaultReceivers),
+                                            null);
+                                }
                                 if (null != firstSubscriber) {
                                     firstSubscriber.onNext(mc.message);
                                 }
@@ -214,7 +239,10 @@ public class Head implements MessageControlNode {
                         callbackWorker.schedule(new Action0() {
                             @Override
                             public void call() {
-                                @Nullable Subscriber firstSubscriber = Iterables.getFirst(receivers.get(mc.message.route), null);
+                                @Nullable Subscriber firstSubscriber;
+                                synchronized (receiverMutex) {
+                                    firstSubscriber = Iterables.getFirst(receivers.get(mc.message.route), null);
+                                }
                                 if (null != firstSubscriber) {
                                     firstSubscriber.onCompleted();
                                 }
@@ -226,7 +254,10 @@ public class Head implements MessageControlNode {
                         callbackWorker.schedule(new Action0() {
                             @Override
                             public void call() {
-                                @Nullable Subscriber firstSubscriber = Iterables.getFirst(receivers.get(mc.message.route), null);
+                                @Nullable Subscriber firstSubscriber;
+                                synchronized (receiverMutex) {
+                                    firstSubscriber = Iterables.getFirst(receivers.get(mc.message.route), null);
+                                }
                                 if (null != firstSubscriber) {
                                     firstSubscriber.onError(new ReceiveException(mc.message));
                                 }

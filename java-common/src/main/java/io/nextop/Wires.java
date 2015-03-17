@@ -3,6 +3,7 @@ package io.nextop;
 import javax.annotation.Nullable;
 import java.io.*;
 import java.net.Socket;
+import java.util.NoSuchElementException;
 
 public final class Wires {
 
@@ -31,6 +32,9 @@ public final class Wires {
         return new TransferBuffer(size);
     }
 
+    public static Wire.Adapter composeAdapters(Wire.Adapter ... adapters) {
+        return new CompositeAdapter(adapters);
+    }
 
 
 
@@ -352,6 +356,24 @@ public final class Wires {
         @Override
         public synchronized void flush() throws IOException {
             // already flushed
+        }
+    }
+
+
+    private static final class CompositeAdapter implements Wire.Adapter {
+        final Wire.Adapter[] adapters;
+
+        CompositeAdapter(Wire.Adapter ... adapters) {
+            this.adapters = adapters;
+        }
+
+        @Override
+        public Wire adapt(Wire wire) throws InterruptedException, NoSuchElementException {
+            Wire w = wire;
+            for (Wire.Adapter adapter : adapters) {
+                w = adapter.adapt(w);
+            }
+            return w;
         }
     }
 

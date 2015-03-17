@@ -4,6 +4,7 @@ import io.nextop.*;
 import io.nextop.client.MessageControl;
 import io.nextop.Wire;
 import io.nextop.Wires;
+import io.nextop.client.MessageControlState;
 import io.nextop.client.node.AbstractMessageControlNode;
 import io.nextop.client.node.Head;
 import io.nextop.client.node.http.HttpNode;
@@ -118,13 +119,12 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
     protected void initSelf(Bundle savedState) {
         state = new State();
 
-        // FIXME HOLY CRAP THIS IS TAKING ENTRIES
         // at this point the upstream is set
-//        dnsHttpNode = new HttpNode();
-//        dnsHead = Head.create(this, getMessageControlState(), dnsHttpNode, getScheduler());
-//
-//        dnsHead.init(savedState);
+        MessageControlState dnsMcs = new MessageControlState(this);
+        dnsHttpNode = new HttpNode();
+        dnsHead = Head.create(this, dnsMcs, dnsHttpNode, getScheduler());
 
+        dnsHead.init(savedState);
     }
 
     @Override
@@ -137,11 +137,11 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
         // FIXME
         if (active != this.active) {
             this.active = active;
-//            if (active) {
-//                dnsHead.start();
-//            } else {
-//                dnsHead.stop();
-//            }
+            if (active) {
+                dnsHead.start();
+            } else {
+                dnsHead.stop();
+            }
         }
     }
 
@@ -268,12 +268,10 @@ public class NextopClientWireFactory extends AbstractMessageControlNode implemen
     }
 
     boolean doDnsReset() {
-        // FIXME
         if (!config.fixedAuthorities.isEmpty()) {
             state.resetDnsAuthorities(config.fixedAuthorities);
             return true;
         }
-
 
         List<Authority> reportDownAuthorities = state.getUnreportedDownAuthorities(config.allowedFailsPerAuthority);
         Message dnsRequest;

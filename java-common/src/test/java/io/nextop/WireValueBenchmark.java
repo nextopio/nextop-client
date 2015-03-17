@@ -76,8 +76,6 @@ public class WireValueBenchmark extends TestCase {
         byte[] cbytes = baos.toByteArray();
         System.out.printf("c %d bytes\n", cbytes.length);
 
-
-
         System.out.printf("%s\n", json);
         System.out.printf("json %d bytes\n", json.length());
     }

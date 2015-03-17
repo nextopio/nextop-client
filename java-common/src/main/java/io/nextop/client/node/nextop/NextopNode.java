@@ -1,5 +1,6 @@
 package io.nextop.client.node.nextop;
 
+import com.google.common.io.ByteStreams;
 import io.nextop.Id;
 import io.nextop.Message;
 import io.nextop.Wire;
@@ -9,20 +10,24 @@ import io.nextop.client.MessageControl;
 import io.nextop.client.MessageControlNode;
 import io.nextop.client.MessageControlState;
 import io.nextop.client.node.AbstractMessageControlNode;
+import io.nextop.log.NL;
+import io.nextop.util.NoCopyByteArrayOutputStream;
 
 import javax.annotation.Nullable;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 /** Nextop is symmetric protocol, so the client and server both use an instance
  * of this class to communicate. The difference between instances is the
  * Wire.Factory, which is responsible for a secure connection.
  * The nextop protocol is optimized to pipeline messages up/down. There is a tradeoff
- * in ordering in the case the endpoint crashes. Assuming a reliable endpoint, order is maintained.
- * */
+ * in ordering in the case the endpoint crashes. Assuming a reliable endpoint, order is maintained. */
 public class NextopNode extends AbstractMessageControlNode {
 
     public static final class Config {
@@ -36,6 +41,25 @@ public class NextopNode extends AbstractMessageControlNode {
 
     public static final Config DEFAULT_CONFIG = new Config(/* aim for one packet per chunk */ 4 * 1024);
 
+    public static final CompressionStrategy COMPRESS_NON_BINARY = new CompressionStrategy() {
+        @Override
+        public boolean isCompress(Message message) {
+            @Nullable WireValue content = message.getContent();
+            if (null == content) {
+                return true;
+            }
+            switch (content.getType()) {
+                case IMAGE:
+                case BLOB:
+                    return false;
+                default:
+                    return true;
+            }
+        }
+    };
+
+    private static final int DEFAULT_T_STARTUP_MS = 3000;
+    private static final int DEFAULT_T_DROP_MS = 2 * DEFAULT_T_STARTUP_MS;
 
 
     final Config config;
@@ -54,6 +78,13 @@ public class NextopNode extends AbstractMessageControlNode {
 
     final SharedTransferState sts;
 
+    CompressionStrategy compressionStrategy = COMPRESS_NON_BINARY;
+
+    final UpstreamActive upstreamActive;
+
+    final int startupMs = DEFAULT_T_STARTUP_MS;
+    final int dropTimeoutMs = DEFAULT_T_DROP_MS;
+
 
 
     public NextopNode() {
@@ -64,6 +95,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
         sts = new SharedTransferState(this);
 
+        upstreamActive = new UpstreamActive();
     }
 
     /** Call before #init.
@@ -95,8 +127,12 @@ public class NextopNode extends AbstractMessageControlNode {
 
     @Override
     protected void initSelf(@Nullable Bundle savedState) {
-        // ready to receive
-        upstream.onActive(true);
+        // the control looper sets upstream active when there is a successful connection to the peer
+        // the control looper drops upstream active after #dropTimeoutMs of no successful connection to the peer
+        // hold for the estimated #startupMs
+        // This prevents a request from hitting another route when it will be net faster/better
+        // to hit nextop if sent before this timeout
+        upstreamActive.up(startupMs);
     }
 
     @Override
@@ -134,34 +170,94 @@ public class NextopNode extends AbstractMessageControlNode {
         if (active) {
             MessageControlState mcs = getMessageControlState();
             if (!mcs.onActiveMessageControl(mc, upstream)) {
-                switch (mc.type) {
-                    case MESSAGE:
-                        mcs.add(mc.message);
-                        break;
-                    default:
-                        // ignore
-                        break;
-                }
+                mcs.add(mc);
             }
         }
         // TODO else send back upstream?
     }
 
 
+    /////// CONNECTIVITY ///////
+
+    private void onConnected() {
+        upstreamActive.up();
+    }
+
+    private void onDisconnected() {
+        upstreamActive.down(dropTimeoutMs);
+    }
 
 
+    private final Runnable ON_CONNECTED = new Runnable() {
+        @Override
+        public void run() {
+            onConnected();
+        }
+    };
+    private final Runnable ON_DISCONNECTED = new Runnable() {
+        @Override
+        public void run() {
+            onDisconnected();
+        }
+    };
+
+
+    final class UpstreamActive {
+        boolean active = false;
+
+        long pendingDownTime = 0L;
+        @Nullable
+        Runnable pendingDown = null;
+
+        private void clearPendingDown() {
+            pendingDownTime = 0L;
+            pendingDown = null;
+        }
+
+        void up() {
+            clearPendingDown();
+            if (!active) {
+                active = true;
+                upstream.onActive(true);
+            }
+        }
+        void down() {
+            clearPendingDown();
+            if (active) {
+                active = false;
+                upstream.onActive(false);
+            }
+        }
+
+        void up(int holdMs) {
+            up();
+            down(holdMs);
+        }
+        void down(int delayMs) {
+            long downTime = System.currentTimeMillis() + delayMs;
+            if (pendingDownTime < downTime) {
+                pendingDownTime = downTime;
+                pendingDown = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (this == pendingDown) {
+                            down();
+                        }
+                    }
+                };
+                postDelayed(pendingDown, delayMs);
+            }
+        }
+    }
 
 
     final class ControlLooper extends Thread {
-
         final byte[] controlBuffer = new byte[4 * 1024];
-
 
         @Override
         public void run() {
-
+            @Nullable SerializationState ss = null;
             @Nullable SharedWireState sws = null;
-
 
             top:
             while (active) {
@@ -189,11 +285,16 @@ public class NextopNode extends AbstractMessageControlNode {
                                 e.printStackTrace();
                                 continue top;
                             }
-                            System.out.printf("Transfer state sync took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                            NL.nl.metric("node.nextop.control.sync", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                         }
 
+                        post(ON_CONNECTED);
+
                         sws = new SharedWireState(wire);
-                        WriteLooper writeLooper = new WriteLooper(sws);
+                        if (null == ss) {
+                            ss = new SerializationState();
+                        }
+                        WriteLooper writeLooper = new WriteLooper(sws, ss);
                         ReadLooper readLooper = new ReadLooper(sws);
                         sws.writeLooper = writeLooper;
                         sws.readLooper = readLooper;
@@ -213,6 +314,9 @@ public class NextopNode extends AbstractMessageControlNode {
                     // FIXME log
                     e.printStackTrace();
                     continue top;
+                }
+                finally {
+                    post(ON_DISCONNECTED);
                 }
             }
 
@@ -411,19 +515,25 @@ public class NextopNode extends AbstractMessageControlNode {
         }
     }
 
+    static final class SerializationState {
+        // FIXME need to work more on memory footprint.
+        final byte[] serBytes = new byte[8 * 1024 * 1024];
+        final ByteBuffer serBuffer = ByteBuffer.wrap(serBytes);
+
+        SerializationState() {
+        }
+    }
+
     final class WriteLooper extends Thread {
         final SharedWireState sws;
+        final SerializationState ss;
         final MessageControlState mcs = getMessageControlState();
 
         final byte[] controlBuffer = new byte[1024];
 
-        // FIXME need to work more on memory footprint.
-        final ByteBuffer serBuffer = ByteBuffer.allocate(8 * 1024 * 1024);
-
-        int messageWriteCount = 0;
-
-        WriteLooper(SharedWireState sws) {
+        WriteLooper(SharedWireState sws, SerializationState ss) {
             this.sws = sws;
+            this.ss = ss;
         }
 
         @Override
@@ -438,23 +548,17 @@ public class NextopNode extends AbstractMessageControlNode {
             @Nullable MessageControlState.Entry entry = null;
 
             try {
-                System.out.printf("Start write loop\n");
-                long startWriteLoopNanos = System.nanoTime();
+                NL.nl.message("node.nextop.write", "Start write loop");
 
                 top:
                 while (sws.active) {
-                    // clear the interrrupted status
-//                    Thread.interrupted();
-
                     pollUrgent();
 
                     if (null == entry) {
                         entry = mcs.takeFirstAvailable(NextopNode.this);
                         if (null == entry) {
                             {
-                                long startNanos = System.nanoTime();
                                 sws.wire.flush();
-//                                System.out.printf("Flush took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
                             }
                             try {
                                 entry = mcs.takeFirstAvailable(NextopNode.this, Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
@@ -473,13 +577,42 @@ public class NextopNode extends AbstractMessageControlNode {
                         {
                             long startNanos = System.nanoTime();
 
+                            final ByteBuffer serBuffer = ss.serBuffer;
+                            final byte[] serBytes = ss.serBytes;
+
                             // create it
                             byte[] bytes;
+                            boolean compressed;
                             try {
-                                WireValue.of(entry.message).toBytes(serBuffer);
+                                pkg(entry.mc).toBytes(serBuffer);
                                 serBuffer.flip();
-                                bytes = new byte[serBuffer.remaining()];
-                                serBuffer.get(bytes);
+                                int n = serBuffer.remaining();
+
+                                assert pkg(entry.mc).equals(WireValue.valueOf(serBytes));
+
+                                if (compressionStrategy.isCompress(entry.message)) {
+                                    try {
+                                        NoCopyByteArrayOutputStream os = new NoCopyByteArrayOutputStream(serBytes, n);
+                                        GZIPOutputStream gzos = new GZIPOutputStream(os);
+                                        try {
+                                            gzos.write(serBytes, 0, n);
+                                            gzos.finish();
+                                        } finally {
+                                            gzos.close();
+                                        }
+                                        bytes = os.toByteArray();
+                                        compressed = true;
+                                    } catch (OutOfMemoryError e) {
+                                        // Don't compress - too much temp space needed
+                                        bytes = new byte[n];
+                                        System.arraycopy(serBytes, 0, bytes, 0, n);
+                                        compressed = false;
+                                    }
+                                } else {
+                                    bytes = new byte[n];
+                                    System.arraycopy(serBytes, 0, bytes, 0, n);
+                                    compressed = false;
+                                }
                             } finally {
                                 serBuffer.clear();
                             }
@@ -493,11 +626,10 @@ public class NextopNode extends AbstractMessageControlNode {
                                 chunkOffsets[i] = chunkOffsets[i - 1] + config.chunkBytes;
                             }
 
-                            assert WireValue.of(entry.message).equals(WireValue.valueOf(bytes));
+                            writeState = new MessageWriteState(entry.id, bytes, chunkOffsets, compressed);
 
-                            writeState = new MessageWriteState(entry.id, bytes, chunkOffsets);
-
-//                            System.out.printf("Create write state took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                            NL.nl.metric("node.nextop.write.state", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
+                            NL.nl.count("node.nextop.write.%s", entry.mc.type);
                         }
                     }
 
@@ -516,9 +648,11 @@ public class NextopNode extends AbstractMessageControlNode {
                             c += 4;
                             WireValue.putint(controlBuffer, c, n);
                             c += 4;
+                            controlBuffer[c] = writeState.compressed ? (byte) 0x01 : (byte) 0x00;
+                            c += 1;
                             sws.wire.write(controlBuffer, 0, c, 0);
                         }
-//                        System.out.printf("Write F_MESSAGE_START took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                        NL.nl.metric("node.nextop.write.start", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                     }
 
                     for (int i = 0; i < n; ++i) {
@@ -554,7 +688,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                     }
                                     sws.wire.write(writeState.bytes, start, end - start, 0);
                                 }
-//                                System.out.printf("Write F_MESSAGE_CHUNK took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                                NL.nl.metric("node.nextop.write.chunk", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                             }
 
 
@@ -579,22 +713,17 @@ public class NextopNode extends AbstractMessageControlNode {
                             c += 1;
                             sws.wire.write(controlBuffer, 0, c, 0);
                         }
-//                        System.out.printf("Write F_MESSAGE_END took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                        NL.nl.metric("node.nextop.write.end", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                     }
-
-                    messageWriteCount += 1;
-//                    System.out.printf("Wrote %d messages in %.3fms\n", messageWriteCount, ((System.nanoTime() - startWriteLoopNanos) / 1000) / 1000.f);
 
                     // done with entry, transfer to pending ack
                     mcs.remove(entry.id, MessageControlState.End.COMPLETED);
-                    sts.writePendingAck.add(entry.message);
+                    sts.writePendingAck.add(entry.mc);
                     entry = null;
                 }
 
                 {
-                    long startNanos = System.nanoTime();
                     sws.wire.flush();
-//                    System.out.printf("Flush took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
                 }
             } catch (IOException e) {
                 // FIXME log
@@ -610,7 +739,7 @@ public class NextopNode extends AbstractMessageControlNode {
             }
 
 
-            System.out.printf("End write loop\n");
+            NL.nl.message("node.nextop.write", "End write loop");
 
             sts.membar();
         }
@@ -620,12 +749,11 @@ public class NextopNode extends AbstractMessageControlNode {
                 int u = 0;
                 long startNanos = System.nanoTime();
                 for (byte[] urgentMessage; null != (urgentMessage = sts.writeUrgentMessages.poll()); ) {
-//                    System.out.printf("Write urgent\n");
                     sws.wire.write(urgentMessage, 0, urgentMessage.length, 0);
                     u += 1;
                 }
                 if (0 < u) {
-//                    System.out.printf("Send %d urget took %.3fms\n", u, ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                    NL.nl.metric("node.nextop.write.urgent", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
                 }
             }
         }
@@ -636,8 +764,6 @@ public class NextopNode extends AbstractMessageControlNode {
         final MessageControlState mcs = getMessageControlState();
 
         final byte[] controlBuffer = new byte[1024];
-
-        int messageReadCount = 0;
 
 
         ReadLooper(SharedWireState sws) {
@@ -660,23 +786,18 @@ public class NextopNode extends AbstractMessageControlNode {
 
             try {
 
-                System.out.printf("Start read loop\n");
-                long startReadLoopNanos = System.nanoTime();
+                NL.nl.message("node.nextop.read", "Start read loop");
 
                 top:
                 while (sws.active) {
-                    {
-                        long startNanos = System.nanoTime();
-                        sws.wire.read(controlBuffer, 0, 1, 0);
-//                        System.out.printf("Read type took %.3fms\n", ((System.nanoTime() - startNanos) / 1000) / 1000.f);
-                    }
+                    sws.wire.read(controlBuffer, 0, 1, 0);
                     {
                         long startNanos = System.nanoTime();
                         byte type = controlBuffer[0];
                         switch (type) {
                             case F_MESSAGE_START: {
-                                // F_MESSAGE_START [id][total length][total chunks]
-                                int c = Id.LENGTH + 4 + 4;
+                                // F_MESSAGE_START [id][total length][total chunks][compressed]
+                                int c = Id.LENGTH + 4 + 4 + 1;
                                 sws.wire.read(controlBuffer, 0, c, 0);
                                 c = 0;
                                 id = Id.fromBytes(controlBuffer, c);
@@ -684,11 +805,13 @@ public class NextopNode extends AbstractMessageControlNode {
                                 int length = WireValue.getint(controlBuffer, c);
                                 c += 4;
                                 int chunkCount = WireValue.getint(controlBuffer, c);
+                                c += 4;
+                                boolean compressed = (0xFF & controlBuffer[c]) != 0;
 
                                 readState = sts.readStates.get(id);
                                 if (null == readState) {
                                     // create it
-                                    readState = new MessageReadState(id, length, chunkCount);
+                                    readState = new MessageReadState(id, length, chunkCount, compressed);
                                     sts.readStates.put(id, readState);
                                 }
 
@@ -747,7 +870,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                 }
 
                                 if (conflict) {
-//                                    System.out.printf("Conflict\n");
+                                    NL.nl.count("node.nextop.read.conflict");
 
                                     // discard chunk content
                                     sws.wire.skip(chunkLength, 0);
@@ -799,34 +922,10 @@ public class NextopNode extends AbstractMessageControlNode {
 
                                 sts.readStates.remove(id);
 
-
-                                messageReadCount += 1;
-//                                System.out.printf("Read %d messages in %.3fms\n", messageReadCount, ((System.nanoTime() - startReadLoopNanos) / 1000) / 1000.f);
-
-                                // decode
-                                final WireValue messageValue = WireValue.valueOf(readState.bytes);
-                                // defer the parsing to the context thread TODO better?
-                                switch (messageValue.getType()) {
-                                    case MESSAGE:
-                                        post(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                Message message = messageValue.asMessage();
-                                                upstream.onMessageControl(MessageControl.receive(message));
-                                                // FIXME mcs needs to transmit message controls.
-                                                // FIXME the hard part is how to handle that on channels that don't do controls (but this might not matter because message controls are only on the down for a multi client)
-                                                // FIXME actually, yes, this won't matter for a multi client. so adding it for a full client is fine
-                                                upstream.onMessageControl(MessageControl.receive(MessageControl.Type.COMPLETE, message.route));
-                                            }
-                                        });
-                                        break;
-                                    default:
-                                        // FIXME log
-                                        break;
-                                }
-
+                                // defer the parsing to the context thread
+                                // TODO is this better thank inline? (get numbers)
+                                post(new Dispatch(id, readState));
                                 readState = null;
-
 
                                 break;
                             }
@@ -843,7 +942,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                 break;
                             }
                             case F_NACK: {
-//                                System.out.printf("NACK\n");
+                                NL.nl.count("node.nextop.read.nack");
 
                                 // F_NACK [id]
                                 int c = Id.LENGTH;
@@ -852,9 +951,9 @@ public class NextopNode extends AbstractMessageControlNode {
                                 Id uid = Id.fromBytes(controlBuffer, c);
 
                                 // move from pending to active
-                                @Nullable Message message = sts.writePendingAck.remove(uid, MessageControlState.End.ERROR);
-                                if (null != message) {
-                                    mcs.add(message);
+                                @Nullable MessageControl mc = sts.writePendingAck.remove(uid, MessageControlState.End.ERROR);
+                                if (null != mc) {
+                                    mcs.add(mc);
                                 } else {
                                     // this would be a bug in sync state - one node thought the other had something it doesn't
                                     assert false;
@@ -866,7 +965,7 @@ public class NextopNode extends AbstractMessageControlNode {
                                 // protocol error
                                 throw new IOException("Protocol error.");
                         }
-//                        System.out.printf("Read %d took %.3fms\n", type, ((System.nanoTime() - startNanos) / 1000) / 1000.f);
+                        NL.nl.metric("node.nextop.read.%s", System.nanoTime() - startNanos, TimeUnit.NANOSECONDS, type);
                     }
 
                 }
@@ -877,9 +976,45 @@ public class NextopNode extends AbstractMessageControlNode {
                 sws.end();
             }
 
-            System.out.printf("End read loop\n");
+            NL.nl.message("node.nextop.read", "End read loop");
 
             sts.membar();
+        }
+
+        final class Dispatch implements Runnable {
+            final Id id;
+            final MessageReadState readState;
+
+            Dispatch(Id id, MessageReadState readState) {
+                this.id = id;
+                this.readState = readState;
+            }
+
+            @Override
+            public void run() {
+                try {
+                    WireValue pkg;
+                    if (readState.compressed) {
+                        NoCopyByteArrayOutputStream os = new NoCopyByteArrayOutputStream(1024);
+                        ByteStreams.copy(new GZIPInputStream(new ByteArrayInputStream(readState.bytes)), os);
+                        // TODO copy this if the overhead is too large (the byte buffer has padding at the end)
+                        pkg = WireValue.valueOf(os.getBytes(), os.getOffset());
+                    } else {
+                        pkg = WireValue.valueOf(readState.bytes);
+                    }
+
+                    MessageControl mc = unpkg(pkg);
+                    NL.nl.count("node.nextop.read.%s", mc.type);
+                    upstream.onMessageControl(MessageControl.receive(mc.type, mc.message));
+                } catch (Exception e) {
+                    // FIXME the nack might create an infinite retry here; think about something better
+                    // FIXME possibly just ban the session since it's running an incompatible version
+                    sts.writeUrgentMessages.add(nack(id));
+                    sws.writeLooper.interrupt();
+
+                    NL.nl.unhandled("node.nextop.read", e);
+                }
+            }
         }
     }
 
@@ -905,7 +1040,15 @@ public class NextopNode extends AbstractMessageControlNode {
         return ack;
     }
 
+    // message packaging
 
+    static WireValue pkg(MessageControl mc) {
+        return MessageControl.toWireValue(mc);
+    }
+
+    static MessageControl unpkg(WireValue value) {
+        return MessageControl.fromWireValue(value);
+    }
 
 
     // FIXME relied on new threads being a membar. all this state is shared across 1+1 (writer+reader) threads in sequence
@@ -955,15 +1098,17 @@ public class NextopNode extends AbstractMessageControlNode {
         final Id id;
 
         final byte[] bytes;
+        final boolean compressed;
         // [0] is the start of the first chunk
         final int[] chunkOffsets;
         final boolean[] chunkWrites;
 
 
-        MessageWriteState(Id id, byte[] bytes, int[] chunkOffsets) {
+        MessageWriteState(Id id, byte[] bytes, int[] chunkOffsets, boolean compressed) {
             this.id = id;
             this.bytes = bytes;
             this.chunkOffsets = chunkOffsets;
+            this.compressed = compressed;
             // init all false
             chunkWrites = new boolean[chunkOffsets.length];
         }
@@ -971,6 +1116,7 @@ public class NextopNode extends AbstractMessageControlNode {
 
     static final class MessageReadState {
         final Id id;
+        final boolean compressed;
 
         final byte[] bytes;
         // [0] is the start of the first chunk
@@ -978,11 +1124,12 @@ public class NextopNode extends AbstractMessageControlNode {
         final boolean[] chunkReads;
 
 
-        MessageReadState(Id id, int length, int chunkCount) {
+        MessageReadState(Id id, int length, int chunkCount, boolean compressed) {
             if (length < chunkCount) {
                 throw new IllegalArgumentException();
             }
             this.id = id;
+            this.compressed = compressed;
             bytes = new byte[length];
             chunkOffsets = new int[chunkCount];
             chunkReads = new boolean[chunkCount];
@@ -991,13 +1138,11 @@ public class NextopNode extends AbstractMessageControlNode {
 
 
 
-
-
     /////// NEXTOP PROTOCOL ///////
 
     // FIXME be able to transfer MessageControl not just message
 
-    /** [id][total length][total chunks] */
+    /** [id][total length][total chunks][compressed] */
     public static final byte F_MESSAGE_START = 0x01;
     /** [chunk index][chunk offset][chunk length][data] */
     public static final byte F_MESSAGE_CHUNK = 0x02;
@@ -1021,6 +1166,12 @@ public class NextopNode extends AbstractMessageControlNode {
     static final byte SYNC_STATUS_OK = 0x00;
     static final byte SYNC_STATUS_ERROR = 0x01;
 
+
+
+
+    public static interface CompressionStrategy {
+        boolean isCompress(Message message);
+    }
 
 
 

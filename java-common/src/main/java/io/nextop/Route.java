@@ -65,25 +65,6 @@ public final class Route {
     }
 
 
-    public boolean isLocal() {
-        return via.isLocal();
-    }
-
-    @Nullable
-    public Id getLocalId() {
-        if (via.isLocal() && target.path.isFixed() && 1 <= target.path.segments.size()) {
-            Path.Segment first = target.path.segments.get(0);
-            assert Path.Segment.Type.FIXED.equals(first.type);
-            try {
-                return Id.valueOf(first.value);
-            } catch (IllegalArgumentException e) {
-                // FIXME log, strange ... could be a client-generated bad value
-                return null;
-            }
-        }
-        return null;
-    }
-
 
 
     @Override

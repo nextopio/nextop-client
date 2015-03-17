@@ -24,12 +24,12 @@ repositories {
 }
 
 android {
-    compileSdkVersion 21
-    buildToolsVersion '21.1.2'
+    compileSdkVersion 22
+    buildToolsVersion '22.0.0'
 
     defaultConfig {
         minSdkVersion 10
-        targetSdkVersion 21
+        targetSdkVersion 22
         versionCode androidVersionCode()
     }
     buildTypes {
@@ -45,9 +45,12 @@ dependencies {
     compile(project(':java-common')) {
         // use the version included in Android
         exclude module: 'commons-logging'
+        exclude module: 'commons-collections'
     }
-    // since there is no standard volley distribution (?),
-    // expect users to have their own package of volley
+    // TODO the new tools don't like "provided" with aars?
+    // TODO for now, bundle volley with Nextop
+    // TODO(provided) since there is no standard volley distribution (?),
+    // TODO(provided) expect users to have their own package of volley
     compile project(':volley')
 
     // FIXME why is this not included as a transitive dependency of :java-common?

@@ -25,7 +25,6 @@ import io.nextop.client.node.MultiNode;
 import io.nextop.client.node.http.HttpNode;
 import io.nextop.client.node.nextop.NextopClientWireFactory;
 import io.nextop.client.node.nextop.NextopNode;
-import io.nextop.com.crittercism.app.Crittercism;
 import rx.Observable;
 import rx.Scheduler;
 import rx.Subscriber;
@@ -43,11 +42,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/**
- * By default, Nextop collects crash metrics via a custom version of Crittercism
- * that won't interfere with Crittercism used in apps that use Nextop.
- * To disable Nextop Crittercism, call {@link #disableNextopCrittercism}. */
 // FIXME calls all receives on the MAIN thread
+// FIXME work out scheduling in general (all signatures should take a scheduler)
 @Beta
 public class Nextop {
     /** The android:name to use in application meta-data to set the access key
@@ -92,7 +88,6 @@ public class Nextop {
     }
 
     private static Nextop create(Context context, @Nullable Auth auth) {
-        initCrittercism(context);
         return new Nextop(context, auth);
     }
 
@@ -430,7 +425,7 @@ public class Nextop {
         static <T> Receiver<T> create(final Nextop nextop, Route route, Observable<T> in, UnsubscribeBehavior defaultUnsubscribeBehavior) {
             Map<UnsubscribeBehavior, Observable<T>> ins = new HashMap<UnsubscribeBehavior, Observable<T>>(2);
 
-            final @Nullable Id id = route.getLocalId();
+            final @Nullable Id id = Message.getLocalId(route);
             if (null != id) {
                 ins.put(UnsubscribeBehavior.DETACH, in.share());
                 ins.put(UnsubscribeBehavior.CANCEL_SEND, in.doOnUnsubscribe(new Action0() {
@@ -471,7 +466,7 @@ public class Nextop {
         // return null if there is no outgoing message for this nurl
         @Nullable
         public Id getId() {
-            return route.getLocalId();
+            return Message.getLocalId(route);
         }
 
 
@@ -481,8 +476,6 @@ public class Nextop {
         }
 
         private static class Source<T> {
-
-
             final Map<UnsubscribeBehavior, Observable<T>> ins;
 
             Source(Map<UnsubscribeBehavior, Observable<T>> ins) {
@@ -885,24 +878,26 @@ public class Nextop {
         }
 
         private static MessageControlNode createLimitedNode() {
-            // FIXME 0.2 see ClientDemo for where we want to be
-//            NextopNode nextopNode = new NextopNode();
-//            nextopNode.setWireFactory(new NextopClientWireFactory(
-//                    new NextopClientWireFactory.Config(Authority.valueOf("dns.nextop.io"), 2,
-//                            /* FIXME */ Collections.singletonList(Authority.valueOf(/*"127.0.0.1:27780"*/"54.149.233.13:27780")))));
-//
-//            return nextopNode;
+            // FIXME 0.2 cache, durability
+
+            // head
+            //   ^- multi
+            //       ^- nextop
+            //       ^- http
+
+            NextopNode nextopNode = new NextopNode();
+            nextopNode.setWireFactory(new NextopClientWireFactory(
+                    new NextopClientWireFactory.Config(Authority.valueOf(/* FIXME move to config */ "dns.nextop.io"), 2)));
 
             HttpNode httpNode = new HttpNode();
-            return httpNode;
 
-//            MultiNode multiNode = new MultiNode(nextopNode, httpNode);
-
+            MultiNode multiNode = new MultiNode(MultiNode.Downstream.create(nextopNode),
+                    MultiNode.Downstream.create(httpNode, MultiNode.Downstream.Support.LOCAL));
+            return multiNode;
         }
 
         private Limited(Context context, @Nullable Auth auth) {
             super(context, auth, createLimitedNode());
-
         }
     }
 
@@ -968,33 +963,6 @@ public class Nextop {
         private Auth(Id accessKey, Set<Id> grantKeys) {
             this.accessKey = accessKey;
             this.grantKeys = grantKeys;
-        }
-    }
-
-
-    /////// CRITTERCISM ///////
-
-    /* the Nextop library contains a package-translated version of Crittercism. */
-    // TODO inject the appId at build time
-
-    public static void enableNextopCrittercism() {
-        Crittercism.setOptOutStatus(false);
-    }
-
-    public static void disableNextopCrittercism() {
-        Crittercism.setOptOutStatus(true);
-    }
-
-    private static boolean crittercismInitialized = false;
-
-    private static void initCrittercism(Context context) {
-        if (!crittercismInitialized) {
-            @Nullable Context applicationContext = context.getApplicationContext();
-            if (null != applicationContext) {
-                String appId = /* nextop-client#android */ "54e7b5883cf56b9e0457e38e";
-                Crittercism.initialize(applicationContext, appId);
-                crittercismInitialized = true;
-            }
         }
     }
 }

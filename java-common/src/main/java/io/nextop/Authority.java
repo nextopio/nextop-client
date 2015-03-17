@@ -8,7 +8,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 public final class Authority {
-    static enum Type {
+    public static enum Type {
         IP,
         NAMED,
         LOCAL
