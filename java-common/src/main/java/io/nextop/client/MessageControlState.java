@@ -12,6 +12,7 @@ import io.nextop.sortedlist.SplaySortedList;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action0;
+import rx.functions.Func1;
 import rx.subjects.BehaviorSubject;
 
 import javax.annotation.Nullable;
@@ -72,37 +73,40 @@ public final class MessageControlState {
     /** non-blocking */
     @Nullable
     public Entry takeFirstAvailable(MessageControlChannel owner) {
-        synchronized (mutex) {
-            for (Group group : groupsByPriority) {
-                if (!group.entries.isEmpty()) {
-                    Entry first = group.entries.get(0);
-                    if (null == first.owner) {
-                        take(first.id, owner);
-                        return first;
-                    }
-                }
-            }
-            return null;
+        return takeFirstAvailable(null, null, owner);
+    }
+
+    /** non-blocking */
+    public Entry takeFirstAvailable(Id minExclusive, MessageControlChannel owner) {
+        if (null == minExclusive) {
+            throw new IllegalArgumentException();
         }
+        return takeFirstAvailable(null, minExclusive, owner);
+    }
+
+    /** non-blocking */
+    public Entry takeFirstAvailable(Func1<Entry, Boolean> predicate, MessageControlChannel owner) {
+        if (null == predicate) {
+            throw new IllegalArgumentException();
+        }
+        return takeFirstAvailable(predicate, null, owner);
     }
 
     /** non-blocking.
      * this version is useful if testing to replace the head of a transfer
      * with a more important entry.
-     * @param min the minimum priority to search for the first available.
+     * @param predicate takes the first eligible entry that passes this test
+     * @param minExclusive the minimum priority to search for the first available.
      *            If none available with greater priority, returns null. */
     @Nullable
-    public Entry takeFirstAvailable(Id min, MessageControlChannel owner) {
-        if (null == min) {
-            throw new IllegalArgumentException();
-        }
+    public Entry takeFirstAvailable(@Nullable Func1<Entry, Boolean> predicate, @Nullable Id minExclusive, MessageControlChannel owner) {
         synchronized (mutex) {
             for (Group group : groupsByPriority) {
                 if (!group.entries.isEmpty()) {
                     Entry first = group.entries.get(0);
-                    if (min.equals(first.id)) {
+                    if (null != minExclusive && minExclusive.equals(first.id)) {
                         return null;
-                    } else if (null == first.owner) {
+                    } else if (null == first.owner && (null == predicate || predicate.call(first))) {
                         take(first.id, owner);
                         return first;
                     }
@@ -116,27 +120,30 @@ public final class MessageControlState {
     /** blocking */
     @Nullable
     public Entry takeFirstAvailable(MessageControlChannel owner, long timeout, TimeUnit timeUnit) throws InterruptedException {
-        final long nanosPerMillis = TimeUnit.MILLISECONDS.toNanos(1);
-        synchronized (mutex) {
-            long timeoutNanos = timeUnit.toNanos(timeout);
-            Entry entry;
-            while (null == (entry = takeFirstAvailable(owner)) && 0 < timeoutNanos) {
-                long nanos = System.nanoTime();
-                mutex.wait(timeoutNanos / nanosPerMillis, (int) (timeoutNanos % nanosPerMillis));
-                timeoutNanos -= (System.nanoTime() - nanos);
-            }
-            return entry;
-        }
+        return takeFirstAvailable(null, null, owner, timeout, timeUnit);
     }
 
     /** blocking */
     @Nullable
-    public Entry takeFirstAvailable(Id min, MessageControlChannel owner, long timeout, TimeUnit timeUnit) throws InterruptedException {
+    public Entry takeFirstAvailable(Id minExclusive, MessageControlChannel owner, long timeout, TimeUnit timeUnit) throws InterruptedException {
+        return takeFirstAvailable(null, minExclusive, owner, timeout, timeUnit);
+    }
+
+    /** blocking */
+    @Nullable
+    public Entry takeFirstAvailable(Func1<Entry, Boolean> predicate, MessageControlChannel owner, long timeout, TimeUnit timeUnit) throws InterruptedException {
+        return takeFirstAvailable(predicate, null, owner, timeout, timeUnit);
+    }
+
+    /** blocking */
+    @Nullable
+    public Entry takeFirstAvailable(@Nullable Func1<Entry, Boolean> predicate, @Nullable Id minExclusive, MessageControlChannel owner,
+                                    long timeout, TimeUnit timeUnit) throws InterruptedException {
         final long nanosPerMillis = TimeUnit.MILLISECONDS.toNanos(1);
         synchronized (mutex) {
             long timeoutNanos = timeUnit.toNanos(timeout);
             Entry entry;
-            while (null == (entry = takeFirstAvailable(min, owner)) && 0 < timeoutNanos) {
+            while (null == (entry = takeFirstAvailable(predicate, minExclusive, owner)) && 0 < timeoutNanos) {
                 long nanos = System.nanoTime();
                 mutex.wait(timeoutNanos / nanosPerMillis, (int) (timeoutNanos % nanosPerMillis));
                 timeoutNanos -= (System.nanoTime() - nanos);

@@ -33,6 +33,7 @@ import io.nextop.org.apache.http.io.HttpMessageWriterFactory;
 import io.nextop.org.apache.http.io.SessionInputBuffer;
 import io.nextop.org.apache.http.io.SessionOutputBuffer;
 import io.nextop.org.apache.http.protocol.*;
+import rx.functions.Func1;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -238,6 +239,14 @@ public final class HttpNode extends AbstractMessageControlNode {
         }
     }
 
+    static final Func1<MessageControlState.Entry, Boolean> IS_SENDABLE = new Func1<MessageControlState.Entry, Boolean>() {
+        @Override
+        public Boolean call(MessageControlState.Entry entry) {
+            // HTTP can't send to the Nextop local route
+            return !Message.isLocal(entry.message.route);
+        }
+    };
+
     final class RequestLooper extends Thread {
         final MessageControlState mcs;
         final SharedLooperState sls;
@@ -264,22 +273,13 @@ public final class HttpNode extends AbstractMessageControlNode {
             while (active) {
                 @Nullable MessageControlState.Entry entry;
                 try {
-                    entry = mcs.takeFirstAvailable(HttpNode.this,
+                    entry = mcs.takeFirstAvailable(IS_SENDABLE, HttpNode.this,
                             Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
                     continue top;
                 }
 
                 if (null != entry) {
-                    while (!isSendable(entry.mc)) {
-                        try {
-                            entry = mcs.takeFirstAvailable(entry.id, HttpNode.this,
-                                    Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
-                        } catch (InterruptedException e) {
-                            continue top;
-                        }
-                    }
-
                     @Nullable SharedLooperState.MostRecentSend mostRecentSend = sls.mostRecentSends.get(entry.id);
                     if (null != mostRecentSend) {
                         int delayMs = (int) mostRecentSend.activeStrategy.getDelay(TimeUnit.MILLISECONDS);
@@ -769,7 +769,7 @@ public final class HttpNode extends AbstractMessageControlNode {
                 context.setAttribute(HttpClientContext.HTTP_ROUTE, route);
 
 
-                // TODO managedConn is an intance of CPoolProxy
+                // TODO managedConn is an instance of CPoolProxy
                 // TODO an easy way to call getConnection or get the connection out of it without reflection?
 
                 httpProcessor.process(request, context);
@@ -1229,6 +1229,8 @@ public final class HttpNode extends AbstractMessageControlNode {
             return super.doReceiveResponse(request, conn, context);
         }
     }
+
+
 
 
 
