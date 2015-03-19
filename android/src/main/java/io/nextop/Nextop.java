@@ -347,7 +347,7 @@ public class Nextop {
 
     // each call guaranteed to be a unique timestamp
     // colliding times are shifted into the future
-    public long uniqueMillis() {
+    public long timestamp() {
         long millis = millis();
         if (millis <= headUniqueMillis) {
             headUniqueMillis += 1;
@@ -361,7 +361,15 @@ public class Nextop {
 
     /////// CAMERA ///////
 
-    /* the Nextop instance can manage the camera,
+    // FIXME rename to lockCamera
+    public void addCameraUser() {
+        throw new IllegalStateException("Call on a started nextop.");
+    }
+    // FIXME rename to unlockCamera
+    public void removeCameraUser() {
+        throw new IllegalStateException("Call on a started nextop.");
+    }
+    /** the Nextop instance can manage the camera,
      * which (can be) useful to
      * - align camera performance with network performance
      *   (quality, etc)
@@ -371,13 +379,6 @@ public class Nextop {
      *   {@link #addCameraUser} and in pause call {@link #removeCameraUser},
      *   then (in between) wait for a camera instance with {@link #camera}.
      */
-
-    public void addCameraUser() {
-        throw new IllegalStateException("Call on a started nextop.");
-    }
-    public void removeCameraUser() {
-        throw new IllegalStateException("Call on a started nextop.");
-    }
     public Observable<CameraAdapter> camera() {
         return Observable.empty();
     }
