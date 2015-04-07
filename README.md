@@ -1,3 +1,5 @@
+Note: Nextop development is moving to a private branch while we prepare for launch. We are focused on scalability, tightening the package, and providing tools on http://nextop.io. Stay tuned! [@nextopio](https://twitter.com/nextopio)
+
 # Nextop Mobile CDN
 
 Nextop is rethinking a CDN for mobile from the ground up. Mobile devices operate in high latency and
